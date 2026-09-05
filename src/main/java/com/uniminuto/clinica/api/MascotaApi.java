@@ -29,4 +29,18 @@ public interface MascotaApi {
             @RequestParam boolean ascendente)
             throws BadRequestException;
 
+    @GetMapping(value = "/buscar-by-raza",
+            produces = {"application/json"},
+            consumes = {"application/json"})
+    ResponseEntity<List<Mascota>> buscarPorRaza(
+            @RequestParam Integer razaId)
+            throws BadRequestException;
+
+    @GetMapping(value = "/buscar-by-cliente",
+            produces = {"application/json"},
+            consumes = {"application/json"})
+    ResponseEntity<List<Mascota>> buscarPorCliente(
+            @RequestParam Long clienteId)
+            throws BadRequestException;
+
 }

@@ -26,4 +26,16 @@ public class MascotaApiController implements MascotaApi {
         return ResponseEntity.ok(this.mascotaService
                 .listarMascotasOrdenado(ascendente));
     }
+
+    @Override
+    public ResponseEntity<List<Mascota>> buscarPorRaza(Integer razaId) throws BadRequestException {
+        return ResponseEntity.ok(this.mascotaService
+                .listarMascotasPorRaza(razaId));
+    }
+
+    @Override
+    public ResponseEntity<List<Mascota>> buscarPorCliente(Long clienteId) throws BadRequestException {
+        return ResponseEntity.ok(this.mascotaService
+                .listarMascotasPorCliente(clienteId));
+    }
 }
