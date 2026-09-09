@@ -2,6 +2,8 @@ package com.uniminuto.clinica.apicontroller;
 
 import com.uniminuto.clinica.api.MascotaApi;
 import com.uniminuto.clinica.entity.Mascota;
+import com.uniminuto.clinica.models.MascotaRq;
+import com.uniminuto.clinica.models.MiRespuestaRS;
 import com.uniminuto.clinica.service.MascotaService;
 import org.apache.coyote.BadRequestException;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,5 +39,15 @@ public class MascotaApiController implements MascotaApi {
     public ResponseEntity<List<Mascota>> buscarPorCliente(Long clienteId) throws BadRequestException {
         return ResponseEntity.ok(this.mascotaService
                 .listarMascotasPorCliente(clienteId));
+    }
+
+    @Override
+    public ResponseEntity<MiRespuestaRS> guardarMascota(MascotaRq mascotaRq) throws BadRequestException {
+        return ResponseEntity.ok(this.mascotaService.guardarMascota(mascotaRq));
+    }
+
+    @Override
+    public ResponseEntity<MiRespuestaRS> actualizarMascota(MascotaRq mascotaRq) throws BadRequestException {
+        return ResponseEntity.ok(this.mascotaService.actualizarMascota(mascotaRq));
     }
 }
