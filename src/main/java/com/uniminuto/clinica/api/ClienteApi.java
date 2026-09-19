@@ -19,3 +19,5 @@ public interface ClienteApi {
     ResponseEntity<List<Cliente>> listarClientes()
             throws BadRequestException;
 }
+
+// metodo para buscar
