@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-public class MascotaApiController implements MascotaApi {
+public class nMascotaApiController implements MascotaApi {
 
     @Autowired
     private MascotaService mascotaService;
