@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Archivo de configuración de Maven (pom.xml).
+    Aquí se define de qué depende el proyecto (librerías) y cómo se debe construir.
+    No es necesario modificar este archivo para el ejercicio.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <!-- Usamos Spring Boot como "padre" del proyecto: esto nos da versiones ya
+         probadas y compatibles entre sí de todas las librerías que usaremos. -->
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>3.2.5</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.uniminuto</groupId>
+    <artifactId>clinica</artifactId>
+    <version>1.0.0</version>
+    <name>clinica</name>
+    <description>Backend Clinica Veterinaria - Primer Parcial Programacion Web</description>
+
+    <properties>
+        <!-- Version de Java que usaremos -->
+        <java.version>17</java.version>
+    </properties>
+
+    <dependencies>
+        <!-- Nos permite crear servicios web REST (Controllers, @GetMapping, etc). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- Nos permite trabajar con bases de datos usando JPA / Hibernate,
+             sin tener que escribir SQL a mano (usamos Repository). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-jpa</artifactId>
+        </dependency>
+
+        <!-- Nos permite validar los datos que llegan en los DTO (@NotNull, @NotBlank, etc). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+        <!-- Base de datos en memoria H2: no requiere instalación, ideal para
+             pruebas y para sustentar el ejercicio en cualquier equipo. -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Dependencias necesarias para hacer pruebas del proyecto. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>clinica</finalName>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>
