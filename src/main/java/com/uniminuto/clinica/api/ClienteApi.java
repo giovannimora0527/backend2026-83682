@@ -13,7 +13,7 @@ import java.util.List;
 @RequestMapping("/cliente")
 public interface ClienteApi {
 
-    @GetMapping(value = "/listar-todos",
+    @GetMapping(value = "/listar",
             produces = {"application/json"},
             consumes = {"application/json"})
     ResponseEntity<List<Cliente>> listarClientes()

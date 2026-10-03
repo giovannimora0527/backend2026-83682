@@ -19,12 +19,11 @@ import java.util.List;
 @RequestMapping("/mascota")
 public interface MascotaApi {
 
-    @GetMapping(value = "/listar-mascotas",
+    @GetMapping(value = "/listar",
             produces = {"application/json"},
             consumes = {"application/json"})
     ResponseEntity<List<Mascota>> listarMascotas()
             throws BadRequestException;
-
 
     @GetMapping(value = "/listar-mascotas-ordenado",
             produces = {"application/json"},
