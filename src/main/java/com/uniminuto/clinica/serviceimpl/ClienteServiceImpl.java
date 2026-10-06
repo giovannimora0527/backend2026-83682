@@ -22,4 +22,10 @@ public class ClienteServiceImpl implements ClienteService {
                 .sorted((c1, c2) -> c1.getNombres().compareToIgnoreCase(c2.getNombres()))
                 .toList();
     }
+
+    @Override
+    public Cliente getClienteByNumeroDocumento(String numeroDocumento) throws BadRequestException {
+        return clienteRepository.findByNumeroDocumento(numeroDocumento)
+                .orElseThrow(() -> new BadRequestException("Cliente no encontrado con el número de documento: " + numeroDocumento));
+    }
 }

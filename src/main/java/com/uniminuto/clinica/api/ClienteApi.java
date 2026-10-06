@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
@@ -17,5 +18,13 @@ public interface ClienteApi {
             produces = {"application/json"},
             consumes = {"application/json"})
     ResponseEntity<List<Cliente>> listarClientes()
+            throws BadRequestException;
+
+
+    @GetMapping(value = "/buscar-by-numero-documento",
+            produces = {"application/json"},
+            consumes = {"application/json"})
+    ResponseEntity<Cliente> getClientesByNumeroDocumento(
+            @RequestParam("numeroDocumento") String numeroDocumento)
             throws BadRequestException;
 }
