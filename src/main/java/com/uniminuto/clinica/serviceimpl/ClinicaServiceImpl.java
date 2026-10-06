@@ -2,7 +2,7 @@ package com.uniminuto.clinica.serviceimpl;
 
 import com.uniminuto.clinica.models.MiRespuestaRS;
 import com.uniminuto.clinica.service.ClinicaService;
-import org.apache.coyote.BadRequestException;
+import com.uniminuto.clinica.exception.BadRequestException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -15,9 +15,9 @@ public class ClinicaServiceImpl implements ClinicaService {
 
     @Override
     public MiRespuestaRS testService3() throws BadRequestException {
-        MiRespuestaRS rta = new MiRespuestaRS();
-        rta.setStatus(200);
-        rta.setMessage("Servicio con respuesta personalizada :)");
-        return rta;
+        MiRespuestaRS respuesta = new MiRespuestaRS();
+        respuesta.setStatus(200);
+        respuesta.setMessage("Servicio ok desde clase y objeto");
+        return respuesta;
     }
 }

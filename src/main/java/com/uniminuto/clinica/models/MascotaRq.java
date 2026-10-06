@@ -3,20 +3,20 @@ package com.uniminuto.clinica.models;
 import lombok.Data;
 
 /**
- * Clase que representa la solicitud de una mascota.
+ * Clase que representa la solicitud para crear o actualizar una mascota.
  */
 @Data
 public class MascotaRq {
 
     /**
-     * Identificador de la mascota.
+     * Id unico de la mascota.
      */
     private Integer mascotaId;
 
     /**
      * Nombre de la mascota.
      */
-    private String nombreMascota;
+    private String nombre;
 
     /**
      * Edad de la mascota.
@@ -32,4 +32,5 @@ public class MascotaRq {
      * Identificador del cliente propietario de la mascota.
      */
     private Long clienteId;
+
 }

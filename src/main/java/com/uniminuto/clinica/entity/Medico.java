@@ -8,20 +8,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Data;
 
-import java.time.LocalDate;
-
 @Entity
-@Table(name = "cliente")
+@Table(name = "medico")
 @Data
-public class Cliente {
+public class Medico {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "cliente_id")
-    private Long id;
-
-    @Column(name = "usuario_id", unique = true)
-    private Integer usuarioId;
-
+    @Column(name = "id") private Long id;
     @Column(name = "tipo_documento", nullable = false, length = 10)
     private String tipoDocumento;
 
@@ -34,18 +28,12 @@ public class Cliente {
     @Column(name = "apellidos", nullable = false, length = 100)
     private String apellidos;
 
-    @Column(name = "fecha_nacimiento", nullable = false)
-    private LocalDate fechaNacimiento;
-
-    @Column(name = "genero", length = 1)
-    private String genero;
-
     @Column(name = "telefono", length = 20)
     private String telefono;
 
-    @Column(name = "direccion", columnDefinition = "TEXT")
-    private String direccion;
+    @Column(name = "registro_profesional", nullable = false, unique = true, length = 50)
+    private String registroProfesional;
 
-    @Column(name = "activo", nullable = false)
-    private Boolean activo;
+    @Column(name = "especializacion_id", nullable = false)
+    private Integer especializacionId;
 }

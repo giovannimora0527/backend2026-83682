@@ -12,34 +12,35 @@ import lombok.Data;
 
 import java.time.LocalDateTime;
 
-
 @Entity
 @Table(name = "mascota")
 @Data
 public class Mascota {
 
     @Id
-    @Column(name = "mascota_id", nullable = false)
+    @Column(name = "mascota_id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Integer mascotaId;
 
-    @Column(name = "nombre_mascota", nullable = false)
+    @Column(name = "nombre_mascota")
     private String nombreMascota;
 
-    @Column(name = "edad", nullable = false)
+    @Column(name = "edad")
     private Integer edad;
 
-    @Column(name = "fecha_registro", nullable = false)
+    @Column(name = "fecha_registro")
     private LocalDateTime fechaRegistro;
 
     @Column(name = "fecha_modificacion")
     private LocalDateTime fechaModificacion;
 
     @ManyToOne
+    @JoinColumn(name = "cliente_id")
+    private Cliente cliente;
+
+    @ManyToOne
     @JoinColumn(name = "raza_id")
     private Raza raza;
 
-    @ManyToOne
-    @JoinColumn(name = "cliente_id")
-    private Cliente cliente;
+
 }

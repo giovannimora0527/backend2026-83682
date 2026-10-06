@@ -1,6 +1,7 @@
 package com.uniminuto.clinica.serviceimpl;
 
 import com.uniminuto.clinica.entity.Cliente;
+import com.uniminuto.clinica.exception.BadRequestException;
 import com.uniminuto.clinica.repository.ClienteRepository;
 import com.uniminuto.clinica.service.ClienteService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -14,8 +15,11 @@ public class ClienteServiceImpl implements ClienteService {
     @Autowired
     private ClienteRepository clienteRepository;
 
+
     @Override
-    public List<Cliente> obtenerClientes() {
-        return clienteRepository.findAll();
+    public List<Cliente> listarClientes() throws BadRequestException {
+        return clienteRepository.findAll().stream()
+                .sorted((c1, c2) -> c1.getNombres().compareToIgnoreCase(c2.getNombres()))
+                .toList();
     }
 }
