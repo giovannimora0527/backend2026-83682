@@ -36,8 +36,7 @@ public class AnotacionHistoriaApiController
     public ResponseEntity<AnotacionHistoria> crearAnotacion(
             AnotacionHistoria anotacion) {
 
-        return ResponseEntity.ok(
-                this.anotacionHistoriaService.crearAnotacion(anotacion)
+        return ResponseEntity.ok(this.anotacionHistoriaService.crearAnotacion(anotacion)
         );
     }
 
