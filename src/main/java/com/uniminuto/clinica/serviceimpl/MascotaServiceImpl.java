@@ -9,7 +9,7 @@ import com.uniminuto.clinica.repository.ClienteRepository;
 import com.uniminuto.clinica.repository.MascotaRepository;
 import com.uniminuto.clinica.repository.RazaRepository;
 import com.uniminuto.clinica.service.MascotaService;
-import org.apache.coyote.BadRequestException;
+import com.uniminuto.clinica.exception.BadRequestException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -18,6 +18,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
+/** Implementa las consultas, validaciones y operaciones de registro de mascotas. */
+/** Implementa las consultas, validaciones y operaciones de registro de mascotas. */
 @Service
 public class MascotaServiceImpl implements MascotaService {
 
@@ -30,11 +32,13 @@ public class MascotaServiceImpl implements MascotaService {
    @Autowired
    private ClienteRepository clienteRepository;
 
+    /** {@inheritDoc} */
     @Override
     public List<Mascota> listarMascotas() throws BadRequestException {
         return mascotaRepository.findAll();
     }
 
+    /** {@inheritDoc} */
     @Override
     public List<Mascota> listarMascotasOrdenado(boolean ascendente) throws BadRequestException {
         List<Mascota> mascotas = mascotaRepository.findAll();
@@ -51,6 +55,7 @@ public class MascotaServiceImpl implements MascotaService {
         return mascotas;
     }
 
+    /** {@inheritDoc} */
     @Override
     public List<Mascota> listarMascotasPorRaza(Integer idRaza) throws BadRequestException {
         // Paso 1. Valido que idRaza no sea nulo o negativo
@@ -69,6 +74,7 @@ public class MascotaServiceImpl implements MascotaService {
 
     }
 
+    /** {@inheritDoc} */
     @Override
     public List<Mascota> listarMascotasPorCliente(Long idCliente) throws BadRequestException {
         //Paso 1. Valido que idCliente no sea nulo o negativo
@@ -86,6 +92,13 @@ public class MascotaServiceImpl implements MascotaService {
         return this.mascotaRepository.findAllByCliente(optCliente.get());
     }
 
+    /** {@inheritDoc} */
+    @Override
+    public Mascota consultarMascota(Integer id) {
+        return mascotaRepository.findById(id).orElseThrow(() -> new com.uniminuto.clinica.exception.BadRequestException(org.springframework.http.HttpStatus.NOT_FOUND, "Mascota no encontrada"));
+    }
+
+    /** {@inheritDoc} */
     @Override
     public MiRespuestaRS guardarMascota(MascotaRq mascotaRq) throws BadRequestException {
         //Paso 1. Validar el objeto de entrada
@@ -114,15 +127,19 @@ public class MascotaServiceImpl implements MascotaService {
         // Paso 4. Creo la respuesta y la devuelvo
         MiRespuestaRS respuesta = new MiRespuestaRS();
         respuesta.setMessage("Mascota guardada exitosamente");
-        respuesta.setStatus(200);
+        respuesta.setStatus(201);
 
         return respuesta;
     }
 
+    /** {@inheritDoc} */
     @Override
     public MiRespuestaRS actualizarMascota(MascotaRq mascotaRq) throws BadRequestException {
         //Paso 1. Validar el objeto de entrada
         this.validarMascotaRq(mascotaRq);
+        if (mascotaRq.getMascotaId() == null || mascotaRq.getMascotaId() <= 0) {
+            throw new BadRequestException("El id de la mascota es obligatorio y debe ser positivo");
+        }
 
         // Paso 2. Consulto si la raza existe
         Optional<Raza> optRaza = this.razaRepository.findById(mascotaRq.getRazaId());
@@ -147,7 +164,7 @@ public class MascotaServiceImpl implements MascotaService {
         mascotaExistente.setEdad(mascotaRq.getEdad());
         mascotaExistente.setRaza(optRaza.get());
         mascotaExistente.setCliente(optCliente.get());
-        mascotaExistente.setFechaRegistro(LocalDateTime.now());
+        mascotaExistente.setFechaModificacion(LocalDateTime.now());
 
         this.mascotaRepository.save(mascotaExistente);
 
@@ -163,7 +180,7 @@ public class MascotaServiceImpl implements MascotaService {
         if (mascotaRq == null) {
             throw new BadRequestException("El objeto MascotaRq no puede ser nulo");
         }
-        if (mascotaRq.getNombreMascota() == null || mascotaRq.getNombreMascota().isEmpty()) {
+        if (mascotaRq.getNombreMascota() == null || mascotaRq.getNombreMascota().isBlank()) {
             throw new BadRequestException("El nombre de la mascota no puede ser nulo o vacío");
         }
         if (mascotaRq.getEdad() == null || mascotaRq.getEdad() <= 0) {

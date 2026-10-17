@@ -4,7 +4,7 @@ import com.uniminuto.clinica.entity.Cliente;
 import com.uniminuto.clinica.entity.Mascota;
 import com.uniminuto.clinica.models.MascotaRq;
 import com.uniminuto.clinica.models.MiRespuestaRS;
-import org.apache.coyote.BadRequestException;
+import com.uniminuto.clinica.exception.BadRequestException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,33 +15,28 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 @RequestMapping("/mascota")
 public interface MascotaApi {
 
     @GetMapping(value = "/listar",
-            produces = {"application/json"},
-            consumes = {"application/json"})
+            produces = {"application/json"})
     ResponseEntity<List<Mascota>> listarMascotas()
             throws BadRequestException;
 
     @GetMapping(value = "/listar-mascotas-ordenado",
-            produces = {"application/json"},
-            consumes = {"application/json"})
+            produces = {"application/json"})
     ResponseEntity<List<Mascota>> listarMascotas(
             @RequestParam boolean ascendente)
             throws BadRequestException;
 
     @GetMapping(value = "/buscar-by-raza",
-            produces = {"application/json"},
-            consumes = {"application/json"})
+            produces = {"application/json"})
     ResponseEntity<List<Mascota>> buscarPorRaza(
             @RequestParam Integer razaId)
             throws BadRequestException;
 
     @GetMapping(value = "/buscar-by-cliente",
-            produces = {"application/json"},
-            consumes = {"application/json"})
+            produces = {"application/json"})
     ResponseEntity<List<Mascota>> buscarPorCliente(
             @RequestParam Long clienteId)
             throws BadRequestException;
