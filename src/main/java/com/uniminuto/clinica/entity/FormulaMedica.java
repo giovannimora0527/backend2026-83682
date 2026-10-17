@@ -24,6 +24,14 @@ public class FormulaMedica {
     @Column (name = "dosis",nullable = false)
     private String dosis ;
 
+    @Column(name = "frecuencia")
+    private String frecuencia;
+    @Column(name = "duracion_tratamiento")
+    private String duracionTratamiento;
+    @Column(name = "fecha_emision")
+    private LocalDateTime fechaEmision;
+    @Column(name = "activo")
+    private Boolean activo;
     @Column (name= "indicaciones")
     private String indicaciones ;
 

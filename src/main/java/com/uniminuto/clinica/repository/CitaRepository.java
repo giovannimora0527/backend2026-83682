@@ -9,6 +9,7 @@ import java.util.List;
 @Repository
 
 public interface CitaRepository extends  JpaRepository<Cita, Long> {
+    List<Cita> findAllByOrderByFechaHoraDesc();
     List<Cita> findAllByFechaHoraBetweenOrderByFechaHoraDesc(
             LocalDateTime fechaInicial,
             LocalDateTime fechaFinal

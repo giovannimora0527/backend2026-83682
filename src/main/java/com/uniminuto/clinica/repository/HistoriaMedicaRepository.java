@@ -7,6 +7,8 @@ import java.util.List;
 @Repository
 public interface HistoriaMedicaRepository
         extends JpaRepository<HistoriaMedica,Long>{
+    List<HistoriaMedica> findAllByOrderByFechaCreacionDesc();
+    boolean existsByCitaId(Long citaId);
     List<HistoriaMedica> findAllByFechaCreacionBetweenOrderByFechaCreacionDesc(
             LocalDateTime fechaInicial,
             LocalDateTime fechaFinal ) ;

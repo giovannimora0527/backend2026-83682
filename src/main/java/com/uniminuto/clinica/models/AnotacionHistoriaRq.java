@@ -9,10 +9,10 @@ public class AnotacionHistoriaRq {
     private Long anotacionId;
 
     // Id de la historia médica a la que pertenece la anotación.
-    private Integer historiaId;
+    private Long historiaId;
 
     // Id del médico que realiza la anotación.
-    private Integer medicoId;
+    private Long medicoId;
 
     // Información escrita por el médico.
     private String descripcion;

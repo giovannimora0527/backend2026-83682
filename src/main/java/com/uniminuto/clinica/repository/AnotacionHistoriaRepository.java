@@ -7,5 +7,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface AnotacionHistoriaRepository
         extends JpaRepository<AnotacionHistoria, Long> {
+    java.util.List<AnotacionHistoria> findByHistoriaIdOrderByFechaDesc(Long historiaId);
 
 }

@@ -14,11 +14,15 @@ public class AnotacionHistoria {
     @Column(name = "id", nullable = false)
     private Long id ;
     @Column (name ="historia_id",nullable = false)
-    private Integer historiaId ;
+    private Long historiaId ;
     @Column (name="medico_id",nullable = false)
-    private Integer medicoId ;
+    private Long medicoId ;
     @Column (name ="fecha",nullable = false)
     private LocalDateTime fecha ;
+    @Column(name = "observacion")
+    private String observacion;
+    @Column(name = "evolucion")
+    private String evolucion;
     @Column (name= "descripcion",nullable = false)
     private String descripcion ;
 
