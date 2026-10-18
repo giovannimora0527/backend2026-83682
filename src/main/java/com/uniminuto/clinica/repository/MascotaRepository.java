@@ -19,6 +19,9 @@ public interface MascotaRepository extends JpaRepository<Mascota, Integer> {
 
     List<Mascota> findAllByCliente(Cliente cliente);
 
+    /** Busca una mascota por nombre sin distinguir mayúsculas (servicio del parcial). */
+    Optional<Mascota> findFirstByNombreMascotaIgnoreCaseOrderByMascotaIdAsc(String nombreMascota);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.Query("select m from Mascota m where m.mascotaId = :id")
     Optional<Mascota> lockById(@org.springframework.data.repository.query.Param("id") Integer id);

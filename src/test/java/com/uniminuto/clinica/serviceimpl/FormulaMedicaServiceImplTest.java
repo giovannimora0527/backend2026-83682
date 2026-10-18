@@ -35,14 +35,18 @@ class FormulaMedicaServiceImplTest {
     @InjectMocks FormulaMedicaServiceImpl service;
 
     @Test
-    void creaFormulaAsociadaSoloAHistoriaClinica() {
+    void desdeHistoriaClinicaResuelveLaCitaDeLaMascotaPorqueLaTablaSoloGuardaCitaId() {
         LocalDate emision = LocalDate.of(2026, 10, 16);
         Mascota mascota = mascota(4, 8L);
         Veterinario vet = veterinario(11L);
         HistoriaClinica historia = historia(21L, mascota, vet, emision.minusDays(1));
+        Cita cita = cita(51L, mascota, vet, emision.minusDays(1));
         Medicamento medicamento = medicamento(31L, "Antibiótico");
         when(veterinarios.findById(11L)).thenReturn(Optional.of(vet));
         when(historias.findById(21L)).thenReturn(Optional.of(historia));
+        when(historias.findFirstByMascota_MascotaIdOrderByFechaHoraAsc(4)).thenReturn(Optional.of(historia));
+        when(citas.findFirstByMascota_MascotaIdAndVeterinario_VeterinarioIdAndEstadoNotOrderByFechaHoraDesc(4, 11L, EstadoCita.CANCELADA))
+                .thenReturn(Optional.of(cita));
         when(medicamentos.findFirstByNombreIgnoreCase("Antibiótico")).thenReturn(Optional.of(medicamento));
         when(formulas.save(any())).thenAnswer(call -> call.getArgument(0));
 
@@ -50,11 +54,29 @@ class FormulaMedicaServiceImplTest {
 
         assertEquals(emision, response.fechaEmision());
         assertEquals(21L, response.historiaClinicaId());
-        verify(citas, never()).findById(any());
-        verify(citas, never()).findFirstByMascota_MascotaIdAndVeterinario_VeterinarioIdOrderByFechaHoraDesc(any(), any());
-        verify(formulas).save(argThat(f -> f.getCita() == null
-                && f.getHistoriaClinica() == historia && f.getVeterinario() == vet
-                && emision.equals(f.getFechaEmision())));
+        assertEquals(11L, response.veterinarioId());
+        verify(formulas).save(argThat(f -> f.getCita() == cita
+                && f.getIndicaciones().contains("Fecha de emisión: " + emision)));
+    }
+
+    @Test
+    void fechaDeEmisionIgualAlRegistroNoAgregaLineaYSeDerivaDeLaFechaDeRegistro() {
+        LocalDate hoy = LocalDate.now();
+        Mascota mascota = mascota(4, 8L);
+        Veterinario vet = veterinario(11L);
+        Cita cita = cita(51L, mascota, vet, hoy.minusDays(1));
+        prepararMascotaVetMedicamento(mascota, vet);
+        when(citas.findById(51L)).thenReturn(Optional.of(cita));
+        when(formulas.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        FormulaResponse response = service.crear(request(4, null, 11L, hoy, 51L));
+
+        assertEquals(hoy, response.fechaEmision());
+        assertEquals("Cada 8 horas", response.frecuencia());
+        assertEquals(5, response.duracionDias());
+        assertEquals("Con alimento", response.indicaciones());
+        verify(formulas).save(argThat(f -> !f.getIndicaciones().contains("Fecha de emisión")
+                && f.getFechaActualizacion() == null));
     }
 
     @Test
@@ -139,7 +161,7 @@ class FormulaMedicaServiceImplTest {
         Veterinario vet = veterinario(11L);
         Cita cita = cita(51L, mascota, vet, emision.minusDays(1));
         prepararMascotaVetMedicamento(mascota, vet);
-        when(citas.findFirstByMascota_MascotaIdAndVeterinario_VeterinarioIdOrderByFechaHoraDesc(4, 11L))
+        when(citas.findFirstByMascota_MascotaIdAndVeterinario_VeterinarioIdAndEstadoNotOrderByFechaHoraDesc(4, 11L, EstadoCita.CANCELADA))
                 .thenReturn(Optional.of(cita));
         when(formulas.save(any())).thenAnswer(call -> call.getArgument(0));
 
@@ -153,12 +175,48 @@ class FormulaMedicaServiceImplTest {
         Mascota mascota = mascota(4, 8L);
         Veterinario vet = veterinario(11L);
         prepararMascotaVet(mascota, vet);
-        when(citas.findFirstByMascota_MascotaIdAndVeterinario_VeterinarioIdOrderByFechaHoraDesc(4, 11L))
+        when(citas.findFirstByMascota_MascotaIdAndVeterinario_VeterinarioIdAndEstadoNotOrderByFechaHoraDesc(4, 11L, EstadoCita.CANCELADA))
                 .thenReturn(Optional.empty());
 
         assertThrows(BadRequestException.class,
                 () -> service.crear(request(4, null, 11L, LocalDate.now(), null)));
         verify(formulas, never()).save(any());
+    }
+
+    @Test
+    void rechazaAsociarUnaFormulaNuevaAUnaCitaCancelada() {
+        LocalDate emision = LocalDate.of(2026, 10, 16);
+        Mascota mascota = mascota(4, 8L);
+        Veterinario vet = veterinario(11L);
+        Cita cancelada = cita(51L, mascota, vet, emision.minusDays(1));
+        cancelada.setEstado(EstadoCita.CANCELADA);
+        prepararMascotaVet(mascota, vet);
+        when(citas.findById(51L)).thenReturn(Optional.of(cancelada));
+
+        BadRequestException error = assertThrows(BadRequestException.class,
+                () -> service.crear(request(4, null, 11L, emision, 51L)));
+        assertEquals(409, error.getStatus().value());
+        verify(formulas, never()).save(any());
+    }
+
+    @Test
+    void editarUnaFormulaYaAsociadaAUnaCitaLuegoCanceladaConservaSuHistorico() {
+        LocalDate emision = LocalDate.of(2026, 10, 16);
+        Mascota mascota = mascota(4, 8L);
+        Veterinario vet = veterinario(11L);
+        Cita cancelada = cita(51L, mascota, vet, emision.minusDays(1));
+        cancelada.setEstado(EstadoCita.CANCELADA);
+        FormulaMedica existente = new FormulaMedica();
+        existente.setCita(cancelada);
+        existente.setFechaCreacion(emision.atStartOfDay());
+        when(formulas.findById(71L)).thenReturn(Optional.of(existente));
+        prepararMascotaVetMedicamento(mascota, vet);
+        when(formulas.save(any())).thenAnswer(call -> call.getArgument(0));
+
+        FormulaResponse response = service.actualizar(71L, request(4, null, 11L, emision, null));
+
+        assertEquals(51L, existente.getCita().getCitaId());
+        assertEquals("Cada 8 horas", response.frecuencia());
     }
 
     @Test

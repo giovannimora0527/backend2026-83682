@@ -2,7 +2,11 @@ package com.uniminuto.clinica.models;
 
 import java.time.LocalDateTime;
 
-/** Campos mínimos de una historia para la tabla de resultados. */
+/**
+ * Campos mínimos de una historia para la tabla de resultados.
+ *
+ * @param estado estado calculado ("Con anotaciones" o "Sin anotaciones"); no es una columna de la base de datos
+ */
 public record HistoriaResumenResponse(Long historiaClinicaId, Long clienteId, String clienteNombre,
         Integer mascotaId, String mascotaNombre, Long veterinarioId, String veterinarioNombre,
-        LocalDateTime fechaHora, String motivoConsulta) { }
+        LocalDateTime fechaHora, String motivoConsulta, String estado) { }

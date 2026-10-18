@@ -1,7 +1,7 @@
-
 package com.uniminuto.clinica.service;
 
 import com.uniminuto.clinica.entity.Cliente;
+
 import java.util.List;
 
 /**
@@ -24,4 +24,12 @@ public interface ClienteService {
      * @return cliente encontrado
      */
     Cliente obtenerCliente(Long id);
+
+    /**
+     * Busca un cliente mediante su número de documento.
+     *
+     * @param numeroDocumento número de documento del cliente
+     * @return cliente encontrado
+     */
+    Cliente obtenerClientePorDocumento(String numeroDocumento);
 }

@@ -19,7 +19,12 @@ import java.util.*;
 /** Implementa las consultas, validaciones y operaciones de escritura de citas. */
 @Service
 public class CitaServiceImpl implements CitaService {
-    private static final Set<String> SORTS = Set.of("fechaHora", "estado", "citaId");
+    private static final Set<String> SORTS = Set.of("fechaHora", "estado", "citaId",
+            "cliente.nombres", "mascota.nombreMascota", "veterinario.nombres");
+    /** Columnas que ordena la tabla de Angular traducidas a propiedades de la entidad Cita. */
+    private static final Map<String, String> SORT_ALIASES = Map.of(
+            "fecha", "fechaHora", "hora", "fechaHora",
+            "clienteId", "cliente.nombres", "mascotaId", "mascota.nombreMascota", "veterinarioId", "veterinario.nombres");
     private final CitaRepository citas;
     private final ClienteRepository clientes;
     private final MascotaRepository mascotas;
@@ -37,8 +42,18 @@ public class CitaServiceImpl implements CitaService {
         if (page < 0 || size < 1 || size > 100) throw new BadRequestException("page debe ser >= 0 y size debe estar entre 1 y 100");
         Pageable pageable = sort == null || sort.isBlank()
                 ? PageRequest.of(page, size, Sort.by(Sort.Order.desc("fechaHora")))
-                : PageSupport.pageable(page, size, sort, direction, "fechaHora", SORTS);
+                : PageSupport.pageable(page, size, SORT_ALIASES.getOrDefault(sort, sort), direction, "fechaHora", SORTS);
+        // La columna Hora ordena por la hora del día (no por fecha y hora), mediante HOUR/MINUTE.
+        boolean ordenarPorHora = "hora".equals(sort);
+        boolean horaAscendente = ordenarPorHora && pageable.getSort().getOrderFor("fechaHora").isAscending();
+        if (ordenarPorHora) pageable = PageRequest.of(page, size);
         Specification<Cita> spec = (root, query, cb) -> {
+            if (ordenarPorHora && !Long.class.equals(query.getResultType())) {
+                var hora = cb.function("hour", Integer.class, root.get("fechaHora"));
+                var minuto = cb.function("minute", Integer.class, root.get("fechaHora"));
+                query.orderBy(horaAscendente ? List.of(cb.asc(hora), cb.asc(minuto), cb.asc(root.get("fechaHora")))
+                        : List.of(cb.desc(hora), cb.desc(minuto), cb.desc(root.get("fechaHora"))));
+            }
             List<Predicate> p = new ArrayList<>();
             if (clienteId != null) p.add(cb.equal(root.get("cliente").get("clienteId"), clienteId));
             if (mascotaId != null) p.add(cb.equal(root.get("mascota").get("mascotaId"), mascotaId));
@@ -53,6 +68,17 @@ public class CitaServiceImpl implements CitaService {
         // Si el usuario elige otro orden, prevalece el Pageable sobre el orden predeterminado de la consulta.
         Page<CitaResponse> result = citas.findAll(spec, pageable).map(this::response);
         return PageResponse.from(result);
+    }
+
+    /** {@inheritDoc} */
+    @Transactional(readOnly = true)
+    public List<CitaResponse> filtrarPorFechas(LocalDateTime fechaInicio, LocalDateTime fechaFinal) {
+        if (fechaInicio == null || fechaFinal == null)
+            throw new BadRequestException("fechaInicio y fechaFinal son obligatorias");
+        if (fechaInicio.isAfter(fechaFinal))
+            throw new BadRequestException("fechaInicio no puede ser posterior a fechaFinal");
+        return citas.findAllByFechaHoraBetweenOrderByFechaHoraDesc(fechaInicio, fechaFinal)
+                .stream().map(this::response).toList();
     }
 
     /** {@inheritDoc} */
@@ -91,13 +117,8 @@ public class CitaServiceImpl implements CitaService {
         checkAvailability(veterinario, mascota, request.fecha(), request.hora(), id);
         EstadoCita requested = request.estado() == null ? cita.getEstado() : request.estado();
         if (!validTransition(cita.getEstado(), requested)) throw new BadRequestException(HttpStatus.CONFLICT, "Transición de estado de cita no permitida");
-        if (cita.getEstado() != EstadoCita.PENDIENTE &&
-                (!Objects.equals(cita.getCliente().getClienteId(), cliente.getClienteId()) ||
-                 !Objects.equals(cita.getMascota().getMascotaId(), mascota.getMascotaId()) ||
-                 !Objects.equals(cita.getVeterinario().getVeterinarioId(), veterinario.getVeterinarioId()) ||
-                 !Objects.equals(cita.getFecha(), request.fecha()) || !Objects.equals(cita.getHora(), request.hora()) ||
-                 !Objects.equals(cita.getMotivoConsulta(), request.motivoConsulta().trim())))
-            throw new BadRequestException(HttpStatus.CONFLICT, "Solo una cita pendiente permite cambiar sus datos");
+        // Las citas activas (pendiente, confirmada o programada) pueden reprogramarse; las atendidas y
+        // canceladas ya se rechazaron arriba (PDF 2.3, reglas 8 y 9).
         cita.setCliente(cliente); cita.setMascota(mascota); cita.setVeterinario(veterinario);
         cita.setFecha(request.fecha()); cita.setHora(request.hora()); cita.setMotivoConsulta(request.motivoConsulta().trim()); cita.setEstado(requested);
         return response(citas.save(cita));
@@ -107,7 +128,9 @@ public class CitaServiceImpl implements CitaService {
         if (r == null || r.clienteId() == null || r.clienteId() <= 0 || r.mascotaId() == null || r.mascotaId() <= 0 || r.veterinarioId() == null || r.veterinarioId() <= 0)
             throw new BadRequestException("clienteId, mascotaId y veterinarioId son obligatorios y deben ser positivos");
         if (r.fecha() == null || r.hora() == null) throw new BadRequestException("fecha y hora son obligatorias");
-        if (LocalDateTime.of(r.fecha(), r.hora()).isBefore(LocalDateTime.now())) throw new BadRequestException("No se pueden registrar citas en el pasado");
+        // Al editar, una cita cuya fecha ya pasó puede guardarse si no se cambia su fecha ni su hora.
+        boolean mismaFechaHora = current != null && Objects.equals(current.getFecha(), r.fecha()) && Objects.equals(current.getHora(), r.hora());
+        if (!mismaFechaHora && LocalDateTime.of(r.fecha(), r.hora()).isBefore(LocalDateTime.now())) throw new BadRequestException("No se pueden registrar citas en el pasado");
         PageSupport.required(r.motivoConsulta(), "motivoConsulta");
         if (r.motivoConsulta().trim().length() > 500) throw new BadRequestException("motivoConsulta no puede superar 500 caracteres");
         if (r.estado() != null && !EnumSet.allOf(EstadoCita.class).contains(r.estado())) throw new BadRequestException("Estado de cita inválido");
@@ -115,12 +138,24 @@ public class CitaServiceImpl implements CitaService {
             throw new BadRequestException("Una cita nueva debe iniciar pendiente, confirmada o programada");
     }
 
+    /**
+     * Valida la disponibilidad (PDF 2.2, reglas 4 y 5): el veterinario no puede tener otra cita activa
+     * 15 minutos antes o después (también cuando el margen cruza la medianoche) y la mascota no puede
+     * tener otra cita activa a la misma hora. Las citas canceladas no ocupan agenda.
+     */
     private void checkAvailability(Veterinario vet, Mascota pet, LocalDate date, LocalTime time, Long excludedId) {
-        for (Cita existing : citas.findByVeterinario_VeterinarioIdAndFecha(vet.getVeterinarioId(), date)) {
-            if (existing.getVeterinario() == null || existing.getHora() == null) continue;
-            if (Objects.equals(existing.getCitaId(), excludedId) || existing.getEstado() == EstadoCita.CANCELADA) continue;
-            if (Duration.between(existing.getHora(), time).abs().compareTo(Duration.ofMinutes(15)) < 0)
-                throw new BadRequestException(HttpStatus.CONFLICT, "El veterinario debe tener al menos 15 minutos entre citas");
+        LocalDateTime inicio = LocalDateTime.of(date, time);
+        Duration margen = Duration.ofMinutes(15);
+        List<LocalDate> dias = new ArrayList<>(List.of(date));
+        if (time.isBefore(LocalTime.MIDNIGHT.plus(margen))) dias.add(date.minusDays(1));
+        if (time.isAfter(LocalTime.MAX.minus(margen))) dias.add(date.plusDays(1));
+        for (LocalDate dia : dias) {
+            for (Cita existing : citas.findByVeterinario_VeterinarioIdAndFecha(vet.getVeterinarioId(), dia)) {
+                if (existing.getVeterinario() == null || existing.getFechaHora() == null) continue;
+                if (Objects.equals(existing.getCitaId(), excludedId) || existing.getEstado() == EstadoCita.CANCELADA) continue;
+                if (Duration.between(existing.getFechaHora(), inicio).abs().compareTo(margen) < 0)
+                    throw new BadRequestException(HttpStatus.CONFLICT, "El veterinario debe tener al menos 15 minutos entre citas");
+            }
         }
         for (Cita existing : citas.findByMascota_MascotaIdAndFecha(pet.getMascotaId(), date)) {
             if (existing.getMascota() == null || existing.getHora() == null) continue;
@@ -144,5 +179,8 @@ public class CitaServiceImpl implements CitaService {
                 c.getFecha(), c.getHora(), c.getMotivoConsulta(), c.getEstado());
     }
     private String fullName(String first, String last) { return (first == null ? "" : first) + " " + (last == null ? "" : last); }
-    private BadRequestException missing(String type) { return new BadRequestException(HttpStatus.NOT_FOUND, type + " no encontrado"); }
+    private BadRequestException missing(String type) {
+        boolean femenino = type.equals("Cita") || type.equals("Mascota");
+        return new BadRequestException(HttpStatus.NOT_FOUND, type + (femenino ? " no encontrada" : " no encontrado"));
+    }
 }

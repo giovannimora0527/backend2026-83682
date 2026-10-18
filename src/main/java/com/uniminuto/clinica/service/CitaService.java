@@ -46,6 +46,16 @@ public interface CitaService {
     CitaResponse consultar(Long id);
 
     /**
+     * Lista las citas entre dos fechas, de la más reciente a la más antigua (servicio del parcial).
+     *
+     * @param fechaInicio fecha y hora inicial
+     * @param fechaFinal fecha y hora final
+     * @return citas encontradas
+     */
+    java.util.List<CitaResponse> filtrarPorFechas(java.time.LocalDateTime fechaInicio,
+                                                  java.time.LocalDateTime fechaFinal);
+
+    /**
      * Registra una nueva cita con los datos proporcionados.
      *
      * @param request información necesaria para crear la cita

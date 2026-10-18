@@ -1,0 +1,3 @@
+# Copie este archivo como clinica-local.properties y ponga la contrasena real de MySQL.
+# clinica-local.properties esta en .gitignore y nunca se sube al repositorio.
+spring.datasource.password=CAMBIAR

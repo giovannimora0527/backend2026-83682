@@ -98,6 +98,8 @@ public class HistoriaClinicaApiController {
      * @param size cantidad de anotaciones por página
      * @param sort campo por el que se ordenan las anotaciones
      * @param direction dirección del ordenamiento
+     * @param veterinarioId filtro opcional por veterinario que registró la anotación
+     * @param fecha filtro opcional por fecha de la anotación (ISO, aaaa-mm-dd)
      * @return respuesta HTTP con la página de anotaciones
      */
     @GetMapping("/{id}/anotaciones")
@@ -106,9 +108,15 @@ public class HistoriaClinicaApiController {
             @RequestParam(defaultValue="0") int page,
             @RequestParam(defaultValue="20") int size,
             @RequestParam(required=false) String sort,
-            @RequestParam(defaultValue="DESC") String direction) {
+            @RequestParam(defaultValue="DESC") String direction,
+            @RequestParam(required=false) Long veterinarioId,
+            @RequestParam(required=false)
+            @DateTimeFormat(iso=DateTimeFormat.ISO.DATE) LocalDate fecha) {
 
+        // Sin filtros se mantiene exactamente la consulta anterior del endpoint.
+        if (veterinarioId == null && fecha == null)
+            return ResponseEntity.ok(anotaciones.listarHistoria(id, page, size, sort, direction));
         return ResponseEntity.ok(
-                anotaciones.listarHistoria(id, page, size, sort, direction));
+                anotaciones.listarHistoria(id, page, size, sort, direction, veterinarioId, fecha));
     }
 }

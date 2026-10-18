@@ -111,9 +111,30 @@ public class MascotaApiController implements MascotaApi {
      * @param id identificador de la mascota
      * @return respuesta HTTP con los datos de la mascota consultada
      */
-    @org.springframework.web.bind.annotation.GetMapping("/{id}")
-    public ResponseEntity<Mascota> consultarMascota(
-            @org.springframework.web.bind.annotation.PathVariable Integer id) {
+    @Override
+    public ResponseEntity<Mascota> consultarMascota(Integer id) {
         return ResponseEntity.ok(mascotaService.consultarMascota(id));
+    }
+
+    /**
+     * Busca una mascota por su nombre.
+     *
+     * @param nombre nombre de la mascota
+     * @return respuesta HTTP con la mascota encontrada
+     */
+    @Override
+    public ResponseEntity<Mascota> buscarPorNombre(String nombre) throws BadRequestException {
+        return ResponseEntity.ok(mascotaService.buscarMascotaPorNombre(nombre));
+    }
+
+    /**
+     * Elimina una mascota que no tenga registros clínicos asociados.
+     *
+     * @param id identificador de la mascota
+     * @return respuesta HTTP con el resultado de la eliminación
+     */
+    @Override
+    public ResponseEntity<MiRespuestaRS> eliminarMascota(Integer id) throws BadRequestException {
+        return ResponseEntity.ok(mascotaService.eliminarMascota(id));
     }
 }

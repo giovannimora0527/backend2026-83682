@@ -16,22 +16,34 @@ import jakarta.persistence.criteria.JoinType;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
-/** Implementa la consulta, validación, creación y actualización de fórmulas médicas. */
-/** Implementa la consulta, validación, creación y actualización de fórmulas médicas. */
+/**
+ * Implementa la consulta, validación, creación y actualización de fórmulas médicas.
+ *
+ * <p>La tabla {@code formula_medica} solo guarda la cita, el medicamento, la dosis y las
+ * indicaciones. La mascota, el cliente y el veterinario se obtienen de la cita asociada.
+ * La frecuencia, la duración y la fecha de emisión (cuando difiere de la fecha de registro)
+ * se guardan como líneas etiquetadas dentro de {@code indicaciones}, el mismo formato que ya
+ * usan los registros existentes ("Frecuencia: ...", "Duración en días: ...").</p>
+ */
 @Service
 public class FormulaMedicaServiceImpl implements FormulaMedicaService {
     private static final Set<String> SORTS = Set.of(
-            "fechaCreacion", "formulaMedicaId", "cita.mascota.mascotaId");
+            "fechaCreacion", "formulaMedicaId", "cita.mascota.mascotaId",
+            "cita.veterinario.nombres", "medicamentoEntity.nombre");
     private static final Map<String, String> SORT_ALIASES = Map.of(
             "fechaCreacionRegistro", "fechaCreacion",
-            // Until the schema migration is applied, emission date follows the
-            // existing API meaning: the formula creation timestamp.
+            // La fecha de emisión se deriva de la fecha de registro de la fórmula.
             "fechaEmision", "fechaCreacion",
-            "mascotaId", "cita.mascota.mascotaId");
+            "mascotaId", "cita.mascota.mascotaId",
+            "veterinarioId", "cita.veterinario.nombres",
+            "medicamento", "medicamentoEntity.nombre");
     private static final String FREQUENCY_PREFIX = "Frecuencia: ";
     private static final String DURATION_PREFIX = "Duración en días: ";
+    private static final String INSTRUCTIONS_PREFIX = "Indicaciones: ";
+    private static final String EMISSION_PREFIX = "Fecha de emisión: ";
     private final FormulaMedicaRepository formulas;
     private final HistoriaClinicaRepository historias;
     private final VeterinarioRepository veterinarios;
@@ -60,25 +72,24 @@ public class FormulaMedicaServiceImpl implements FormulaMedicaService {
             Join<Cita, Mascota> mascotaCita = cita.join("mascota", JoinType.LEFT);
             Join<Cita, Cliente> clienteCita = cita.join("cliente", JoinType.LEFT);
             Join<Cita, Veterinario> veterinarioCita = cita.join("veterinario", JoinType.LEFT);
-            Join<FormulaMedica, HistoriaClinica> historia = root.join("historiaClinica", JoinType.LEFT);
-            Join<HistoriaClinica, Mascota> mascotaHistoria = historia.join("mascota", JoinType.LEFT);
-            Join<Mascota, Cliente> clienteHistoria = mascotaHistoria.join("cliente", JoinType.LEFT);
-            Join<FormulaMedica, Veterinario> veterinarioDirecto = root.join("veterinario", JoinType.LEFT);
-            var mascotaRelacionada = cb.coalesce(mascotaCita.get("mascotaId"), mascotaHistoria.get("mascotaId"));
-            var clienteRelacionado = cb.coalesce(clienteCita.get("clienteId"), clienteHistoria.get("clienteId"));
-            var veterinarioRelacionado = cb.coalesce(veterinarioCita.get("veterinarioId"),
-                    veterinarioDirecto.get("veterinarioId"));
+            Join<Mascota, Cliente> clienteMascota = mascotaCita.join("cliente", JoinType.LEFT);
+            var clienteRelacionado = cb.coalesce(clienteCita.get("clienteId"), clienteMascota.get("clienteId"));
             if (clienteId != null) p.add(cb.equal(clienteRelacionado, clienteId));
-            if (mascotaId != null) p.add(cb.equal(mascotaRelacionada, mascotaId));
-            if (vetId != null) p.add(cb.equal(veterinarioRelacionado, vetId));
-            if (medicamento != null && !medicamento.isBlank())
-                p.add(cb.like(cb.lower(root.get("medicamentoEntity").get("nombre")), "%" + medicamento.trim().toLowerCase(Locale.ROOT) + "%"));
+            if (mascotaId != null) p.add(cb.equal(mascotaCita.get("mascotaId"), mascotaId));
+            if (vetId != null) p.add(cb.equal(veterinarioCita.get("veterinarioId"), vetId));
+            if (medicamento != null && !medicamento.isBlank()) {
+                Join<FormulaMedica, Medicamento> med = root.join("medicamentoEntity", JoinType.LEFT);
+                p.add(cb.like(cb.lower(med.get("nombre")), "%" + medicamento.trim().toLowerCase(Locale.ROOT) + "%"));
+            }
             if (fecha != null) {
-                Predicate fechaEmisionPersistida = cb.equal(root.get("fechaEmision"), fecha);
-                Predicate fechaAntigua = cb.and(cb.isNull(root.get("fechaEmision")),
+                var indicaciones = root.<String>get("indicaciones");
+                Predicate emisionGuardada = cb.like(indicaciones, "%" + EMISSION_PREFIX + fecha + "%");
+                Predicate sinEmisionGuardada = cb.or(cb.isNull(indicaciones),
+                        cb.notLike(indicaciones, "%" + EMISSION_PREFIX + "%"));
+                Predicate fechaRegistro = cb.and(sinEmisionGuardada,
                         cb.greaterThanOrEqualTo(root.<LocalDateTime>get("fechaCreacion"), fecha.atStartOfDay()),
                         cb.lessThan(root.<LocalDateTime>get("fechaCreacion"), fecha.plusDays(1).atStartOfDay()));
-                p.add(cb.or(fechaEmisionPersistida, fechaAntigua));
+                p.add(cb.or(emisionGuardada, fechaRegistro));
             }
             return cb.and(p.toArray(Predicate[]::new));
         };
@@ -87,7 +98,14 @@ public class FormulaMedicaServiceImpl implements FormulaMedicaService {
 
     /** {@inheritDoc} */
     @Transactional(readOnly = true)
-    public FormulaResponse consultar(Long id) { return response(formulas.findById(id).orElseThrow(this::missing)); }
+    public List<FormulaResponse> listarOrdenadas(boolean ascendente) {
+        Sort sort = Sort.by(ascendente ? Sort.Direction.ASC : Sort.Direction.DESC, "fechaCreacion");
+        return formulas.findAll(sort).stream().map(f -> response(f, false)).toList();
+    }
+
+    /** {@inheritDoc} */
+    @Transactional(readOnly = true)
+    public FormulaResponse consultar(Long id) { return response(formulas.findById(id).orElseThrow(this::missing), true); }
     /** {@inheritDoc} */
     @Transactional public FormulaResponse crear(FormulaRequest request) { return save(null, request); }
     /** {@inheritDoc} */
@@ -104,55 +122,38 @@ public class FormulaMedicaServiceImpl implements FormulaMedicaService {
         HistoriaClinica historia = request.historiaClinicaId() == null ? null
                 : historias.findById(request.historiaClinicaId())
                         .orElseThrow(() -> new BadRequestException(HttpStatus.NOT_FOUND, "Historia clinica no encontrada"));
-        Cita cita = request.citaId() == null ? null
-                : citas.findById(request.citaId())
-                        .orElseThrow(() -> new BadRequestException(HttpStatus.NOT_FOUND, "Cita no encontrada"));
-
-        // Compatibility with older Angular payloads that send mascotaId/veterinarioId
-        // but omit both association IDs: resolve and persist a real matching appointment.
-        if (cita == null && historia == null) {
-            cita = citas.findFirstByMascota_MascotaIdAndVeterinario_VeterinarioIdOrderByFechaHoraDesc(
-                            request.mascotaId(), veterinario.getVeterinarioId())
-                    .orElseThrow(() -> new BadRequestException(HttpStatus.CONFLICT,
-                            "La formula requiere una cita o historia clinica existente"));
-        }
-
-        Mascota mascota;
-        if (cita != null) {
-            mascota = cita.getMascota();
-            if (mascota == null)
-                throw new BadRequestException(HttpStatus.CONFLICT, "La cita no tiene una mascota valida");
-        } else {
-            mascota = historia.getMascota();
-            if (mascota == null)
-                throw new BadRequestException(HttpStatus.CONFLICT, "La historia clinica no tiene una mascota valida");
-        }
-
-        if (request.mascotaId() != null && !request.mascotaId().equals(mascota.getMascotaId()))
-            throw new BadRequestException(HttpStatus.CONFLICT, "La mascota indicada no coincide con la asociacion clinica");
-        if (historia != null && (historia.getMascota() == null
-                || !historia.getMascota().getMascotaId().equals(mascota.getMascotaId())))
-            throw new BadRequestException(HttpStatus.CONFLICT, "La mascota de la cita no coincide con la historia clinica");
-
-        if (cita != null) {
-            if (cita.getVeterinario() == null
-                    || !cita.getVeterinario().getVeterinarioId().equals(veterinario.getVeterinarioId()))
-                throw new BadRequestException(HttpStatus.CONFLICT, "La cita no coincide con la mascota y el medico indicados");
-            if (mascota.getCliente() == null || cita.getCliente() == null
-                    || !mascota.getCliente().getClienteId().equals(cita.getCliente().getClienteId()))
-                throw new BadRequestException(HttpStatus.CONFLICT,
-                        "El cliente de la cita no corresponde al propietario de la mascota");
-            if (cita.getFechaHora() != null
-                    && request.fechaEmision().isBefore(cita.getFechaHora().toLocalDate()))
-                throw new BadRequestException("La fecha de emision no puede ser anterior a la cita");
-        } else if (mascota.getCliente() == null) {
-            throw new BadRequestException(HttpStatus.CONFLICT,
-                    "La mascota de la historia clinica no tiene un cliente asociado");
-        }
-
+        if (historia != null && historia.getMascota() == null)
+            throw new BadRequestException(HttpStatus.CONFLICT, "La historia clinica no tiene una mascota valida");
+        if (historia != null && request.mascotaId() != null
+                && !request.mascotaId().equals(historia.getMascota().getMascotaId()))
+            throw new BadRequestException(HttpStatus.CONFLICT, "La mascota indicada no coincide con la historia clinica");
         if (historia != null && historia.getFechaHora() != null
                 && request.fechaEmision().isBefore(historia.getFechaHora().toLocalDate()))
             throw new BadRequestException("La fecha de emision no puede ser anterior a la historia clinica");
+
+        Cita cita = resolveCita(existing, request, historia, veterinario);
+        // Una cita cancelada no es una consulta realizada: no se permite como nueva asociación.
+        // Si la fórmula ya estaba asociada a esa cita, se conserva para no alterar el histórico.
+        boolean mismaCita = existing != null && existing.getCita() == cita;
+        if (cita.getEstado() == EstadoCita.CANCELADA && !mismaCita)
+            throw new BadRequestException(HttpStatus.CONFLICT, "No se puede asociar la formula a una cita cancelada");
+        Mascota mascota = cita.getMascota();
+        if (mascota == null)
+            throw new BadRequestException(HttpStatus.CONFLICT, "La cita no tiene una mascota valida");
+        if (request.mascotaId() != null && !request.mascotaId().equals(mascota.getMascotaId()))
+            throw new BadRequestException(HttpStatus.CONFLICT, "La mascota indicada no coincide con la asociacion clinica");
+        if (historia != null && !historia.getMascota().getMascotaId().equals(mascota.getMascotaId()))
+            throw new BadRequestException(HttpStatus.CONFLICT, "La mascota de la cita no coincide con la historia clinica");
+        if (cita.getVeterinario() == null
+                || !cita.getVeterinario().getVeterinarioId().equals(veterinario.getVeterinarioId()))
+            throw new BadRequestException(HttpStatus.CONFLICT, "La cita no coincide con la mascota y el medico indicados");
+        if (mascota.getCliente() == null || cita.getCliente() == null
+                || !mascota.getCliente().getClienteId().equals(cita.getCliente().getClienteId()))
+            throw new BadRequestException(HttpStatus.CONFLICT,
+                    "El cliente de la cita no corresponde al propietario de la mascota");
+        if (cita.getFechaHora() != null
+                && request.fechaEmision().isBefore(cita.getFechaHora().toLocalDate()))
+            throw new BadRequestException("La fecha de emision no puede ser anterior a la cita");
 
         Medicamento medicamento = request.medicamentoId() == null
                 ? medicamentos.findFirstByNombreIgnoreCase(request.medicamento().trim())
@@ -162,17 +163,36 @@ public class FormulaMedicaServiceImpl implements FormulaMedicaService {
                         .orElseThrow(() -> new BadRequestException(HttpStatus.NOT_FOUND,
                                 "Medicamento no encontrado"));
 
+        LocalDateTime ahora = LocalDateTime.now();
         FormulaMedica formula = existing == null ? new FormulaMedica() : existing;
+        if (formula.getFechaCreacion() == null) formula.setFechaCreacion(ahora);
         formula.setCita(cita);
-        formula.setHistoriaClinica(historia);
-        formula.setVeterinario(veterinario);
-        formula.setFechaEmision(request.fechaEmision());
         formula.setMedicamentoEntity(medicamento);
         formula.setDosisTexto(request.dosis().stripTrailingZeros().toPlainString());
-        formula.setIndicaciones(storeInstructions(request));
-        if (formula.getFechaCreacion() == null) formula.setFechaCreacion(LocalDateTime.now());
-        formula.setFechaActualizacion(LocalDateTime.now());
-        return response(formulas.save(formula));
+        formula.setIndicaciones(storeInstructions(request, formula.getFechaCreacion().toLocalDate()));
+        if (existing != null) formula.setFechaActualizacion(ahora);
+        return response(formulas.save(formula), true);
+    }
+
+    /**
+     * Determina la cita de la fórmula: la indicada, la ya asociada (si sigue coincidiendo)
+     * o la cita más reciente no cancelada entre la mascota y el veterinario.
+     */
+    private Cita resolveCita(FormulaMedica existing, FormulaRequest request, HistoriaClinica historia,
+            Veterinario veterinario) {
+        if (request.citaId() != null)
+            return citas.findById(request.citaId())
+                    .orElseThrow(() -> new BadRequestException(HttpStatus.NOT_FOUND, "Cita no encontrada"));
+        Integer mascotaId = historia != null ? historia.getMascota().getMascotaId() : request.mascotaId();
+        if (existing != null && existing.getCita() != null && existing.getCita().getMascota() != null
+                && existing.getCita().getVeterinario() != null
+                && existing.getCita().getMascota().getMascotaId().equals(mascotaId)
+                && existing.getCita().getVeterinario().getVeterinarioId().equals(veterinario.getVeterinarioId()))
+            return existing.getCita();
+        return citas.findFirstByMascota_MascotaIdAndVeterinario_VeterinarioIdAndEstadoNotOrderByFechaHoraDesc(
+                        mascotaId, veterinario.getVeterinarioId(), EstadoCita.CANCELADA)
+                .orElseThrow(() -> new BadRequestException(HttpStatus.CONFLICT,
+                        "La formula requiere una cita no cancelada entre la mascota y el veterinario"));
     }
 
     private void validate(FormulaRequest request) {
@@ -192,38 +212,48 @@ public class FormulaMedicaServiceImpl implements FormulaMedicaService {
         if (request.indicaciones() != null && request.indicaciones().length() > 5000)
             throw new BadRequestException("indicaciones supera la longitud permitida");
     }
-    private String storeInstructions(FormulaRequest request) {
-        String text = FREQUENCY_PREFIX + request.frecuencia().trim() + "\n" + DURATION_PREFIX + request.duracionDias();
-        return request.indicaciones() == null || request.indicaciones().isBlank() ? text : text + "\nIndicaciones: " + request.indicaciones().trim();
+
+    private String storeInstructions(FormulaRequest request, LocalDate fechaRegistro) {
+        StringBuilder text = new StringBuilder(FREQUENCY_PREFIX).append(request.frecuencia().trim())
+                .append("\n").append(DURATION_PREFIX).append(request.duracionDias());
+        if (!request.fechaEmision().equals(fechaRegistro))
+            text.append("\n").append(EMISSION_PREFIX).append(request.fechaEmision());
+        if (request.indicaciones() != null && !request.indicaciones().isBlank())
+            text.append("\n").append(INSTRUCTIONS_PREFIX).append(request.indicaciones().trim());
+        return text.toString();
     }
 
-    private FormulaResponse response(FormulaMedica formula) {
+    private FormulaResponse response(FormulaMedica formula, boolean incluirHistoria) {
         Cita cita = formula.getCita();
-        HistoriaClinica historia = formula.getHistoriaClinica();
-        Mascota mascota = cita != null ? cita.getMascota() : historia == null ? null : historia.getMascota();
+        Mascota mascota = cita == null ? null : cita.getMascota();
         Cliente cliente = cita != null && cita.getCliente() != null ? cita.getCliente()
                 : mascota == null ? null : mascota.getCliente();
-        Veterinario veterinario = cita != null && cita.getVeterinario() != null
-                ? cita.getVeterinario() : formula.getVeterinario();
+        Veterinario veterinario = cita == null ? null : cita.getVeterinario();
+        Long historiaId = !incluirHistoria || mascota == null ? null
+                : historias.findFirstByMascota_MascotaIdOrderByFechaHoraAsc(mascota.getMascotaId())
+                        .map(HistoriaClinica::getHistoriaClinicaId).orElse(null);
         InstructionData instructionData = parseInstructions(formula.getIndicaciones());
+        LocalDate fechaEmision = instructionData.emissionDate() != null ? instructionData.emissionDate()
+                : formula.getFechaCreacion() == null ? null : formula.getFechaCreacion().toLocalDate();
+        Medicamento medicamento = formula.getMedicamentoEntity();
         return new FormulaResponse(formula.getFormulaMedicaId(), mascota == null ? null : mascota.getMascotaId(),
                 mascota == null ? null : mascota.getNombreMascota(), cliente == null ? null : cliente.getClienteId(),
                 cliente == null ? null : cliente.getNombres()+" "+cliente.getApellidos(),
-                historia == null ? null : historia.getHistoriaClinicaId(),
+                historiaId,
                 veterinario == null ? null : veterinario.getVeterinarioId(),
                 veterinario == null ? null : veterinario.getNombres()+" "+veterinario.getApellidos(),
-                formula.getFechaEmision() != null ? formula.getFechaEmision()
-                        : formula.getFechaCreacion() == null ? null : formula.getFechaCreacion().toLocalDate(),
-                formula.getMedicamentoEntity().getNombre(), parseDose(formula.getDosisTexto()), instructionData.frequency(),
-                instructionData.durationDays(), instructionData.instructions(), formula.getFechaCreacion(),
-                formula.getDosisTexto());
+                fechaEmision,
+                medicamento == null ? null : medicamento.getNombre(), parseDose(formula.getDosisTexto()),
+                instructionData.frequency(), instructionData.durationDays(), instructionData.instructions(),
+                formula.getFechaCreacion(), formula.getDosisTexto());
     }
 
     private FormulaResumenResponse summary(FormulaMedica formula) {
-        FormulaResponse response = response(formula);
+        FormulaResponse response = response(formula, false);
         return new FormulaResumenResponse(response.formulaMedicaId(), response.mascotaId(), response.mascotaNombre(),
                 response.clienteId(), response.clienteNombre(), response.veterinarioId(), response.veterinarioNombre(),
-                response.fechaEmision(), response.medicamento(), response.fechaCreacion());
+                response.fechaEmision(), response.medicamento(), response.fechaCreacion(),
+                response.dosis(), response.dosisTexto(), response.frecuencia(), response.clienteNombre());
     }
 
     private BigDecimal parseDose(String text) {
@@ -238,19 +268,22 @@ public class FormulaMedicaServiceImpl implements FormulaMedicaService {
     }
 
     private InstructionData parseInstructions(String text) {
-        if (text == null) return new InstructionData(null, null, null);
+        if (text == null) return new InstructionData(null, null, null, null);
         String frequency = null, instructions = null;
         Integer duration = null;
+        LocalDate emission = null;
         for (String line : text.split("\\R")) {
             if (line.startsWith(FREQUENCY_PREFIX)) frequency = line.substring(FREQUENCY_PREFIX.length());
             else if (line.startsWith(DURATION_PREFIX)) {
                 try { duration = Integer.parseInt(line.substring(DURATION_PREFIX.length()).trim()); } catch (NumberFormatException ignored) { }
-            } else if (line.startsWith("Indicaciones: ")) instructions = line.substring("Indicaciones: ".length());
+            } else if (line.startsWith(EMISSION_PREFIX)) {
+                try { emission = LocalDate.parse(line.substring(EMISSION_PREFIX.length()).trim()); } catch (DateTimeParseException ignored) { }
+            } else if (line.startsWith(INSTRUCTIONS_PREFIX)) instructions = line.substring(INSTRUCTIONS_PREFIX.length());
             else if (!line.isBlank()) instructions = instructions == null ? line : instructions + "\n" + line;
         }
-        return new InstructionData(frequency, duration, instructions);
+        return new InstructionData(frequency, duration, instructions, emission);
     }
 
-    private record InstructionData(String frequency, Integer durationDays, String instructions) { }
+    private record InstructionData(String frequency, Integer durationDays, String instructions, LocalDate emissionDate) { }
     private BadRequestException missing() { return new BadRequestException(HttpStatus.NOT_FOUND, "Fórmula médica no encontrada"); }
 }

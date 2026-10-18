@@ -88,7 +88,8 @@ class FormulaMedicaListingIntegrationTest {
         FormulaResponse ambas = service.crear(request(mascota, historia, veterinario, medicamento,
                 cita, fechaEmision, true));
 
-        assertNull(soloCita.historiaClinicaId());
+        // formula_medica no tiene historia_medica_id: la historia se deriva de la mascota de la cita.
+        assertEquals(historia.getHistoriaClinicaId(), soloCita.historiaClinicaId());
         assertEquals(mascota.getMascotaId(), soloHistoria.mascotaId());
         assertEquals(historia.getHistoriaClinicaId(), soloHistoria.historiaClinicaId());
         assertEquals(historia.getHistoriaClinicaId(), ambas.historiaClinicaId());

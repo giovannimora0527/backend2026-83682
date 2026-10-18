@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import com.uniminuto.clinica.exception.BadRequestException;
 
-@RequestMapping("/clinica")
+@RequestMapping({"/clinica", "/veterinaria"})
 public interface ClinicaApi {
 
     /**

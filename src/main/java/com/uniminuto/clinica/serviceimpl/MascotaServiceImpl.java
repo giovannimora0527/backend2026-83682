@@ -10,15 +10,18 @@ import com.uniminuto.clinica.repository.MascotaRepository;
 import com.uniminuto.clinica.repository.RazaRepository;
 import com.uniminuto.clinica.service.MascotaService;
 import com.uniminuto.clinica.exception.BadRequestException;
+import com.uniminuto.clinica.repository.CitaRepository;
+import com.uniminuto.clinica.repository.HistoriaClinicaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
-/** Implementa las consultas, validaciones y operaciones de registro de mascotas. */
 /** Implementa las consultas, validaciones y operaciones de registro de mascotas. */
 @Service
 public class MascotaServiceImpl implements MascotaService {
@@ -31,6 +34,12 @@ public class MascotaServiceImpl implements MascotaService {
 
    @Autowired
    private ClienteRepository clienteRepository;
+
+   @Autowired
+   private CitaRepository citaRepository;
+
+   @Autowired
+   private HistoriaClinicaRepository historiaClinicaRepository;
 
     /** {@inheritDoc} */
     @Override
@@ -66,7 +75,7 @@ public class MascotaServiceImpl implements MascotaService {
         // Paso 2. Consulto la raza dado el id de la raza
         Optional<Raza> optRaza = this.razaRepository.findById(idRaza);
         if (optRaza.isEmpty()){
-            throw new BadRequestException("No existe la raza con id: " + idRaza);
+            throw new BadRequestException(HttpStatus.NOT_FOUND, "No existe la raza con id: " + idRaza);
         }
 
         // Consulto las mascotas por raza y devuelvo el resultado
@@ -85,7 +94,7 @@ public class MascotaServiceImpl implements MascotaService {
         // Paso 2. Consulto el cliente dado el id del cliente
         Optional<Cliente> optCliente = this.clienteRepository.findById(idCliente);
         if (optCliente.isEmpty()){
-            throw new BadRequestException("No existe el cliente con id: " + idCliente);
+            throw new BadRequestException(HttpStatus.NOT_FOUND, "No existe el cliente con id: " + idCliente);
         }
 
         // Consulto las mascotas por cliente y devuelvo el resultado
@@ -95,7 +104,46 @@ public class MascotaServiceImpl implements MascotaService {
     /** {@inheritDoc} */
     @Override
     public Mascota consultarMascota(Integer id) {
-        return mascotaRepository.findById(id).orElseThrow(() -> new com.uniminuto.clinica.exception.BadRequestException(org.springframework.http.HttpStatus.NOT_FOUND, "Mascota no encontrada"));
+        return mascotaRepository.findById(id).orElseThrow(() -> new BadRequestException(HttpStatus.NOT_FOUND, "Mascota no encontrada"));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public Mascota buscarMascotaPorNombre(String nombre) throws BadRequestException {
+        if (nombre == null || nombre.isBlank()) {
+            throw new BadRequestException("El nombre de la mascota no puede estar vacío");
+        }
+        return mascotaRepository.findFirstByNombreMascotaIgnoreCaseOrderByMascotaIdAsc(nombre.trim())
+                .orElseThrow(() -> new BadRequestException(HttpStatus.NOT_FOUND,
+                        "No se encontró la mascota con el nombre: " + nombre.trim()));
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * <p>La base de datos no define claves foráneas, por lo que la integridad se valida aquí:
+     * una mascota con citas o historias clínicas no se elimina.</p>
+     */
+    @Override
+    @Transactional
+    public MiRespuestaRS eliminarMascota(Integer mascotaId) throws BadRequestException {
+        if (mascotaId == null || mascotaId <= 0) {
+            throw new BadRequestException("El id de la mascota es obligatorio y debe ser positivo");
+        }
+        Mascota mascota = consultarMascota(mascotaId);
+        long citasAsociadas = citaRepository.contarPorMascota(mascotaId);
+        long historiasAsociadas = historiaClinicaRepository.contarPorMascota(mascotaId);
+        if (citasAsociadas > 0 || historiasAsociadas > 0) {
+            throw new BadRequestException(HttpStatus.CONFLICT, "No se puede eliminar a "
+                    + mascota.getNombreMascota() + " porque tiene " + citasAsociadas + " cita(s) y "
+                    + historiasAsociadas + " historia(s) clínica(s) asociadas.");
+        }
+        mascotaRepository.delete(mascota);
+
+        MiRespuestaRS respuesta = new MiRespuestaRS();
+        respuesta.setStatus(200);
+        respuesta.setMessage("Mascota eliminada correctamente");
+        return respuesta;
     }
 
     /** {@inheritDoc} */
@@ -155,7 +203,7 @@ public class MascotaServiceImpl implements MascotaService {
         // Paso 3. Consulto si la mascota existe
         Optional<Mascota> optMascota = this.mascotaRepository.findById(mascotaRq.getMascotaId());
         if (optMascota.isEmpty()) {
-            throw new BadRequestException("La mascota seleccionada no es valida");
+            throw new BadRequestException(HttpStatus.NOT_FOUND, "La mascota seleccionada no existe");
         }
 
         // Paso 4. Actualizar los datos

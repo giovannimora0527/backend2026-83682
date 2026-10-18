@@ -14,10 +14,16 @@ La URL base se forma con `server.servlet.contextPath` (por defecto `/clinica/v1`
 | GET | `/mascota/buscar-by-raza?razaId=1` | Filtra por raza. |
 | GET | `/mascota/buscar-by-cliente?clienteId=1` | Filtra por cliente. |
 | GET | `/mascota/{id}` | Consulta una mascota. |
-| POST | `/mascota/guardar` | Crea una mascota. |
-| POST | `/mascota/actualizar` | Actualiza una mascota (contrato existente). |
-| GET | `/clinica/test`, `/clinica/test2`, `/clinica/test3` | Rutas de comprobación existentes. |
-| GET | `/veterinarios`, `/veterinarios/{id}` | Lista o consulta veterinarios. |
+| POST | `/mascota/guardar` | Crea una mascota (201). |
+| POST o PUT | `/mascota/actualizar` | Actualiza una mascota (Angular usa POST). |
+| DELETE | `/mascota/eliminar/{id}` | Elimina una mascota sin citas ni historias; si las tiene responde 409. |
+| GET | `/clinica/test`, `/clinica/test2`, `/clinica/test3` (también `/veterinaria/...`) | Rutas de comprobación. |
+| GET | `/raza/listar` | Lista razas. |
+| GET | `/veterinarios`, `/veterinarios/{id}` | Lista o consulta veterinarios (tabla `medico`). |
+| GET | `/usuario/test` | Comprobación del módulo de usuarios. |
+| GET | `/usuario/listar`, `/usuario/listar-ordenado` | Usuarios por nombre, sin hash de contraseña. |
+| POST | `/usuario/guardar` | Crea un usuario (201; 409 si el usuario o el correo ya existen). |
+| POST o PUT | `/usuario/actualizar` | Actualiza un usuario; sin `password` conserva la contraseña. |
 | GET | `/citas` | Lista citas. Filtros: `clienteId`, `mascotaId`, `veterinarioId`, `fecha`, `estado`. |
 | GET | `/citas/{id}` | Consulta una cita. |
 | POST | `/citas` | Registra una cita. |
@@ -33,6 +39,20 @@ La URL base se forma con `server.servlet.contextPath` (por defecto `/clinica/v1`
 | GET | `/formulas-medicas/{id}` | Consulta una fórmula. |
 | POST | `/formulas-medicas` | Crea una fórmula. |
 | PUT | `/formulas-medicas/{id}` | Actualiza una fórmula existente. |
+
+### Rutas conservadas del parcial
+
+| Método | Ruta | Uso |
+|---|---|---|
+| GET | `/cliente/all` | Lista clientes (igual que `/cliente/listar`). |
+| GET | `/cliente/cliente-documento?numeroDocumento=...` | Busca cliente por documento. |
+| GET | `/mascota/buscar?nombre=...` | Busca mascota por nombre (sin distinguir mayúsculas). |
+| GET | `/mascota/listar-ordenado?ascendente=true` | Igual que `/mascota/listar-mascotas-ordenado`. |
+| GET | `/medico/all` | Lista médicos. |
+| GET | `/medico/buscar?tipoDocumento=CC&numeroDocumento=...` | Busca médico por documento. |
+| GET | `/medico/buscarPorRegistroProfesional?registroProfesional=...` | Busca médico por registro. |
+| GET | `/cita/filtrar-by-fechas?fechaInicio=2026-01-01T00:00:00&fechaFinal=2026-12-31T23:59:59` | Citas entre fechas (ISO). |
+| GET | `/formula-medica/listar-ordenado?asc=true` | Fórmulas ordenadas por fecha de registro. |
 
 Los recursos clínicos aceptan `page`, `size`, `sort` y `direction=ASC|DESC`. Citas ordena por fecha y hora descendentes por defecto; los otros listados ordenan por su fecha correspondiente descendente.
 
@@ -55,8 +75,8 @@ Content-Type: application/json
 }
 ```
 
-Los valores de estado son `PENDIENTE`, `CONFIRMADA`, `ATENDIDA`, `CANCELADA` y `PROGRAMADA`. Las respuestas de error tienen `{ status, error, message }`; se usan 400 para entradas inválidas, 404 para identificadores inexistentes y 409 para conflictos de disponibilidad/estado o integridad.
+Los valores de estado son `PENDIENTE`, `CONFIRMADA`, `ATENDIDA`, `CANCELADA` y `PROGRAMADA`. Las respuestas de error son JSON `{ status, error, message }`: 400 entradas o parámetros inválidos, 404 identificador o ruta inexistente, 405 método no permitido, 409 conflictos de disponibilidad, estado, duplicados o integridad, y 500 solo para errores inesperados (se registran en el log).
 
 ## CORS
 
-En el perfil `dev`, CORS permite el origen `http://localhost:4200`. Se puede cambiar con `CORS_ALLOWED_ORIGIN`. En `prod`, CORS permanece deshabilitado salvo que se configure explícitamente un único origen con esa variable.
+CORS global para `http://localhost:4200` y `http://127.0.0.1:4200` (métodos GET, POST, PUT, PATCH, DELETE, OPTIONS; cabeceras `Content-Type`, `Authorization`, `Accept`). Se cambia con `CORS_ALLOWED_ORIGINS` (lista separada por comas). Otros orígenes reciben 403 en el preflight.

@@ -73,4 +73,20 @@ public interface MascotaService {
      * @return mascota encontrada
      */
     Mascota consultarMascota(Integer id);
+
+    /**
+     * Busca una mascota por su nombre (servicio del parcial).
+     *
+     * @param nombre nombre de la mascota
+     * @return mascota encontrada
+     */
+    Mascota buscarMascotaPorNombre(String nombre) throws BadRequestException;
+
+    /**
+     * Elimina una mascota que no tenga citas ni historias clínicas asociadas.
+     *
+     * @param mascotaId identificador de la mascota
+     * @return respuesta con el resultado
+     */
+    MiRespuestaRS eliminarMascota(Integer mascotaId) throws BadRequestException;
 }

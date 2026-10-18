@@ -16,10 +16,24 @@ import java.time.LocalDate;
 import java.util.*;
 
 /** Implementa las consultas y la creación de historias clínicas y su anotación inicial. */
-/** Implementa las consultas y la creación de historias clínicas y su anotación inicial. */
 @Service
 public class HistoriaClinicaServiceImpl implements HistoriaClinicaService {
-    private static final Set<String> SORTS = Set.of("fechaHora", "historiaClinicaId");
+    /** Estado calculado de la historia según tenga o no anotaciones registradas. */
+    static final String CON_ANOTACIONES = "Con anotaciones";
+    /** Estado calculado de la historia cuando no tiene anotaciones registradas. */
+    static final String SIN_ANOTACIONES = "Sin anotaciones";
+    private static final Set<String> SORTS = Set.of("fechaHora", "historiaClinicaId",
+            "mascota.nombreMascota", "mascota.cliente.nombres");
+    /** Columnas de la tabla de Angular que se ordenan con SQL, traducidas a propiedades de la entidad. */
+    private static final Map<String, String> SORT_ALIASES = Map.of(
+            "mascotaId", "mascota.nombreMascota", "clienteId", "mascota.cliente.nombres");
+    /**
+     * Columnas que no existen en historia_medica (el veterinario y el motivo se obtienen de la anotación
+     * inicial, y el motivo se guarda codificado), por lo que se ordenan en memoria sobre el resultado filtrado.
+     */
+    private static final Map<String, java.util.function.Function<HistoriaResumenResponse, String>> ORDEN_EN_MEMORIA = Map.of(
+            "veterinarioId", HistoriaResumenResponse::veterinarioNombre,
+            "motivoConsulta", HistoriaResumenResponse::motivoConsulta);
     private final HistoriaClinicaRepository historias;
     private final ClienteRepository clientes;
     private final MascotaRepository mascotas;
@@ -43,7 +57,11 @@ public class HistoriaClinicaServiceImpl implements HistoriaClinicaService {
     @Transactional(readOnly = true)
     public PageResponse<HistoriaResumenResponse> listar(int page, int size, String sort, String direction,
             Long clienteId, Integer mascotaId, Long veterinarioId, LocalDate fecha) {
-        Pageable pageable = PageSupport.pageable(page, size, sort, direction, "fechaHora", SORTS);
+        java.util.function.Function<HistoriaResumenResponse, String> enMemoria = sort == null ? null : ORDEN_EN_MEMORIA.get(sort);
+        // Valida page, size y direction con la misma utilidad; el campo se traduce o se ordena en memoria.
+        Pageable pageable = PageSupport.pageable(page, size,
+                enMemoria != null ? "fechaHora" : sort == null ? null : SORT_ALIASES.getOrDefault(sort, sort),
+                direction, "fechaHora", SORTS);
         Specification<HistoriaClinica> spec = (root, query, cb) -> {
             List<Predicate> p = new ArrayList<>();
             if (clienteId != null) p.add(cb.equal(root.get("mascota").get("cliente").get("clienteId"), clienteId));
@@ -62,7 +80,30 @@ public class HistoriaClinicaServiceImpl implements HistoriaClinicaService {
             }
             return cb.and(p.toArray(Predicate[]::new));
         };
-        return PageResponse.from(historias.findAll(spec, pageable).map(this::summary));
+        if (enMemoria == null) return PageResponse.from(historias.findAll(spec, pageable).map(this::summary));
+
+        // Orden por veterinario o motivo: se resumen todas las historias filtradas, se ordenan y se pagina.
+        boolean ascendente = pageable.getSort().getOrderFor("fechaHora").isAscending();
+        List<HistoriaResumenResponse> ordenadas = historias.findAll(spec, Sort.by(Sort.Direction.DESC, "fechaHora"))
+                .stream().map(this::summary)
+                .sorted(Comparator.comparing(enMemoria, (a, b) -> compararTexto(a, b, ascendente)))
+                .toList();
+        int desde = Math.min((int) pageable.getOffset(), ordenadas.size());
+        int hasta = Math.min(desde + pageable.getPageSize(), ordenadas.size());
+        return PageResponse.from(new PageImpl<>(ordenadas.subList(desde, hasta), pageable, ordenadas.size()));
+    }
+
+    /**
+     * Compara textos sin distinguir mayúsculas ni tildes, en el sentido indicado;
+     * los valores vacíos quedan al final en ambos sentidos.
+     */
+    private static int compararTexto(String a, String b, boolean ascendente) {
+        if (a == null || a.isBlank()) return b == null || b.isBlank() ? 0 : 1;
+        if (b == null || b.isBlank()) return -1;
+        java.text.Collator collator = java.text.Collator.getInstance(Locale.forLanguageTag("es"));
+        collator.setStrength(java.text.Collator.PRIMARY);
+        int resultado = collator.compare(a, b);
+        return ascendente ? resultado : -resultado;
     }
 
     /** {@inheritDoc} */
@@ -84,6 +125,10 @@ public class HistoriaClinicaServiceImpl implements HistoriaClinicaService {
         Cita cita = null;
         if (r.citaId() != null) {
             cita = citas.findById(r.citaId()).orElseThrow(() -> missing("Cita"));
+            if (cita.getMascota() == null || cita.getCliente() == null || cita.getVeterinario() == null) {
+                throw new BadRequestException(HttpStatus.CONFLICT,
+                        "La cita asociada tiene relaciones incompletas");
+            }
             if (!cita.getMascota().getMascotaId().equals(mascota.getMascotaId())
                     || !cita.getCliente().getClienteId().equals(cliente.getClienteId())) {
                 throw new BadRequestException(HttpStatus.CONFLICT,
@@ -138,31 +183,46 @@ public class HistoriaClinicaServiceImpl implements HistoriaClinicaService {
     }
 
     private HistoriaResponse response(HistoriaClinica h) {
-        Cliente cliente = h.getCliente() != null ? h.getCliente() : h.getMascota().getCliente();
-        Anotacion note = latestNote(h);
+        Mascota mascota = h.getMascota();
+        Cliente cliente = h.getCliente() != null ? h.getCliente() : mascota == null ? null : mascota.getCliente();
+        List<Anotacion> notes = notes(h);
+        Anotacion note = clinicalNote(notes);
         Veterinario vet = h.getVeterinario() != null ? h.getVeterinario() : note == null ? null : note.getVeterinario();
         HistoriaClinicaNarrativeCodec.Narrative clinicalData = clinicalData(h, note);
         return new HistoriaResponse(h.getHistoriaClinicaId(), cliente == null ? null : cliente.getClienteId(),
                 cliente == null ? null : cliente.getNombres() + " " + cliente.getApellidos(),
-                h.getMascota().getMascotaId(), h.getMascota().getNombreMascota(),
+                mascota == null ? null : mascota.getMascotaId(), mascota == null ? null : mascota.getNombreMascota(),
                 h.getCita() == null ? null : h.getCita().getCitaId(),
                 vet == null ? null : vet.getVeterinarioId(),
                 vet == null ? null : vet.getNombres() + " " + vet.getApellidos(),
                 h.getFechaHora(), clinicalData.motivoConsulta(), clinicalData.diagnostico(),
-                clinicalData.observaciones());
+                clinicalData.observaciones(), estado(notes));
     }
 
     private HistoriaResumenResponse summary(HistoriaClinica h) {
-        Cliente cliente = h.getCliente() != null ? h.getCliente() : h.getMascota().getCliente();
-        Anotacion note = latestNote(h);
+        Mascota mascota = h.getMascota();
+        Cliente cliente = h.getCliente() != null ? h.getCliente() : mascota == null ? null : mascota.getCliente();
+        List<Anotacion> notes = notes(h);
+        Anotacion note = clinicalNote(notes);
         Veterinario vet = h.getVeterinario() != null ? h.getVeterinario() : note == null ? null : note.getVeterinario();
         HistoriaClinicaNarrativeCodec.Narrative clinicalData = clinicalData(h, note);
         return new HistoriaResumenResponse(h.getHistoriaClinicaId(), cliente == null ? null : cliente.getClienteId(),
                 cliente == null ? null : cliente.getNombres() + " " + cliente.getApellidos(),
-                h.getMascota().getMascotaId(), h.getMascota().getNombreMascota(),
+                mascota == null ? null : mascota.getMascotaId(), mascota == null ? null : mascota.getNombreMascota(),
                 vet == null ? null : vet.getVeterinarioId(),
                 vet == null ? null : vet.getNombres() + " " + vet.getApellidos(),
-                h.getFechaHora(), clinicalData.motivoConsulta());
+                h.getFechaHora(), clinicalData.motivoConsulta(), estado(notes));
+    }
+
+    /** Estado calculado a partir de las anotaciones registradas de la historia (no es una columna). */
+    private String estado(List<Anotacion> notes) {
+        return notes.isEmpty() ? SIN_ANOTACIONES : CON_ANOTACIONES;
+    }
+
+    /** Anotaciones de la historia, de la más reciente a la más antigua (una sola consulta por historia). */
+    private List<Anotacion> notes(HistoriaClinica h) {
+        if (h.getHistoriaClinicaId() == null) return List.of();
+        return anotaciones.findByHistoriaClinica_HistoriaClinicaIdOrderByFechaHoraDesc(h.getHistoriaClinicaId());
     }
 
     private HistoriaClinicaNarrativeCodec.Narrative clinicalData(HistoriaClinica historia, Anotacion note) {
@@ -178,11 +238,16 @@ public class HistoriaClinicaServiceImpl implements HistoriaClinicaService {
                 : HistoriaClinicaNarrativeCodec.decode(note.getDescripcion());
     }
 
-    private Anotacion latestNote(HistoriaClinica h) {
-        if (h.getHistoriaClinicaId() == null) return null;
-        List<Anotacion> notes = anotaciones.findByHistoriaClinica_HistoriaClinicaIdOrderByFechaHoraDesc(
-                h.getHistoriaClinicaId());
-        return notes.isEmpty() ? null : notes.get(0);
+    /**
+     * Anotación que contiene los datos clínicos de la historia: la creada junto con la historia
+     * (formato estructurado). Si no existe, se usa la anotación más reciente.
+     */
+    private Anotacion clinicalNote(List<Anotacion> notes) {
+        if (notes.isEmpty()) return null;
+        for (int i = notes.size() - 1; i >= 0; i--) {
+            if (HistoriaClinicaNarrativeCodec.decode(notes.get(i).getDescripcion()).structured()) return notes.get(i);
+        }
+        return notes.get(0);
     }
 
     private String blankToNull(String value) {

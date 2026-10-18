@@ -3,9 +3,16 @@ package com.uniminuto.clinica.entity;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.NotFound;
+import org.hibernate.annotations.NotFoundAction;
+
 import java.time.LocalDateTime;
 
-/** Fórmula almacenada según las tablas existentes de la clínica. */
+/**
+ * Fórmula médica mapeada exactamente a las columnas existentes de {@code formula_medica}:
+ * id, cita_id, medicamento_id, dosis, indicaciones, fecha_creacion_registro y
+ * fecha_actualizacion_registro. La mascota, el cliente y el veterinario se obtienen de la cita.
+ */
 @Entity
 @Table(name = "formula_medica")
 @Getter
@@ -16,18 +23,12 @@ public class FormulaMedica {
     private Long formulaMedicaId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cita_id", nullable = true)
+    @NotFound(action = NotFoundAction.IGNORE)
+    @JoinColumn(name = "cita_id", nullable = false)
     private Cita cita;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "historia_medica_id")
-    private HistoriaClinica historiaClinica;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "medico_id")
-    private Veterinario veterinario;
-
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @NotFound(action = NotFoundAction.IGNORE)
     @JoinColumn(name = "medicamento_id", nullable = false)
     private Medicamento medicamentoEntity;
 
@@ -42,7 +43,4 @@ public class FormulaMedica {
 
     @Column(name = "fecha_actualizacion_registro")
     private LocalDateTime fechaActualizacion;
-
-    @Column(name = "fecha_emision")
-    private java.time.LocalDate fechaEmision;
 }

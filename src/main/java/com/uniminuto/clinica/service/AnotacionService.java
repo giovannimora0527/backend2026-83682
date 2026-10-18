@@ -45,6 +45,21 @@ public interface AnotacionService {
      * @return página con las anotaciones de la historia clínica
      */
     PageResponse<AnotacionResponse> listarHistoria(
+            Long historiaClinicaId, int page, int size, String sort, String direction,
+            Long veterinarioId, java.time.LocalDate fecha);
+
+    /**
+     * Consulta las anotaciones de una historia clínica sin filtros adicionales,
+     * permitiendo paginación y ordenamiento.
+     *
+     * @param historiaClinicaId identificador de la historia clínica
+     * @param page índice de la página, comenzando en cero
+     * @param size cantidad máxima de anotaciones por página
+     * @param sort campo por el que se ordenarán los resultados
+     * @param direction dirección del ordenamiento, ascendente o descendente
+     * @return página con las anotaciones de la historia clínica
+     */
+    PageResponse<AnotacionResponse> listarHistoria(
             Long historiaClinicaId,
             int page,
             int size,

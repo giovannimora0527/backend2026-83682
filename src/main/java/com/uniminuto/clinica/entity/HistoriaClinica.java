@@ -18,7 +18,8 @@ public class HistoriaClinica {
     @Transient
     private Cliente cliente;
 
-    @ManyToOne(optional = false, fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @org.hibernate.annotations.NotFound(action = org.hibernate.annotations.NotFoundAction.IGNORE)
     @JoinColumn(name = "paciente_id", nullable = false)
     private Mascota mascota;
 

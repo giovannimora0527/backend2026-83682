@@ -37,6 +37,14 @@ public interface FormulaMedicaService {
     );
 
     /**
+     * Lista todas las fórmulas ordenadas por fecha de registro (servicio del parcial).
+     *
+     * @param ascendente {@code true} para orden ascendente, {@code false} para descendente
+     * @return fórmulas ordenadas
+     */
+    java.util.List<FormulaResponse> listarOrdenadas(boolean ascendente);
+
+    /**
      * Consulta una fórmula médica por su identificador.
      *
      * @param id identificador de la fórmula médica

@@ -6,4 +6,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface ClienteRepository extends JpaRepository<Cliente, Long> {
+
+    /** Busca un cliente por número de documento (servicio del parcial). */
+    java.util.Optional<Cliente> findFirstByNumeroDocumento(String numeroDocumento);
 }
