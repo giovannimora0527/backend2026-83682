@@ -1,0 +1,109 @@
+<form [formGroup]="form" (ngSubmit)="guardar()" novalidate>
+  <app-alerta [mensaje]="mensaje()" (cerrar)="mensaje.set(null)"></app-alerta>
+
+  @if (cargandoCatalogos()) {
+    <p class="texto-suave" role="status">Cargando información…</p>
+  }
+
+  <div class="fila">
+    <div class="campo">
+      <label for="h-cliente">Cliente</label>
+      <select id="h-cliente" formControlName="clienteId">
+        <option [ngValue]="null" disabled>Seleccione un cliente</option>
+        @for (cliente of clientes(); track cliente.id) {
+          <option [ngValue]="cliente.id">{{ cliente.nombreCompleto }} ({{ cliente.numeroDocumento }})</option>
+        }
+      </select>
+      @if (invalido('clienteId')) {
+        <small class="error">Seleccione un cliente.</small>
+      }
+    </div>
+
+    <div class="campo">
+      <label for="h-mascota">Mascota</label>
+      <select id="h-mascota" formControlName="mascotaId">
+        <option [ngValue]="null" disabled>{{ textoMascota() }}</option>
+        @for (mascota of mascotas(); track mascota.id) {
+          <option [ngValue]="mascota.id">{{ mascota.nombre }} ({{ mascota.raza }})</option>
+        }
+      </select>
+      @if (invalido('mascotaId')) {
+        <small class="error">Seleccione una mascota del cliente.</small>
+      }
+    </div>
+  </div>
+
+  <div class="campo">
+    <label for="h-cita">Cita atendida</label>
+    <select id="h-cita" formControlName="citaId">
+      <option [ngValue]="null" disabled>{{ textoCita() }}</option>
+      @for (cita of citas(); track cita.id) {
+        <option [ngValue]="cita.id">{{ etiquetaCita(cita) }}</option>
+      }
+    </select>
+    @if (invalido('citaId')) {
+      <small class="error">Seleccione la cita atendida que origina la historia.</small>
+    }
+  </div>
+
+  <div class="campo">
+    <label for="h-veterinario">Veterinario</label>
+    <select id="h-veterinario" formControlName="veterinarioId">
+      <option [ngValue]="null" disabled>Seleccione un veterinario</option>
+      @for (veterinario of veterinarios(); track veterinario.id) {
+        <option [ngValue]="veterinario.id">{{ veterinario.nombreCompleto }} — {{ veterinario.especializacion }}</option>
+      }
+    </select>
+    @if (invalido('veterinarioId')) {
+      <small class="error">Seleccione un veterinario.</small>
+    }
+  </div>
+
+  <div class="fila">
+    <div class="campo">
+      <label for="h-fecha">Fecha de la consulta</label>
+      <input id="h-fecha" type="date" formControlName="fecha" />
+      @if (invalido('fecha')) {
+        <small class="error">Indique la fecha.</small>
+      }
+    </div>
+    <div class="campo">
+      <label for="h-hora">Hora de la consulta</label>
+      <input id="h-hora" type="time" formControlName="hora" />
+      @if (invalido('hora')) {
+        <small class="error">Indique la hora.</small>
+      }
+    </div>
+  </div>
+  @if (fechaFutura()) {
+    <p class="error">La fecha y hora de la consulta no pueden ser futuras.</p>
+  }
+
+  <div class="campo">
+    <label for="h-motivo">Motivo de consulta</label>
+    <textarea id="h-motivo" formControlName="motivo" maxlength="500"></textarea>
+    @if (invalido('motivo')) {
+      <small class="error">Indique el motivo de consulta (máximo 500 caracteres).</small>
+    }
+  </div>
+
+  <div class="campo">
+    <label for="h-diagnostico">Diagnóstico</label>
+    <textarea id="h-diagnostico" formControlName="diagnostico" maxlength="2000"></textarea>
+    @if (invalido('diagnostico')) {
+      <small class="error">Indique el diagnóstico (máximo 2000 caracteres).</small>
+    }
+  </div>
+
+  <div class="campo">
+    <label for="h-observaciones">Observaciones (opcional)</label>
+    <textarea id="h-observaciones" formControlName="observaciones" maxlength="2000"></textarea>
+  </div>
+
+  <div class="formulario-botones">
+    <button type="button" class="btn" (click)="cancelado.emit()" [disabled]="guardando()">Cancelar</button>
+    <button type="submit" class="btn btn-primario" [disabled]="guardando() || cargandoCatalogos()">
+      {{ guardando() ? 'Guardando…' : 'Guardar' }}
+    </button>
+  </div>
+</form>

@@ -1,0 +1,165 @@
+<form [formGroup]="form" (ngSubmit)="guardar()" novalidate>
+  <app-alerta [mensaje]="mensaje()" (cerrar)="mensaje.set(null)"></app-alerta>
+
+  @if (cargandoCatalogos()) {
+    <p class="texto-suave" role="status">Cargando información…</p>
+  }
+
+  @if (formula(); as f) {
+    <p class="texto-suave">
+      Solo se pueden modificar el medicamento, la dosis, la frecuencia, la duración y las indicaciones. La mascota, la
+      consulta, el veterinario y la fecha de emisión forman parte del registro clínico.
+    </p>
+    <dl class="detalle">
+      <div>
+        <dt>Cliente</dt>
+        <dd>{{ f.clienteNombre }}</dd>
+      </div>
+      <div>
+        <dt>Mascota</dt>
+        <dd>{{ f.mascotaNombre }}</dd>
+      </div>
+      <div>
+        <dt>Consulta</dt>
+        <dd>{{ fechaHora(f.fechaConsulta) }} — {{ f.motivoConsulta }}</dd>
+      </div>
+      <div>
+        <dt>Veterinario</dt>
+        <dd>{{ f.veterinarioNombre }}</dd>
+      </div>
+      <div>
+        <dt>Fecha de emisión</dt>
+        <dd>{{ fecha(f.fechaEmision) }}</dd>
+      </div>
+    </dl>
+    <hr />
+  } @else {
+    <div class="fila">
+      <div class="campo">
+        <label for="f-cliente">Cliente</label>
+        <select id="f-cliente" formControlName="clienteId">
+          <option [ngValue]="null" disabled>Seleccione un cliente</option>
+          @for (cliente of clientes(); track cliente.id) {
+            <option [ngValue]="cliente.id">{{ cliente.nombreCompleto }} ({{ cliente.numeroDocumento }})</option>
+          }
+        </select>
+        @if (invalido('clienteId')) {
+          <small class="error">Seleccione un cliente.</small>
+        }
+      </div>
+
+      <div class="campo">
+        <label for="f-mascota">Mascota</label>
+        <select id="f-mascota" formControlName="mascotaId">
+          <option [ngValue]="null" disabled>{{ textoMascota() }}</option>
+          @for (mascota of mascotas(); track mascota.id) {
+            <option [ngValue]="mascota.id">{{ mascota.nombre }} ({{ mascota.raza }})</option>
+          }
+        </select>
+        @if (invalido('mascotaId')) {
+          <small class="error">Seleccione una mascota del cliente.</small>
+        }
+      </div>
+    </div>
+
+    <div class="campo">
+      <label for="f-historia">Historia clínica o consulta</label>
+      <select id="f-historia" formControlName="historiaId">
+        <option [ngValue]="null" disabled>{{ textoHistoria() }}</option>
+        @for (historia of historias(); track historia.id) {
+          <option [ngValue]="historia.id">{{ etiquetaHistoria(historia) }}</option>
+        }
+      </select>
+      @if (invalido('historiaId')) {
+        <small class="error">Seleccione la consulta de la mascota.</small>
+      }
+    </div>
+
+    <div class="fila">
+      <div class="campo">
+        <label for="f-veterinario">Veterinario</label>
+        <select id="f-veterinario" formControlName="veterinarioId">
+          <option [ngValue]="null" disabled>Seleccione un veterinario</option>
+          @for (veterinario of veterinarios(); track veterinario.id) {
+            <option [ngValue]="veterinario.id">{{ veterinario.nombreCompleto }}</option>
+          }
+        </select>
+        @if (invalido('veterinarioId')) {
+          <small class="error">Seleccione un veterinario.</small>
+        }
+      </div>
+
+      <div class="campo">
+        <label for="f-emision">Fecha de emisión</label>
+        <input id="f-emision" type="date" formControlName="fechaEmision" [attr.min]="fechaConsulta()" [attr.max]="hoy" />
+        @if (form.controls.fechaEmision.errors?.['anteriorConsulta'] && (form.controls.fechaEmision.touched || intentoEnvio())) {
+          <small class="error">La fecha de emisión no puede ser anterior a la fecha de la consulta.</small>
+        } @else if (form.controls.fechaEmision.errors?.['fechaFutura'] && (form.controls.fechaEmision.touched || intentoEnvio())) {
+          <small class="error">La fecha de emisión no puede ser futura.</small>
+        } @else if (invalido('fechaEmision')) {
+          <small class="error">Indique la fecha de emisión.</small>
+        }
+      </div>
+    </div>
+  }
+
+  <div class="campo">
+    <label for="f-medicamento">Medicamento</label>
+    <select id="f-medicamento" formControlName="medicamentoId">
+      <option [ngValue]="null" disabled>Seleccione un medicamento</option>
+      @for (medicamento of medicamentos(); track medicamento.id) {
+        <option [ngValue]="medicamento.id">{{ medicamento.nombre }}{{ medicamento.presentacion ? ' — ' + medicamento.presentacion : '' }}</option>
+      }
+    </select>
+    @if (invalido('medicamentoId')) {
+      <small class="error">Seleccione un medicamento.</small>
+    }
+  </div>
+
+  <div class="fila">
+    <div class="campo">
+      <label for="f-dosis">Dosis</label>
+      <input id="f-dosis" type="number" formControlName="dosisValor" step="0.01" min="0.01" />
+      @if (invalido('dosisValor')) {
+        <small class="error">La dosis debe ser un número mayor que 0 (máximo 10000).</small>
+      }
+    </div>
+    <div class="campo">
+      <label for="f-unidad">Unidad</label>
+      <select id="f-unidad" formControlName="dosisUnidad">
+        @for (unidad of unidades(); track unidad) {
+          <option [value]="unidad">{{ unidad }}</option>
+        }
+      </select>
+    </div>
+    <div class="campo">
+      <label for="f-frecuencia">Frecuencia (cada X horas)</label>
+      <input id="f-frecuencia" type="number" formControlName="frecuenciaHoras" step="1" min="1" max="168" />
+      @if (invalido('frecuenciaHoras')) {
+        <small class="error">Indique un número entero de horas entre 1 y 168.</small>
+      }
+    </div>
+    <div class="campo">
+      <label for="f-duracion">Duración (días)</label>
+      <input id="f-duracion" type="number" formControlName="duracionDias" step="1" min="1" max="365" />
+      @if (invalido('duracionDias')) {
+        <small class="error">Indique un número entero de días entre 1 y 365.</small>
+      }
+    </div>
+  </div>
+
+  <div class="campo">
+    <label for="f-indicaciones">Indicaciones</label>
+    <textarea id="f-indicaciones" formControlName="indicaciones" maxlength="1000"></textarea>
+    @if (invalido('indicaciones')) {
+      <small class="error">Indique las indicaciones (máximo 1000 caracteres).</small>
+    }
+  </div>
+
+  <div class="formulario-botones">
+    <button type="button" class="btn" (click)="cancelado.emit()" [disabled]="guardando()">Cancelar</button>
+    <button type="submit" class="btn btn-primario" [disabled]="guardando() || cargandoCatalogos()">
+      {{ guardando() ? 'Guardando…' : 'Guardar' }}
+    </button>
+  </div>
+</form>

@@ -1,0 +1,81 @@
+<div class="tabla-contenedor" [attr.aria-busy]="cargando()">
+  @if (cargando()) {
+    <div class="tabla-cargando" role="status">Cargando…</div>
+  }
+
+  <div class="tabla-scroll">
+    <table class="tabla">
+      <thead>
+        <tr>
+          @for (columna of columnas(); track columna.id) {
+            <th scope="col" [attr.aria-sort]="ariaOrden(columna)">
+              @if (columna.claveOrden) {
+                <button type="button" class="th-boton" (click)="ordenar(columna)" [title]="'Ordenar por ' + columna.titulo">
+                  {{ columna.titulo }}
+                  <span class="flecha" aria-hidden="true">{{ flecha(columna) }}</span>
+                </button>
+              } @else {
+                {{ columna.titulo }}
+              }
+            </th>
+          }
+          @if (acciones()) {
+            <th scope="col" class="col-acciones">Acciones</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (fila of filas(); track $index) {
+          <tr>
+            @for (columna of columnas(); track columna.id) {
+              <td>
+                @if (columna.insignia) {
+                  <span class="badge" [class]="'badge ' + columna.insignia(fila)">{{ columna.valor(fila) }}</span>
+                } @else {
+                  {{ columna.valor(fila) }}
+                }
+              </td>
+            }
+            @if (acciones(); as plantilla) {
+              <td class="col-acciones">
+                <ng-container [ngTemplateOutlet]="plantilla" [ngTemplateOutletContext]="{ $implicit: fila }"></ng-container>
+              </td>
+            }
+          </tr>
+        } @empty {
+          <tr>
+            <td class="tabla-vacia" [attr.colspan]="totalColumnas()">{{ cargando() ? '' : mensajeVacio() }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div class="paginacion">
+    <span class="texto-suave">{{ resumen() }}</span>
+
+    <label class="paginacion-tamano">
+      Filas por página
+      <select (change)="cambiarTamano($event)">
+        @for (opcion of opcionesTamano(); track opcion) {
+          <option [value]="opcion" [selected]="opcion === control().tamano()">{{ opcion }}</option>
+        }
+      </select>
+    </label>
+
+    <div class="paginacion-botones">
+      <button type="button" class="btn btn-sm" (click)="irAPagina(control().pagina() - 1)" [disabled]="control().pagina() === 0 || cargando()">
+        Anterior
+      </button>
+      <span>Página {{ control().pagina() + 1 }} de {{ totalPaginas() }}</span>
+      <button
+        type="button"
+        class="btn btn-sm"
+        (click)="irAPagina(control().pagina() + 1)"
+        [disabled]="control().pagina() + 1 >= totalPaginas() || cargando()"
+      >
+        Siguiente
+      </button>
+    </div>
+  </div>
+</div>

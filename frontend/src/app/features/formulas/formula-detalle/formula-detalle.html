@@ -1,0 +1,66 @@
+<dl class="detalle">
+  <div>
+    <dt>Estado</dt>
+    <dd>
+      <span class="badge" [class]="'badge ' + (formula().activo ? 'badge-verde' : 'badge-gris')">
+        {{ formula().activo ? 'Activa' : 'Inactiva' }}
+      </span>
+    </dd>
+  </div>
+  <div>
+    <dt>Fecha de emisión</dt>
+    <dd>{{ fecha(formula().fechaEmision) }}</dd>
+  </div>
+  <div>
+    <dt>Cliente</dt>
+    <dd>{{ formula().clienteNombre }}</dd>
+  </div>
+  <div>
+    <dt>Mascota</dt>
+    <dd>{{ formula().mascotaNombre }}</dd>
+  </div>
+  <div>
+    <dt>Veterinario</dt>
+    <dd>{{ formula().veterinarioNombre }}</dd>
+  </div>
+  <div>
+    <dt>Historia clínica / cita</dt>
+    <dd>Historia #{{ formula().historiaId }} (cita #{{ formula().citaId }})</dd>
+  </div>
+  <div class="completo">
+    <dt>Consulta asociada</dt>
+    <dd>{{ fechaHora(formula().fechaConsulta) }} — {{ formula().motivoConsulta }}</dd>
+  </div>
+  <div>
+    <dt>Medicamento</dt>
+    <dd>{{ formula().medicamentoNombre }}</dd>
+  </div>
+  <div>
+    <dt>Presentación</dt>
+    <dd>{{ formula().medicamentoPresentacion || 'No registrada' }}</dd>
+  </div>
+  <div>
+    <dt>Dosis</dt>
+    <dd>{{ formula().dosisValor }} {{ formula().dosisUnidad }}</dd>
+  </div>
+  <div>
+    <dt>Frecuencia</dt>
+    <dd>Cada {{ formula().frecuenciaHoras }} horas</dd>
+  </div>
+  <div>
+    <dt>Duración del tratamiento</dt>
+    <dd>{{ formula().duracionDias }} días</dd>
+  </div>
+  <div class="completo">
+    <dt>Indicaciones</dt>
+    <dd>{{ formula().indicaciones }}</dd>
+  </div>
+  <div>
+    <dt>Registrada el</dt>
+    <dd>{{ fechaHora(formula().fechaCreacion) }}</dd>
+  </div>
+  <div>
+    <dt>Última actualización</dt>
+    <dd>{{ formula().fechaActualizacion ? fechaHora(formula().fechaActualizacion!) : 'Sin cambios' }}</dd>
+  </div>
+</dl>

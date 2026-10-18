@@ -1,0 +1,86 @@
+<div class="encabezado-pagina">
+  <div>
+    <h1>Historias clínicas</h1>
+    <p class="texto-suave">Historial médico de cada mascota, de la consulta más reciente a la más antigua.</p>
+  </div>
+  <button type="button" class="btn btn-primario" (click)="formularioAbierto.set(true)">+ Nueva historia</button>
+</div>
+
+<app-alerta [mensaje]="mensaje()" (cerrar)="mensaje.set(null)"></app-alerta>
+
+<form class="tarjeta filtros" [formGroup]="filtroForm" (ngSubmit)="buscar()">
+  <div class="campo">
+    <label for="fh-cliente">Cliente</label>
+    <input id="fh-cliente" type="text" formControlName="cliente" placeholder="Nombre del cliente" />
+  </div>
+  <div class="campo">
+    <label for="fh-mascota">Mascota</label>
+    <input id="fh-mascota" type="text" formControlName="mascota" placeholder="Nombre de la mascota" />
+  </div>
+  <div class="campo">
+    <label for="fh-motivo">Motivo de consulta</label>
+    <input id="fh-motivo" type="text" formControlName="motivo" placeholder="Texto del motivo" />
+  </div>
+  <div class="campo">
+    <label for="fh-veterinario">Veterinario</label>
+    <select id="fh-veterinario" formControlName="veterinarioId">
+      <option [ngValue]="null">Todos</option>
+      @for (veterinario of veterinarios(); track veterinario.id) {
+        <option [ngValue]="veterinario.id">{{ veterinario.nombreCompleto }}</option>
+      }
+    </select>
+  </div>
+  <div class="campo">
+    <label for="fh-estado">Estado</label>
+    <select id="fh-estado" formControlName="estado">
+      <option value="">Todos</option>
+      @for (estado of estados; track estado) {
+        <option [value]="estado">{{ etiquetaEstado[estado] }}</option>
+      }
+    </select>
+  </div>
+  <div class="campo">
+    <label for="fh-desde">Desde</label>
+    <input id="fh-desde" type="date" formControlName="desde" />
+  </div>
+  <div class="campo">
+    <label for="fh-hasta">Hasta</label>
+    <input id="fh-hasta" type="date" formControlName="hasta" />
+  </div>
+  <div class="filtros-botones">
+    <button type="submit" class="btn btn-primario">Buscar</button>
+    <button type="button" class="btn" (click)="limpiar()">Limpiar</button>
+  </div>
+</form>
+
+<div class="tarjeta">
+  <app-tabla-datos
+    [columnas]="columnas"
+    [filas]="filas()"
+    [total]="total()"
+    [control]="tabla"
+    [cargando]="cargando()"
+    [acciones]="acciones"
+    mensajeVacio="No hay historias clínicas que coincidan con la búsqueda."
+    (cambio)="cargar()"
+  ></app-tabla-datos>
+</div>
+
+<ng-template #acciones let-historia>
+  <button type="button" class="btn btn-sm" (click)="historiaVista.set(historia)">Ver</button>
+  @if (historia.estado === 'ABIERTA') {
+    <button type="button" class="btn btn-sm" (click)="cerrar(historia)">Cerrar historia</button>
+  }
+</ng-template>
+
+@if (formularioAbierto()) {
+  <app-modal titulo="Nueva historia clínica" (cerrar)="formularioAbierto.set(false)">
+    <app-historia-form (guardado)="alGuardar($event)" (cancelado)="formularioAbierto.set(false)"></app-historia-form>
+  </app-modal>
+}
+
+@if (historiaVista(); as historia) {
+  <app-modal [titulo]="'Historia clínica #' + historia.id + ' — ' + historia.mascotaNombre" [ancho]="true" (cerrar)="historiaVista.set(null)">
+    <app-historia-detalle [historia]="historia"></app-historia-detalle>
+  </app-modal>
+}

@@ -1,0 +1,78 @@
+<div class="encabezado-pagina">
+  <div>
+    <h1>Citas médicas</h1>
+    <p class="texto-suave">Citas programadas para los pacientes del centro, de la más reciente a la más antigua.</p>
+  </div>
+  <button type="button" class="btn btn-primario" (click)="nueva()">+ Nueva cita</button>
+</div>
+
+<app-alerta [mensaje]="mensaje()" (cerrar)="mensaje.set(null)"></app-alerta>
+
+<form class="tarjeta filtros" [formGroup]="filtroForm" (ngSubmit)="buscar()">
+  <div class="campo">
+    <label for="f-cliente">Cliente</label>
+    <input id="f-cliente" type="text" formControlName="cliente" placeholder="Nombre del cliente" />
+  </div>
+  <div class="campo">
+    <label for="f-mascota">Mascota</label>
+    <input id="f-mascota" type="text" formControlName="mascota" placeholder="Nombre de la mascota" />
+  </div>
+  <div class="campo">
+    <label for="f-veterinario">Veterinario</label>
+    <select id="f-veterinario" formControlName="veterinarioId">
+      <option [ngValue]="null">Todos</option>
+      @for (veterinario of veterinarios(); track veterinario.id) {
+        <option [ngValue]="veterinario.id">{{ veterinario.nombreCompleto }}</option>
+      }
+    </select>
+  </div>
+  <div class="campo">
+    <label for="f-estado">Estado</label>
+    <select id="f-estado" formControlName="estado">
+      <option value="">Todos</option>
+      @for (estado of estados; track estado) {
+        <option [value]="estado">{{ etiquetaEstado[estado] }}</option>
+      }
+    </select>
+  </div>
+  <div class="campo">
+    <label for="f-desde">Desde</label>
+    <input id="f-desde" type="date" formControlName="desde" />
+  </div>
+  <div class="campo">
+    <label for="f-hasta">Hasta</label>
+    <input id="f-hasta" type="date" formControlName="hasta" />
+  </div>
+  <div class="filtros-botones">
+    <button type="submit" class="btn btn-primario">Buscar</button>
+    <button type="button" class="btn" (click)="limpiar()">Limpiar</button>
+  </div>
+</form>
+
+<div class="tarjeta">
+  <app-tabla-datos
+    [columnas]="columnas"
+    [filas]="filas()"
+    [total]="total()"
+    [control]="tabla"
+    [cargando]="cargando()"
+    [acciones]="acciones"
+    mensajeVacio="No hay citas que coincidan con la búsqueda."
+    (cambio)="cargar()"
+  ></app-tabla-datos>
+</div>
+
+<ng-template #acciones let-cita>
+  <button type="button" class="btn btn-sm" (click)="editar(cita)" [disabled]="!puedeEditar(cita)" [title]="ayudaEditar(cita)">
+    Editar
+  </button>
+  @if (cita.estado === 'CANCELADA') {
+    <button type="button" class="btn btn-sm" (click)="reactivar(cita)">Reactivar</button>
+  }
+</ng-template>
+
+@if (formularioAbierto()) {
+  <app-modal [titulo]="citaEnEdicion() ? 'Editar cita #' + citaEnEdicion()?.id : 'Nueva cita'" (cerrar)="cerrarFormulario()">
+    <app-cita-form [cita]="citaEnEdicion()" (guardado)="alGuardar($event)" (cancelado)="cerrarFormulario()"></app-cita-form>
+  </app-modal>
+}

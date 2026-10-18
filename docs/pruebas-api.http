@@ -1,0 +1,303 @@
+### ============================================================
+### Pruebas del API — extensión "REST Client" de VS Code
+### o cliente HTTP de IntelliJ. El backend debe estar en el puerto 8080.
+### Las fechas de ejemplo deben ser FUTURAS: ajústalas si ya pasaron.
+### ============================================================
+@api = http://localhost:8080/api
+
+### ---------- Consultas ----------
+### 1. Clientes
+GET {{api}}/clientes
+
+### 2. Mascotas de un cliente (Juan Pérez = 1)
+GET {{api}}/clientes/1/mascotas
+
+### 3. Cliente inexistente -> 404
+GET {{api}}/clientes/9999/mascotas
+
+### 4. Veterinarios y medicamentos vigentes
+GET {{api}}/veterinarios
+
+###
+GET {{api}}/medicamentos
+
+### 5. Citas: más recientes primero, página de 5
+GET {{api}}/citas?pagina=0&tamano=5
+
+### 6. Citas con filtros y orden por mascota
+GET {{api}}/citas?estado=PENDIENTE&orden=mascota&direccion=asc
+
+### 7. Fórmulas (vista resumida) y detalle completo
+GET {{api}}/formulas
+
+###
+GET {{api}}/formulas/1
+
+### 8. Anotaciones de la historia 1 (más reciente primero)
+GET {{api}}/historias/1/anotaciones?tamano=5
+
+### ---------- Citas: creación ----------
+### 9. Cita válida (Laura Hernández = cliente 4, mascota Bella = 4, veterinario 6)
+POST {{api}}/citas
+Content-Type: application/json
+
+{
+  "clienteId": 4,
+  "mascotaId": 4,
+  "veterinarioId": 6,
+  "fechaHora": "2026-12-01T10:00:00",
+  "motivo": "Control general",
+  "estado": "PENDIENTE"
+}
+
+### 10. Mismo veterinario 10 minutos después -> 409 (veterinario no disponible)
+POST {{api}}/citas
+Content-Type: application/json
+
+{
+  "clienteId": 5,
+  "mascotaId": 5,
+  "veterinarioId": 6,
+  "fechaHora": "2026-12-01T10:10:00",
+  "motivo": "Vacunación",
+  "estado": "PENDIENTE"
+}
+
+### 11. Misma mascota, otro veterinario, 5 minutos después -> 409 (cita duplicada)
+POST {{api}}/citas
+Content-Type: application/json
+
+{
+  "clienteId": 4,
+  "mascotaId": 4,
+  "veterinarioId": 7,
+  "fechaHora": "2026-12-01T10:05:00",
+  "motivo": "Otra consulta",
+  "estado": "PENDIENTE"
+}
+
+### 12. Mascota que NO es del cliente (cliente 1, mascota 2) -> 422
+POST {{api}}/citas
+Content-Type: application/json
+
+{
+  "clienteId": 1,
+  "mascotaId": 2,
+  "veterinarioId": 6,
+  "fechaHora": "2026-12-02T10:00:00",
+  "motivo": "Consulta",
+  "estado": "PENDIENTE"
+}
+
+### 13. Fecha anterior a la actual -> 422
+POST {{api}}/citas
+Content-Type: application/json
+
+{
+  "clienteId": 4,
+  "mascotaId": 4,
+  "veterinarioId": 6,
+  "fechaHora": "2020-01-01T10:00:00",
+  "motivo": "Consulta",
+  "estado": "PENDIENTE"
+}
+
+### 14. Cliente y veterinario inexistentes -> 404
+POST {{api}}/citas
+Content-Type: application/json
+
+{
+  "clienteId": 9999,
+  "mascotaId": 4,
+  "veterinarioId": 6,
+  "fechaHora": "2026-12-03T10:00:00",
+  "motivo": "Consulta",
+  "estado": "PENDIENTE"
+}
+
+### 15. Campos obligatorios vacíos -> 400 con "camposInvalidos"
+POST {{api}}/citas
+Content-Type: application/json
+
+{
+  "motivo": ""
+}
+
+### ---------- Citas: edición y estados ----------
+### 16. Cambiar una cita atendida (la 4) -> 409 (información histórica)
+PUT {{api}}/citas/4
+Content-Type: application/json
+
+{
+  "veterinarioId": 5,
+  "fechaHora": "2026-12-05T10:00:00",
+  "motivo": "Intento de cambio",
+  "estado": "ATENDIDA"
+}
+
+### 17. Reactivar una cita que NO está cancelada (la 6) -> 409
+PATCH {{api}}/citas/6/reactivar
+
+### 18. Reactivar la cancelada (la 10), su fecha ya pasó -> 422
+PATCH {{api}}/citas/10/reactivar
+
+### ---------- Historias y anotaciones ----------
+### 19. Historia válida desde la cita atendida 4 (Laura / Bella, veterinario 5)
+POST {{api}}/historias
+Content-Type: application/json
+
+{
+  "clienteId": 4,
+  "mascotaId": 4,
+  "citaId": 4,
+  "veterinarioId": 5,
+  "fechaHora": "2026-10-11T10:00:00",
+  "motivo": "Control de piel",
+  "diagnostico": "Dermatitis leve",
+  "observaciones": "Baño medicado cada 3 días"
+}
+
+### 20. La misma cita otra vez -> 409 (ya tiene historia)
+POST {{api}}/historias
+Content-Type: application/json
+
+{
+  "clienteId": 4,
+  "mascotaId": 4,
+  "citaId": 4,
+  "veterinarioId": 5,
+  "fechaHora": "2026-10-11T10:00:00",
+  "motivo": "Control de piel",
+  "diagnostico": "Repetida"
+}
+
+### 21. Cita de OTRA mascota (cita 5 es de Toby, mascota 5) -> 422
+POST {{api}}/historias
+Content-Type: application/json
+
+{
+  "clienteId": 4,
+  "mascotaId": 4,
+  "citaId": 5,
+  "veterinarioId": 5,
+  "fechaHora": "2026-10-11T10:00:00",
+  "motivo": "Mezcla de datos",
+  "diagnostico": "Inválida"
+}
+
+### 22. Agregar anotación a la historia 1 -> 201
+POST {{api}}/historias/1/anotaciones
+Content-Type: application/json
+
+{
+  "veterinarioId": 3,
+  "descripcion": "Control a la semana",
+  "observacion": "Sin molestias",
+  "diagnosticoEvolucion": "Recuperación completa"
+}
+
+### 23. Anotación en la historia 3 (CERRADA) -> 409
+POST {{api}}/historias/3/anotaciones
+Content-Type: application/json
+
+{
+  "veterinarioId": 2,
+  "descripcion": "Intento",
+  "observacion": "Intento",
+  "diagnosticoEvolucion": "Intento"
+}
+
+### ---------- Fórmulas ----------
+### 24. Fórmula válida en la historia 2 (Luna = mascota 2), medicamento Amoxicilina = 4
+POST {{api}}/formulas
+Content-Type: application/json
+
+{
+  "mascotaId": 2,
+  "historiaId": 2,
+  "veterinarioId": 3,
+  "fechaEmision": "2026-10-16",
+  "medicamentoId": 5,
+  "dosisValor": 1.5,
+  "dosisUnidad": "ml",
+  "frecuenciaHoras": 12,
+  "duracionDias": 5,
+  "indicaciones": "Administrar con el alimento"
+}
+
+### 25. Mascota inexistente -> 404
+POST {{api}}/formulas
+Content-Type: application/json
+
+{
+  "mascotaId": 9999,
+  "historiaId": 2,
+  "veterinarioId": 3,
+  "fechaEmision": "2026-10-16",
+  "medicamentoId": 5,
+  "dosisValor": 1,
+  "dosisUnidad": "ml",
+  "frecuenciaHoras": 12,
+  "duracionDias": 5,
+  "indicaciones": "x"
+}
+
+### 26. Historia de otra mascota (la historia 1 es de Max, mascota 1) -> 422
+POST {{api}}/formulas
+Content-Type: application/json
+
+{
+  "mascotaId": 2,
+  "historiaId": 1,
+  "veterinarioId": 3,
+  "fechaEmision": "2026-10-16",
+  "medicamentoId": 5,
+  "dosisValor": 1,
+  "dosisUnidad": "ml",
+  "frecuenciaHoras": 12,
+  "duracionDias": 5,
+  "indicaciones": "x"
+}
+
+### 27. Emisión anterior a la consulta -> 422
+POST {{api}}/formulas
+Content-Type: application/json
+
+{
+  "mascotaId": 2,
+  "historiaId": 2,
+  "veterinarioId": 3,
+  "fechaEmision": "2020-01-01",
+  "medicamentoId": 5,
+  "dosisValor": 1,
+  "dosisUnidad": "ml",
+  "frecuenciaHoras": 12,
+  "duracionDias": 5,
+  "indicaciones": "x"
+}
+
+### 28. Dosis 0 y duración 500 -> 400 con "camposInvalidos"
+POST {{api}}/formulas
+Content-Type: application/json
+
+{
+  "mascotaId": 2,
+  "historiaId": 2,
+  "veterinarioId": 3,
+  "fechaEmision": "2026-10-16",
+  "medicamentoId": 5,
+  "dosisValor": 0,
+  "dosisUnidad": "ml",
+  "frecuenciaHoras": 12,
+  "duracionDias": 500,
+  "indicaciones": "x"
+}
+
+### 29. Inactivar (no se elimina) y volver a activar
+PATCH {{api}}/formulas/1/inactivar
+
+###
+PATCH {{api}}/formulas/1/activar
+
+### 30. No existe DELETE -> 405
+DELETE {{api}}/formulas/1

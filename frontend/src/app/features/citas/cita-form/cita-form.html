@@ -1,0 +1,101 @@
+<form [formGroup]="form" (ngSubmit)="guardar()" novalidate>
+  <app-alerta [mensaje]="mensaje()" (cerrar)="mensaje.set(null)"></app-alerta>
+
+  @if (cargandoCatalogos()) {
+    <p class="texto-suave" role="status">Cargando información…</p>
+  }
+
+  <div class="campo">
+    <label for="cita-cliente">Cliente</label>
+    @if (esEdicion()) {
+      <input id="cita-cliente" type="text" [value]="cita()?.clienteNombre ?? ''" readonly />
+    } @else {
+      <select id="cita-cliente" formControlName="clienteId">
+        <option [ngValue]="null" disabled>Seleccione un cliente</option>
+        @for (cliente of clientes(); track cliente.id) {
+          <option [ngValue]="cliente.id">{{ cliente.nombreCompleto }} ({{ cliente.numeroDocumento }})</option>
+        }
+      </select>
+      @if (invalido('clienteId')) {
+        <small class="error">Seleccione un cliente.</small>
+      }
+    }
+  </div>
+
+  <div class="campo">
+    <label for="cita-mascota">Mascota</label>
+    @if (esEdicion()) {
+      <input id="cita-mascota" type="text" [value]="cita()?.mascotaNombre ?? ''" readonly />
+    } @else {
+      <select id="cita-mascota" formControlName="mascotaId">
+        <option [ngValue]="null" disabled>{{ textoMascota() }}</option>
+        @for (mascota of mascotas(); track mascota.id) {
+          <option [ngValue]="mascota.id">{{ mascota.nombre }} ({{ mascota.raza }})</option>
+        }
+      </select>
+      @if (invalido('mascotaId')) {
+        <small class="error">Seleccione una mascota del cliente.</small>
+      }
+    }
+  </div>
+
+  <div class="campo">
+    <label for="cita-veterinario">Veterinario</label>
+    <select id="cita-veterinario" formControlName="veterinarioId">
+      <option [ngValue]="null" disabled>Seleccione un veterinario</option>
+      @for (veterinario of veterinarios(); track veterinario.id) {
+        <option [ngValue]="veterinario.id">{{ veterinario.nombreCompleto }} — {{ veterinario.especializacion }}</option>
+      }
+    </select>
+    @if (invalido('veterinarioId')) {
+      <small class="error">Seleccione un veterinario.</small>
+    }
+  </div>
+
+  <div class="fila">
+    <div class="campo">
+      <label for="cita-fecha">Fecha</label>
+      <input id="cita-fecha" type="date" formControlName="fecha" [attr.min]="esEdicion() ? null : hoy" />
+      @if (invalido('fecha')) {
+        <small class="error">Indique la fecha.</small>
+      }
+    </div>
+    <div class="campo">
+      <label for="cita-hora">Hora</label>
+      <input id="cita-hora" type="time" formControlName="hora" />
+      @if (invalido('hora')) {
+        <small class="error">Indique la hora.</small>
+      }
+    </div>
+  </div>
+  @if (fechaPasada()) {
+    <p class="error">No se pueden registrar citas en fechas anteriores a la actual.</p>
+  }
+
+  <div class="campo">
+    <label for="cita-estado">Estado</label>
+    <select id="cita-estado" formControlName="estado">
+      @for (estado of estados(); track estado) {
+        <option [ngValue]="estado">{{ etiquetaEstado[estado] }}</option>
+      }
+    </select>
+    @if (esEdicion()) {
+      <small class="texto-suave">Solo se muestran los estados a los que puede pasar esta cita.</small>
+    }
+  </div>
+
+  <div class="campo">
+    <label for="cita-motivo">Motivo de la consulta</label>
+    <textarea id="cita-motivo" formControlName="motivo" maxlength="500"></textarea>
+    @if (invalido('motivo')) {
+      <small class="error">Indique el motivo de la consulta (máximo 500 caracteres).</small>
+    }
+  </div>
+
+  <div class="formulario-botones">
+    <button type="button" class="btn" (click)="cancelado.emit()" [disabled]="guardando()">Cancelar</button>
+    <button type="submit" class="btn btn-primario" [disabled]="guardando() || cargandoCatalogos()">
+      {{ guardando() ? 'Guardando…' : 'Guardar' }}
+    </button>
+  </div>
+</form>

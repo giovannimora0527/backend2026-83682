@@ -1,0 +1,40 @@
+<dl class="detalle">
+  <div>
+    <dt>Fecha y hora de la consulta</dt>
+    <dd>{{ fechaHora(historia().fechaHora) }}</dd>
+  </div>
+  <div>
+    <dt>Estado</dt>
+    <dd>{{ etiquetaEstado[historia().estado] }}</dd>
+  </div>
+  <div>
+    <dt>Cliente</dt>
+    <dd>{{ historia().clienteNombre }}</dd>
+  </div>
+  <div>
+    <dt>Mascota</dt>
+    <dd>{{ historia().mascotaNombre }}</dd>
+  </div>
+  <div>
+    <dt>Veterinario</dt>
+    <dd>{{ historia().veterinarioNombre }}</dd>
+  </div>
+  <div>
+    <dt>Cita de origen</dt>
+    <dd>#{{ historia().citaId }}</dd>
+  </div>
+  <div class="completo">
+    <dt>Motivo de consulta</dt>
+    <dd>{{ historia().motivo }}</dd>
+  </div>
+  <div class="completo">
+    <dt>Diagnóstico</dt>
+    <dd>{{ historia().diagnostico }}</dd>
+  </div>
+  <div class="completo">
+    <dt>Observaciones</dt>
+    <dd>{{ historia().observaciones || 'Sin observaciones' }}</dd>
+  </div>
+</dl>
+
+<app-anotaciones-panel [historia]="historia()"></app-anotaciones-panel>

@@ -1,0 +1,50 @@
+<form class="panel-detalle" [formGroup]="form" (ngSubmit)="guardar()" novalidate>
+  <h3>Nueva anotación</h3>
+  <p class="texto-suave">La fecha y la hora se registran automáticamente al guardar.</p>
+
+  <app-alerta [mensaje]="mensaje()" (cerrar)="mensaje.set(null)"></app-alerta>
+
+  <div class="campo">
+    <label for="a-veterinario">Veterinario</label>
+    <select id="a-veterinario" formControlName="veterinarioId">
+      <option [ngValue]="null" disabled>Seleccione un veterinario</option>
+      @for (veterinario of veterinarios(); track veterinario.id) {
+        <option [ngValue]="veterinario.id">{{ veterinario.nombreCompleto }}</option>
+      }
+    </select>
+    @if (invalido('veterinarioId')) {
+      <small class="error">Seleccione un veterinario.</small>
+    }
+  </div>
+
+  <div class="campo">
+    <label for="a-descripcion">Descripción</label>
+    <textarea id="a-descripcion" formControlName="descripcion" maxlength="2000"></textarea>
+    @if (invalido('descripcion')) {
+      <small class="error">Indique la descripción (máximo 2000 caracteres).</small>
+    }
+  </div>
+
+  <div class="campo">
+    <label for="a-observacion">Observación</label>
+    <textarea id="a-observacion" formControlName="observacion" maxlength="2000"></textarea>
+    @if (invalido('observacion')) {
+      <small class="error">Indique la observación (máximo 2000 caracteres).</small>
+    }
+  </div>
+
+  <div class="campo">
+    <label for="a-diagnostico">Diagnóstico o evolución</label>
+    <textarea id="a-diagnostico" formControlName="diagnosticoEvolucion" maxlength="2000"></textarea>
+    @if (invalido('diagnosticoEvolucion')) {
+      <small class="error">Indique el diagnóstico o la evolución (máximo 2000 caracteres).</small>
+    }
+  </div>
+
+  <div class="formulario-botones">
+    <button type="button" class="btn" (click)="cancelada.emit()" [disabled]="guardando()">Cancelar</button>
+    <button type="submit" class="btn btn-primario" [disabled]="guardando()">
+      {{ guardando() ? 'Guardando…' : 'Guardar anotación' }}
+    </button>
+  </div>
+</form>

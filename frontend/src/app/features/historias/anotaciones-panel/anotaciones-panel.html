@@ -1,0 +1,96 @@
+<div class="encabezado-pagina">
+  <h3>Histórico de anotaciones</h3>
+  @if (puedeAnotar()) {
+    <button type="button" class="btn btn-primario btn-sm" (click)="formularioAbierto.set(true)" [disabled]="formularioAbierto()">
+      + Nueva anotación
+    </button>
+  } @else {
+    <span class="texto-suave">Historia cerrada: no admite nuevas anotaciones.</span>
+  }
+</div>
+
+<app-alerta [mensaje]="mensaje()" (cerrar)="mensaje.set(null)"></app-alerta>
+
+@if (formularioAbierto()) {
+  <app-anotacion-form
+    [historiaId]="historia().id"
+    [veterinarios]="veterinarios()"
+    (guardada)="alGuardar()"
+    (cancelada)="formularioAbierto.set(false)"
+  ></app-anotacion-form>
+}
+
+<form class="filtros" [formGroup]="filtroForm" (ngSubmit)="buscar()">
+  <div class="campo">
+    <label for="an-texto">Buscar texto</label>
+    <input id="an-texto" type="text" formControlName="texto" placeholder="Descripción, observación o evolución" />
+  </div>
+  <div class="campo">
+    <label for="an-veterinario">Veterinario</label>
+    <select id="an-veterinario" formControlName="veterinarioId">
+      <option [ngValue]="null">Todos</option>
+      @for (veterinario of veterinarios(); track veterinario.id) {
+        <option [ngValue]="veterinario.id">{{ veterinario.nombreCompleto }}</option>
+      }
+    </select>
+  </div>
+  <div class="campo">
+    <label for="an-desde">Desde</label>
+    <input id="an-desde" type="date" formControlName="desde" />
+  </div>
+  <div class="campo">
+    <label for="an-hasta">Hasta</label>
+    <input id="an-hasta" type="date" formControlName="hasta" />
+  </div>
+  <div class="filtros-botones">
+    <button type="submit" class="btn btn-primario btn-sm">Buscar</button>
+    <button type="button" class="btn btn-sm" (click)="limpiar()">Limpiar</button>
+  </div>
+</form>
+
+<app-tabla-datos
+  [columnas]="columnas"
+  [filas]="filas()"
+  [total]="total()"
+  [control]="tabla"
+  [cargando]="cargando()"
+  [acciones]="acciones"
+  [opcionesTamano]="[5, 10, 20]"
+  mensajeVacio="Esta historia aún no tiene anotaciones."
+  (cambio)="cargar()"
+></app-tabla-datos>
+
+<ng-template #acciones let-anotacion>
+  <button type="button" class="btn btn-sm" (click)="verDetalle(anotacion)">Ver</button>
+</ng-template>
+
+@if (seleccionada(); as anotacion) {
+  <section class="panel-detalle" aria-label="Detalle de la anotación">
+    <div class="encabezado-pagina">
+      <h3>Detalle de la anotación</h3>
+      <button type="button" class="btn btn-sm" (click)="seleccionada.set(null)">Cerrar detalle</button>
+    </div>
+    <dl class="detalle">
+      <div>
+        <dt>Fecha y hora</dt>
+        <dd>{{ fechaHora(anotacion.fechaHora) }}</dd>
+      </div>
+      <div>
+        <dt>Veterinario</dt>
+        <dd>{{ anotacion.veterinarioNombre }}</dd>
+      </div>
+      <div class="completo">
+        <dt>Descripción</dt>
+        <dd>{{ anotacion.descripcion }}</dd>
+      </div>
+      <div class="completo">
+        <dt>Observación</dt>
+        <dd>{{ anotacion.observacion }}</dd>
+      </div>
+      <div class="completo">
+        <dt>Diagnóstico o evolución</dt>
+        <dd>{{ anotacion.diagnosticoEvolucion }}</dd>
+      </div>
+    </dl>
+  </section>
+}
