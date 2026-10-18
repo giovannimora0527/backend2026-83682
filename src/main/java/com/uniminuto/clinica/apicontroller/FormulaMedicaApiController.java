@@ -1,42 +1,88 @@
+
 package com.uniminuto.clinica.apicontroller;
 
-import com.uniminuto.clinica.api.FormulaMedicaApi;
-import com.uniminuto.clinica.entity.FormulaMedica;
-import com.uniminuto.clinica.service.FormulaMedicaService;
-import org.apache.coyote.BadRequestException;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.RestController;
+// ==========================================================
+// CLÍNICA VETERINARIA - UNIMINUTO
+// CONTROLADOR DE FÓRMULAS MÉDICAS
+// ==========================================================
 
+// Interfaz que define los endpoints.
+import com.uniminuto.clinica.api.FormulaMedicaApi;
+
+// Entidad que representa los registros de MySQL.
+import com.uniminuto.clinica.entity.FormulaMedica;
+
+// Servicio que consulta las fórmulas médicas.
+import com.uniminuto.clinica.service.FormulaMedicaService;
+
+// Manejo de listas.
 import java.util.List;
 
+// Permite devolver respuestas HTTP.
+import org.springframework.http.ResponseEntity;
+
+// Identifica esta clase como controlador REST.
+import org.springframework.web.bind.annotation.RestController;
+
+
+// ==========================================================
+// 1. CONFIGURACIÓN DEL CONTROLADOR
+// ==========================================================
+
 /**
- * Controlador encargado de atender las peticiones
+ * Controlador encargado de recibir las solicitudes
  * relacionadas con las fórmulas médicas.
+ *
+ * Implementa las rutas definidas en
+ * FormulaMedicaApi.java.
  */
 @RestController
-public class FormulaMedicaApiController implements FormulaMedicaApi {
+public class FormulaMedicaApiController
+        implements FormulaMedicaApi {
+
+    // ======================================================
+    // 2. SERVICIO DE FÓRMULAS MÉDICAS
+    // ======================================================
+
+    private final FormulaMedicaService formulaMedicaService;
 
     /**
-     * Servicio utilizado para gestionar
-     * las fórmulas médicas.
+     * Inyecta el servicio mediante el constructor.
      */
-    @Autowired
-    private FormulaMedicaService formulaMedicaService;
+    public FormulaMedicaApiController(
+            FormulaMedicaService formulaMedicaService
+    ) {
+        this.formulaMedicaService = formulaMedicaService;
+    }
+
+    // ======================================================
+    // 3. CONSULTAR TODAS LAS FÓRMULAS MÉDICAS
+    // ======================================================
 
     /**
-     * Lista todas las fórmulas médicas ordenadas
-     * desde la más reciente hasta la más antigua.
+     * Atiende la solicitud GET:
      *
-     * @return respuesta HTTP con la lista de fórmulas médicas.
-     * @throws BadRequestException si ocurre un error en la solicitud.
+     * /formula-medica/listar-todos
+     *
+     * Funcionamiento:
+     *
+     * 1. Recibe la solicitud HTTP.
+     * 2. Llama a obtenerFormulasMedicas().
+     * 3. El servicio consulta MySQL.
+     * 4. Devuelve las fórmulas en formato JSON.
+     *
+     * @return HTTP 200 con la lista de fórmulas.
      */
     @Override
-    public ResponseEntity<List<FormulaMedica>> listarFormulasMedicas()
-            throws BadRequestException {
+    public ResponseEntity<List<FormulaMedica>>
+    listarFormulasMedicas() {
 
-        return ResponseEntity.ok(
-                this.formulaMedicaService.obtenerFormulasMedicas()
-        );
+        // Consultar las fórmulas mediante el servicio.
+        List<FormulaMedica> formulas =
+                formulaMedicaService.obtenerFormulasMedicas();
+
+        // Devolver el resultado al cliente Angular.
+        return ResponseEntity.ok(formulas);
     }
+
 }

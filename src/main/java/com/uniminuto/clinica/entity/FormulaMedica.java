@@ -1,65 +1,104 @@
+
 package com.uniminuto.clinica.entity;
 
+// ==========================================================
+// CLÍNICA VETERINARIA - UNIMINUTO
+// ENTIDAD DE FÓRMULAS MÉDICAS
+// ==========================================================
+
+// Importaciones de JPA.
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-import lombok.Data;
 
+// Manejo de fechas y horas.
 import java.time.LocalDateTime;
 
-/**
- * Entidad que representa una fórmula médica
- * almacenada en la base de datos de la clínica.
- */
+// Genera automáticamente getters y setters.
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+// ==========================================================
+// CONFIGURACIÓN DE LA ENTIDAD
+// ==========================================================
+
+@Data
+@NoArgsConstructor
 @Entity
 @Table(name = "formula_medica")
-@Data
 public class FormulaMedica {
 
-    /**
-     * Identificador único de la fórmula médica.
-     */
+    // ======================================================
+    // 1. IDENTIFICADOR
+    // ======================================================
+
+    // Llave primaria automática.
     @Id
-    @Column(name = "id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id")
     private Long id;
 
-    /**
-     * Identificador de la cita asociada a la fórmula médica.
-     */
+    // ======================================================
+    // 2. CITA MÉDICA
+    // ======================================================
+
+    // ID de la cita asociada con la fórmula.
     @Column(name = "cita_id", nullable = false)
     private Integer citaId;
 
-    /**
-     * Identificador del medicamento asociado a la fórmula.
-     */
+    // ======================================================
+    // 3. MEDICAMENTO
+    // ======================================================
+
+    // ID del medicamento formulado.
     @Column(name = "medicamento_id", nullable = false)
     private Integer medicamentoId;
 
-    /**
-     * Dosis indicada para el medicamento.
-     */
-    @Column(name = "dosis", nullable = false, columnDefinition = "TEXT")
+    // ======================================================
+    // 4. DOSIS
+    // ======================================================
+
+    // Cantidad y frecuencia del medicamento.
+    @Column(
+            name = "dosis",
+            nullable = false,
+            columnDefinition = "TEXT"
+    )
     private String dosis;
 
-    /**
-     * Indicaciones adicionales de la fórmula médica.
-     */
-    @Column(name = "indicaciones", columnDefinition = "TEXT")
+    // ======================================================
+    // 5. INDICACIONES
+    // ======================================================
+
+    // Recomendaciones para administrar el medicamento.
+    // Este campo puede estar vacío.
+    @Column(
+            name = "indicaciones",
+            columnDefinition = "TEXT"
+    )
     private String indicaciones;
 
-    /**
-     * Fecha y hora en la que se creó el registro.
-     */
-    @Column(name = "fecha_creacion_registro", nullable = false)
+    // ======================================================
+    // 6. FECHA DE CREACIÓN
+    // ======================================================
+
+    // Fecha y hora en que se registró la fórmula.
+    @Column(
+            name = "fecha_creacion_registro",
+            nullable = false
+    )
     private LocalDateTime fechaCreacionRegistro;
 
-    /**
-     * Fecha y hora de la última actualización del registro.
-     */
+    // ======================================================
+    // 7. FECHA DE ACTUALIZACIÓN
+    // ======================================================
+
+    // Fecha y hora de la última modificación.
+    // Puede ser nula.
     @Column(name = "fecha_actualizacion_registro")
     private LocalDateTime fechaActualizacionRegistro;
+
 }
