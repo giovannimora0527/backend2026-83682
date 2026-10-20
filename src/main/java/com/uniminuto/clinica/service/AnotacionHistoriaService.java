@@ -47,4 +47,16 @@ public interface AnotacionHistoriaService {
             Long id,
             AnotacionHistoria anotacion
     ) throws BadRequestException;
+
+
+
+
+    /**
+     * Consulta todas las anotaciones médicas
+     * registradas en la base de datos.
+     *
+     * @return Lista de anotaciones médicas.
+     */
+    List<AnotacionHistoria> listarTodasLasAnotaciones();
+
 }

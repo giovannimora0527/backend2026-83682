@@ -80,4 +80,25 @@ public interface AnotacionHistoriaApi {
             @PathVariable("id") Long id,
             @RequestBody AnotacionHistoria anotacion
     ) throws BadRequestException;
+
+    // =====================================================
+    // ENDPOINT PARA LISTAR TODAS LAS ANOTACIONES
+    // =====================================================
+
+    /**
+     * Método HTTP: GET
+     *
+     * Ruta:
+     * /anotacion-historia/listar-todos
+     *
+     * @return Todas las anotaciones médicas.
+     */
+
+    @GetMapping(
+            value = "/listar-todos",
+            produces = "application/json"
+    )
+    ResponseEntity<List<AnotacionHistoria>>
+    listarTodasLasAnotaciones();
+
 }

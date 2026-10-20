@@ -1,42 +1,55 @@
+
 package com.uniminuto.clinica.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+// ==========================================================
+// IMPORTACIONES
+// ==========================================================
+
+import jakarta.persistence.*;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 
-/**
- * Entidad que representa la historia médica
- * de un paciente de la clínica veterinaria.
- */
+// ==========================================================
+// ENTIDAD HISTORIA MÉDICA
+// ==========================================================
+
 @Entity
 @Table(name = "historia_medica")
 @Data
+@NoArgsConstructor
 public class HistoriaMedica {
 
-    /**
-     * Identificador único de la historia médica.
-     */
+    // ======================================================
+    // 1. ID GENERADO AUTOMÁTICAMENTE POR MYSQL
+    // ======================================================
+
     @Id
-    @Column(name = "id")
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "id", nullable = false)
     private Long id;
 
-    /**
-     * Identificador del paciente asociado
-     * a la historia médica.
-     */
+    // ======================================================
+    // 2. IDENTIFICADOR DEL PACIENTE
+    // ======================================================
+
     @Column(name = "paciente_id", nullable = false)
     private Integer pacienteId;
 
-    /**
-     * Fecha y hora de creación de la historia médica.
-     */
-    @Column(name = "fecha_creacion")
+    // ======================================================
+    // 3. FECHA DE CREACIÓN
+    // ======================================================
+
+    // MySQL utiliza CURRENT_TIMESTAMP.
+    // No enviamos este campo en las operaciones INSERT.
+    // Tampoco permitimos modificarlo mediante UPDATE.
+
+    @Column(
+            name = "fecha_creacion",
+            insertable = false,
+            updatable = false
+    )
     private LocalDateTime fechaCreacion;
+
 }

@@ -101,4 +101,21 @@ public class AnotacionHistoriaServiceImpl
         return anotacionHistoriaRepository
                 .save(anotacionExistente);
     }
+
+
+    // =====================================================
+    // LISTAR TODAS LAS ANOTACIONES
+    // =====================================================
+
+    /**
+     * Obtiene todas las anotaciones guardadas
+     * en la tabla anotacion_historia.
+     */
+    @Override
+    public List<AnotacionHistoria> listarTodasLasAnotaciones() {
+
+        return anotacionHistoriaRepository.findAll();
+
+    }
+
 }

@@ -82,4 +82,28 @@ public class AnotacionHistoriaApiController
                         .actualizarAnotacion(id, anotacion)
         );
     }
+
+    // =====================================================
+    // CONTROLADOR PARA LISTAR TODAS LAS ANOTACIONES
+    // =====================================================
+
+    /**
+     * Atiende la solicitud GET para consultar
+     * todas las anotaciones registradas.
+     */
+
+    @Override
+    public ResponseEntity<List<AnotacionHistoria>>
+    listarTodasLasAnotaciones() {
+
+        // Consultar las anotaciones mediante el servicio.
+        List<AnotacionHistoria> anotaciones =
+                anotacionHistoriaService
+                        .listarTodasLasAnotaciones();
+
+        // Retornar respuesta HTTP 200 OK.
+        return ResponseEntity.ok(anotaciones);
+
+    }
+
 }
