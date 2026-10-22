@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ClienteServiceImpl implements ClienteService {
@@ -24,8 +25,12 @@ public class ClienteServiceImpl implements ClienteService {
     }
 
     @Override
-    public Cliente getClienteByNumeroDocumento(String numeroDocumento) throws BadRequestException {
-        return clienteRepository.findByNumeroDocumento(numeroDocumento)
-                .orElseThrow(() -> new BadRequestException("Cliente no encontrado con el número de documento: " + numeroDocumento));
+    public Cliente buscarClientesPorDocumento(String documento) throws BadRequestException {
+        Optional<Cliente> clienteOptional = clienteRepository.findByNumeroDocumento(documento);
+        if (clienteOptional.isPresent()) {
+            return clienteOptional.get();
+        } else {
+            throw new BadRequestException("Cliente no encontrado con el documento: " + documento);
+        }
     }
 }

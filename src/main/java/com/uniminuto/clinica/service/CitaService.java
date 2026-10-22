@@ -14,6 +14,8 @@ public interface CitaService {
 
     List<Cita> listarCitasRango(LocalDateTime fechaInicio, LocalDateTime fechaFin) throws BadRequestException;
 
+    List<Cita> listarCitasPorMascota(Integer mascotaId) throws BadRequestException;
+
     MiRespuestaRS crearCita(CitaRq citaRq) throws BadRequestException;
 
     MiRespuestaRS actualizarCita(CitaRq citaRq) throws BadRequestException;

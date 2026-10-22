@@ -42,5 +42,8 @@ public class Mascota {
     @JoinColumn(name = "raza_id")
     private Raza raza;
 
+    @Column(name = "activo")
+    private Boolean activo;
+
 
 }

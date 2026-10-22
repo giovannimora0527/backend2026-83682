@@ -44,6 +44,22 @@ public interface CitaApi {
 
 
     /**
+     * Lista las citas de una mascota.
+     *
+     * @param mascotaId id de la mascota.
+     * @return citas de la mascota ordenadas por fecha descendente.
+     * @throws BadRequestException excepcion.
+     */
+    @GetMapping(value = "/listar-por-mascota",
+            produces = {"application/json"},
+            consumes = {"application/json"})
+    ResponseEntity<List<Cita>> listarCitasPorMascota(
+            @RequestParam Integer mascotaId
+    )
+            throws BadRequestException;
+
+
+    /**
      * Metodo test del servicio.
      *
      * @return Servicio funcionando correctamente.

@@ -12,4 +12,8 @@ import java.util.Optional;
 public interface HistoriaMedicaRepository extends JpaRepository<HistoriaMedica, Long> {
 
     Optional<HistoriaMedica> findByMascota(Mascota mascota);
+
+    boolean existsByMascota(Mascota mascota);
+
+    boolean existsByMascotaAndIdNot(Mascota mascota, Long id);
 }

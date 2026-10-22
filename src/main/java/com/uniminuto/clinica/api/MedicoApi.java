@@ -1,58 +1,52 @@
 package com.uniminuto.clinica.api;
 
-import com.uniminuto.clinica.entity.Cliente;
-import com.uniminuto.clinica.entity.Mascota;
 import com.uniminuto.clinica.entity.Medico;
 import com.uniminuto.clinica.exception.BadRequestException;
+import com.uniminuto.clinica.models.MedicoRq;
+import com.uniminuto.clinica.models.MiRespuestaRS;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @CrossOrigin(origins = "*", allowedHeaders = "*")
 @RequestMapping("/medico")
 public interface MedicoApi {
 
+    @GetMapping(value = "/listar-disponibles",
+            produces = {"application/json"},
+            consumes = {"application/json"})
+    ResponseEntity<List<Medico>> listarMedicosDisponibles(
+            @RequestParam LocalDateTime fechaInicio,
+            @RequestParam LocalDateTime fechaFin)
+            throws BadRequestException;
 
-    /**
-     * Metodo test del servicio.
-     *
-     * @return Servicio funcionando correctamente.
-     * @throws BadRequestException excepcion.
-     */
+
     @GetMapping(value = "/listar",
             produces = {"application/json"},
             consumes = {"application/json"})
-    ResponseEntity<List<Medico>> getMedicos()
+    ResponseEntity<List<Medico>> listarTodos()
             throws BadRequestException;
 
-    /**
-     * Metodo test del servicio.
-     *
-     * @return Servicio funcionando correctamente.
-     * @throws BadRequestException excepcion.
-     */
-    @GetMapping(value = "/buscar",
+    @PostMapping(value = "/crear",
             produces = {"application/json"},
             consumes = {"application/json"})
-    ResponseEntity<Medico> buscarMedico(
-            @RequestParam String tipoDocumento,
-            @RequestParam String numeroDocumento)
+    ResponseEntity<MiRespuestaRS> crearMedico(
+            @RequestBody MedicoRq medicoRq
+    )
             throws BadRequestException;
 
-    /**
-     * Metodo test del servicio.
-     *
-     * @return Servicio funcionando correctamente.
-     * @throws BadRequestException excepcion.
-     */
-    @GetMapping(value = "/buscarPorRegistroProfesional",
+    @PostMapping(value = "/actualizar",
             produces = {"application/json"},
             consumes = {"application/json"})
-    ResponseEntity<Medico> buscarMedicoPorRegistroProfesional(
-            @RequestParam String registroProfesional)
+    ResponseEntity<MiRespuestaRS> actualizarMedico(
+            @RequestBody MedicoRq medicoRq
+    )
             throws BadRequestException;
 }

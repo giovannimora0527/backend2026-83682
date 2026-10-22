@@ -21,10 +21,11 @@ public interface ClienteApi {
             throws BadRequestException;
 
 
-    @GetMapping(value = "/buscar-by-numero-documento",
+    @GetMapping(value = "/buscar-por-documento",
             produces = {"application/json"},
             consumes = {"application/json"})
-    ResponseEntity<Cliente> getClientesByNumeroDocumento(
-            @RequestParam("numeroDocumento") String numeroDocumento)
+    ResponseEntity<Cliente> buscarClientesPorDocumento(
+            @RequestParam String documento
+    )
             throws BadRequestException;
 }

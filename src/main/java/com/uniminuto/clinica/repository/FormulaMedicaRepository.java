@@ -11,5 +11,5 @@ public interface FormulaMedicaRepository extends JpaRepository<FormulaMedica, Lo
 
     List<FormulaMedica> findAllByOrderByFechaCreacionRegistroDesc();
 
-    List<FormulaMedica> findAllByOrderByFechaCreacionRegistroAsc();
+    List<FormulaMedica> findByCita_IdInOrderByFechaCreacionRegistroDesc(List<Long> citaIds);
 }

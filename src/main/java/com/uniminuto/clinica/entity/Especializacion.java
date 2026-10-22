@@ -8,8 +8,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.Data;
 
-@Entity
 @Data
+@Entity
 @Table(name = "especializacion")
 public class Especializacion {
 
@@ -18,14 +18,12 @@ public class Especializacion {
     @Column(name = "id")
     private Long id;
 
-    @Column(name = "nombre", nullable = false, length = 100)
+    @Column(name = "nombre")
     private String nombre;
 
-    @Column(name = "descripcion", columnDefinition = "TEXT")
+    @Column(name = "descripcion")
     private String descripcion;
 
-    @Column( name = "codigo_especializacion", nullable = false, length = 10 )
+    @Column(name = "codigo_especializacion")
     private String codigoEspecializacion;
-
-
 }

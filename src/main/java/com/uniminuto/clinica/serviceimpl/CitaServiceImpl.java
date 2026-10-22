@@ -22,6 +22,8 @@ import java.util.Optional;
 public class CitaServiceImpl implements CitaService {
 
     private static final String ESTADO_PROGRAMADA = "PROGRAMADA";
+    private static final String ESTADO_CANCELADA = "CANCELADA";
+    private static final String ESTADO_CONFIRMADA = "CONFIRMADA";
 
     @Autowired
     private CitaRepository citaRepository;
@@ -46,6 +48,18 @@ public class CitaServiceImpl implements CitaService {
         citas.sort((cita1, cita2)
                 -> cita1.getFechaHora().compareTo(cita2.getFechaHora()));
         return citas;
+    }
+
+    @Override
+    public List<Cita> listarCitasPorMascota(Integer mascotaId) throws BadRequestException {
+        if (mascotaId == null || mascotaId <= 0) {
+            throw new BadRequestException("El id de la mascota es obligatorio y debe ser mayor a cero.");
+        }
+        Optional<Mascota> mascotaOptional = mascotaRepository.findById(mascotaId);
+        if (mascotaOptional.isEmpty()) {
+            throw new BadRequestException("La mascota no existe");
+        }
+        return citaRepository.findByMascotaOrderByFechaHoraDesc(mascotaOptional.get());
     }
 
     private void validarFechas(LocalDateTime fechaInicio, LocalDateTime fechaFin) throws BadRequestException {
@@ -76,17 +90,19 @@ public class CitaServiceImpl implements CitaService {
         }
 
         Cita citaActualizar = optCita.get();
-        if (citaActualizar.getFechaHora().equals(citaRq.getFechaHora()) ) {
-           if (!sePuedeAgendarCitaXFecha(citaActualizar)) {
-               throw new BadRequestException("No se puede actualizar la cita  ya que hay una cita agendada en ese rango de fechas.");
-           }
-        }
+        if (!ESTADO_CANCELADA.equalsIgnoreCase(citaRq.getEstado()) && !ESTADO_CONFIRMADA.equalsIgnoreCase(citaRq.getEstado())) {
+            if (citaActualizar.getFechaHora().equals(citaRq.getFechaHora())) {
+                if (!sePuedeAgendarCitaXFecha(citaActualizar)) {
+                    throw new BadRequestException("No se puede actualizar la cita  ya que hay una cita agendada en ese rango de fechas.");
+                }
+            }
 
-        List<Cita> citas = citaRepository.findByMedicoAndFechaHoraBetween(medicoOptional.get(),
-                citaRq.getFechaHora().minusMinutes(30), citaRq.getFechaHora().plusMinutes(30));
-        if (!citas.isEmpty()) {
-            throw new BadRequestException("No se puede actualizar la cita " +
-                    "ya que hay el médico tiene una cita agendada en ese rango de fechas.");
+            List<Cita> citas = citaRepository.findByMedicoAndFechaHoraBetween(medicoOptional.get(),
+                    citaRq.getFechaHora().minusMinutes(30), citaRq.getFechaHora().plusMinutes(30));
+            if (!citas.isEmpty()) {
+                throw new BadRequestException("No se puede actualizar la cita " +
+                        "ya que hay el médico tiene una cita agendada en ese rango de fechas.");
+            }
         }
 
         citaActualizar.setMedico(medicoOptional.get());
@@ -174,6 +190,9 @@ public class CitaServiceImpl implements CitaService {
         }
         if (citaRq.getFechaHora() == null) {
             throw new BadRequestException("La fecha y hora de la cita no puede ser nula");
+        }
+        if (citaRq.getFechaHora().isBefore(LocalDateTime.now())) {
+            throw new BadRequestException("La fecha y hora de la cita no puede ser anterior a la fecha y hora actual");
         }
         if (citaRq.getMascotaId() == null) {
             throw new BadRequestException("El id de la mascota no puede ser nulo");

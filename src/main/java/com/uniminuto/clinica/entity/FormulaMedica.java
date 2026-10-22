@@ -33,4 +33,10 @@ public class FormulaMedica {
 
     @Column(name = "fecha_actualizacion_registro")
     private LocalDateTime fechaActualizacionRegistro;
+
+    @Column(name = "frecuencia")
+    private String frecuencia;
+
+    @Column(name = "duracion")
+    private String duracion;
 }

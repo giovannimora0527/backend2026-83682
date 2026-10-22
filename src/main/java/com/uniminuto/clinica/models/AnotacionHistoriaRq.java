@@ -4,8 +4,10 @@ import lombok.Data;
 
 @Data
 public class AnotacionHistoriaRq {
-    private Integer mascotaId;
-    private Integer historiaId;
+    private Long citaId;
+    private Long historiaId;
     private Long medicoId;
     private String descripcion;
+    private String diagnostico;
+    private String observaciones;
 }
