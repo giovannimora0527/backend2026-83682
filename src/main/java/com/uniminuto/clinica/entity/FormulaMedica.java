@@ -1,12 +1,6 @@
 
 package com.uniminuto.clinica.entity;
 
-// ==========================================================
-// CLÍNICA VETERINARIA - UNIMINUTO
-// ENTIDAD DE FÓRMULAS MÉDICAS
-// ==========================================================
-
-// Importaciones de JPA.
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -14,91 +8,106 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-// Manejo de fechas y horas.
-import java.time.LocalDateTime;
-
-// Genera automáticamente getters y setters.
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-// ==========================================================
-// CONFIGURACIÓN DE LA ENTIDAD
-// ==========================================================
+import java.time.LocalDateTime;
 
-@Data
-@NoArgsConstructor
+/**
+ * Entidad que representa una fórmula médica
+ * de la clínica veterinaria UNIMINUTO.
+ *
+ * Esta clase permite relacionar las fórmulas
+ * médicas con la tabla formula_medica de MySQL.
+ */
 @Entity
 @Table(name = "formula_medica")
+@Data
+@NoArgsConstructor
 public class FormulaMedica {
 
-    // ======================================================
-    // 1. IDENTIFICADOR
-    // ======================================================
+    // ==========================================
+    // 1. IDENTIFICADOR DE LA FÓRMULA
+    // ==========================================
 
-    // Llave primaria automática.
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id")
     private Long id;
 
-    // ======================================================
-    // 2. CITA MÉDICA
-    // ======================================================
+    // ==========================================
+    // 2. IDENTIFICADOR DE LA CITA MÉDICA
+    // ==========================================
 
-    // ID de la cita asociada con la fórmula.
+    // Relaciona la fórmula con una cita existente.
     @Column(name = "cita_id", nullable = false)
     private Integer citaId;
 
-    // ======================================================
-    // 3. MEDICAMENTO
-    // ======================================================
+    // ==========================================
+    // 3. IDENTIFICADOR DEL MEDICAMENTO
+    // ==========================================
 
-    // ID del medicamento formulado.
+    // Medicamento que se prescribe al paciente.
     @Column(name = "medicamento_id", nullable = false)
     private Integer medicamentoId;
 
-    // ======================================================
-    // 4. DOSIS
-    // ======================================================
+    // ==========================================
+    // 4. DOSIS DEL MEDICAMENTO
+    // ==========================================
 
-    // Cantidad y frecuencia del medicamento.
-    @Column(
-            name = "dosis",
-            nullable = false,
-            columnDefinition = "TEXT"
-    )
+    // Cantidad del medicamento que debe recibir.
+    @Column(name = "dosis", nullable = false)
     private String dosis;
 
-    // ======================================================
-    // 5. INDICACIONES
-    // ======================================================
+    // ==========================================
+    // 5. FRECUENCIA DE ADMINISTRACIÓN
+    // NUEVO CAMPO DEL SEGUNDO PARCIAL
+    // ==========================================
 
-    // Recomendaciones para administrar el medicamento.
-    // Este campo puede estar vacío.
-    @Column(
-            name = "indicaciones",
-            columnDefinition = "TEXT"
-    )
+    // Ejemplo: Cada 8 horas.
+    @Column(name = "frecuencia", length = 100)
+    private String frecuencia;
+
+    // ==========================================
+    // 6. DURACIÓN DEL TRATAMIENTO
+    // NUEVO CAMPO DEL SEGUNDO PARCIAL
+    // ==========================================
+
+    // Ejemplo: 7 días.
+    @Column(name = "duracion_tratamiento", length = 100)
+    private String duracionTratamiento;
+
+    // ==========================================
+    // 7. INDICACIONES MÉDICAS
+    // ==========================================
+
+    // Ejemplo: Administrar después de comer.
+    @Column(name = "indicaciones")
     private String indicaciones;
 
-    // ======================================================
-    // 6. FECHA DE CREACIÓN
-    // ======================================================
+    // ==========================================
+    // 8. FECHA DE EMISIÓN
+    // NUEVO CAMPO DEL SEGUNDO PARCIAL
+    // ==========================================
 
-    // Fecha y hora en que se registró la fórmula.
+    // Fecha en la que se expide la fórmula.
+    @Column(name = "fecha_emision")
+    private LocalDateTime fechaEmision;
+
+    // ==========================================
+    // 9. FECHA DE CREACIÓN DEL REGISTRO
+    // ==========================================
+
     @Column(
             name = "fecha_creacion_registro",
             nullable = false
     )
     private LocalDateTime fechaCreacionRegistro;
 
-    // ======================================================
-    // 7. FECHA DE ACTUALIZACIÓN
-    // ======================================================
+    // ==========================================
+    // 10. FECHA DE ACTUALIZACIÓN
+    // ==========================================
 
-    // Fecha y hora de la última modificación.
-    // Puede ser nula.
     @Column(name = "fecha_actualizacion_registro")
     private LocalDateTime fechaActualizacionRegistro;
-
 }
