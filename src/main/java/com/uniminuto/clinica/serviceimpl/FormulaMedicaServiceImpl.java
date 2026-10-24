@@ -1,6 +1,6 @@
 package com.uniminuto.clinica.serviceimpl;
 
-import com.uniminuto.clinica.entity.FormulaMedica;
+import com.uniminuto.clinica.entity.*;
 import com.uniminuto.clinica.repository.FormulaMedicaRepository;
 import com.uniminuto.clinica.service.FormulaMedicaService;
 import org.springframework.beans.factory.annotation.Autowired;

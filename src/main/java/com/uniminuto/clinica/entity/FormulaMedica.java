@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 @Table(name = "formula_medica")
 @Data
 public class FormulaMedica {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false, updatable = false)

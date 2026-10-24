@@ -10,4 +10,5 @@ public class AnotacionHistoriaRq {
     private String descripcion;
     private String diagnostico;
     private String observaciones;
+    private Integer mascotaId;
 }
