@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Repositorio de la entidad Usuario.
@@ -32,5 +33,12 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
      * @return true si existe, false si no existe.
      */
     Boolean existsByEmail(String email);
+
+    /**
+     * Metodo que busca un usuario por su nombre de usuario.
+     * @param username nombre de usuario.
+     * @return Optional<Usuario> </>.
+     */
+    Optional<Usuario> findByUsername(String username);
 
 }
