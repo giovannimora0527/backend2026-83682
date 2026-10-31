@@ -1,6 +1,7 @@
 package com.uniminuto.clinica.repository;
 
 import com.uniminuto.clinica.entity.Usuario;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -18,7 +19,8 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
      * @param ascendente bandera para odenar ascendente o descendente.
      * @return Lista<Usuario> </>.
      */
-    List<Usuario> findAllByOrderByUsernameAsc(Boolean ascendente);
+    @EntityGraph(attributePaths = "perfil")
+    List<Usuario> findAllByOrderByUsernameAsc();
 
     /**
      * Metodo que verifica si un usuario existe por su nombre de usuario.

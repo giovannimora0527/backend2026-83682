@@ -35,4 +35,9 @@ public class UsuarioRq {
      * Correo electrónico.
      */
     private String email;
+
+    /**
+     * Perfil Id del usuario.
+     */
+    private Integer perfilId;
 }

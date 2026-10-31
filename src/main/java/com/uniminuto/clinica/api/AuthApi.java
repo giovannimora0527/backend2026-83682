@@ -3,6 +3,8 @@ package com.uniminuto.clinica.api;
 import com.uniminuto.clinica.exception.BadRequestException;
 import com.uniminuto.clinica.models.AuthRq;
 import com.uniminuto.clinica.models.AuthRs;
+import com.uniminuto.clinica.models.CloseSession;
+import com.uniminuto.clinica.models.CloseSessionRs;
 import com.uniminuto.clinica.models.LoginRs;
 import com.uniminuto.clinica.models.TokenRq;
 import org.springframework.http.ResponseEntity;
@@ -27,5 +29,13 @@ public interface AuthApi {
             consumes = {"application/json"})
     ResponseEntity<LoginRs> validateToken(
             @RequestBody TokenRq tokenRq)
+            throws BadRequestException;
+
+
+    @PostMapping(value = "/cerrar-sesion",
+            produces = {"application/json"},
+            consumes = {"application/json"})
+    ResponseEntity<CloseSessionRs> cerrarSesion(
+            @RequestBody CloseSession closeSession)
             throws BadRequestException;
 }

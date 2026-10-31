@@ -1,14 +1,15 @@
 package com.uniminuto.clinica.serviceimpl;
 
+import com.uniminuto.clinica.entity.Perfil;
 import com.uniminuto.clinica.entity.Usuario;
 import com.uniminuto.clinica.exception.BadRequestException;
 import com.uniminuto.clinica.models.MiRespuestaRS;
 import com.uniminuto.clinica.models.UsuarioRq;
 import com.uniminuto.clinica.models.UsuarioRs;
+import com.uniminuto.clinica.repository.PerfilRepository;
 import com.uniminuto.clinica.repository.UsuarioRepository;
 import com.uniminuto.clinica.service.UsuarioService;
 import com.uniminuto.clinica.util.PasswordUtil;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -18,13 +19,17 @@ import java.util.Optional;
 @Service
 public class UsuarioServiceImpl implements UsuarioService {
 
-    @Autowired
-    private UsuarioRepository usuarioRepository;
+    private final UsuarioRepository usuarioRepository;
+    private final PerfilRepository perfilRepository;
 
+    public UsuarioServiceImpl(UsuarioRepository usuarioRepository, PerfilRepository perfilRepository) {
+        this.usuarioRepository = usuarioRepository;
+        this.perfilRepository = perfilRepository;
+    }
 
     @Override
     public List<UsuarioRs> obtenerUsuariosOrdenados() {
-        List<Usuario> usuarios = usuarioRepository.findAllByOrderByUsernameAsc(true);
+        List<Usuario> usuarios = usuarioRepository.findAllByOrderByUsernameAsc();
         return convertirUsuarioToUsuarioRs(usuarios);
     }
 
@@ -33,7 +38,7 @@ public class UsuarioServiceImpl implements UsuarioService {
             UsuarioRs usuarioRs = new UsuarioRs();
             usuarioRs.setId(usuario.getId());
             usuarioRs.setUsername(usuario.getUsername());
-            usuarioRs.setRol(usuario.getRol());
+            usuarioRs.setRol(usuario.getPerfil().getNombre());
             usuarioRs.setFechaCreacion(usuario.getFechaCreacion());
             usuarioRs.setActivo(usuario.getActivo());
             usuarioRs.setEmail(usuario.getEmail());
@@ -52,11 +57,17 @@ public class UsuarioServiceImpl implements UsuarioService {
             throw new BadRequestException("El correo electrónico ya existe");
         }
 
+        Optional<Perfil> optPerfil = this.perfilRepository
+                .findById(usuarioRq.getPerfilId());
+        if (optPerfil.isEmpty()) {
+            throw new BadRequestException("El perfil no existe");
+        }
+
         String claveMD5 = PasswordUtil.generarMD5(usuarioRq.getPassword());
         Usuario usuarioNuevo = new Usuario();
         usuarioNuevo.setUsername(usuarioRq.getUsername());
         usuarioNuevo.setPasswordHash(claveMD5);
-        usuarioNuevo.setRol(usuarioRq.getRol());
+        usuarioNuevo.setPerfil(optPerfil.get());
         usuarioNuevo.setEmail(usuarioRq.getEmail());
         usuarioNuevo.setActivo(true);
         usuarioNuevo.setFechaCreacion(LocalDateTime.now());
@@ -91,9 +102,15 @@ public class UsuarioServiceImpl implements UsuarioService {
                 throw new BadRequestException("El correo electrónico ya existe");
             }
         }
+        Optional<Perfil> optPerfil = this.perfilRepository
+                .findById(usuarioRq.getPerfilId());
+        if (optPerfil.isEmpty()) {
+            throw new BadRequestException("El perfil no existe");
+        }
+
         usuarioExistente.setEmail(usuarioRq.getEmail());
-        usuarioExistente.setRol(usuarioRq.getRol());
         usuarioExistente.setActivo(usuarioRq.getActivo());
+        usuarioExistente.setPerfil(optPerfil.get());
         usuarioRepository.save(usuarioExistente);
 
         MiRespuestaRS rta = new MiRespuestaRS();

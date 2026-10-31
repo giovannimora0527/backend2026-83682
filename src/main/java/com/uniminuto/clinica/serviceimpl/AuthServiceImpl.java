@@ -1,13 +1,17 @@
 package com.uniminuto.clinica.serviceimpl;
 
 import com.uniminuto.clinica.entity.OtpToken;
+import com.uniminuto.clinica.entity.Session;
 import com.uniminuto.clinica.entity.Usuario;
 import com.uniminuto.clinica.exception.BadRequestException;
 import com.uniminuto.clinica.models.AuthRq;
 import com.uniminuto.clinica.models.AuthRs;
+import com.uniminuto.clinica.models.CloseSession;
+import com.uniminuto.clinica.models.CloseSessionRs;
 import com.uniminuto.clinica.models.LoginRs;
 import com.uniminuto.clinica.models.TokenRq;
 import com.uniminuto.clinica.repository.OtpTokenRepository;
+import com.uniminuto.clinica.repository.SessionRepository;
 import com.uniminuto.clinica.repository.UsuarioRepository;
 import com.uniminuto.clinica.service.AuthService;
 import com.uniminuto.clinica.service.EmailService;
@@ -37,8 +41,13 @@ public class AuthServiceImpl implements AuthService {
     private UsuarioRepository usuarioRepository;
 
     @Autowired
+    private SessionRepository sessionRepository;
+
+    @Autowired
     private EmailService emailService;
 
+    @Autowired
+    private Utilidades utilidades;
 
     @Override
     public AuthRs login(AuthRq authRq) throws BadRequestException {
@@ -62,8 +71,11 @@ public class AuthServiceImpl implements AuthService {
         String bodyHtml = this.generarHtmlBodyCorreo(user.getUsername(), tokenOtp);
         this.emailService.enviarCorreo(user.getEmail(), "Token OTP", bodyHtml, FROM);
 
-        // Valido si el usuario ya tiene un token OTP usado = 0,
+        // Verifico si ya existe un token OTP para el usuario
         // si es así, lo elimino antes de crear uno nuevo
+        Optional<OtpToken> existingToken = this
+                .otpTokenRepository.findByUsuarioId(user.getId());
+        existingToken.ifPresent(this.otpTokenRepository::delete);
         OtpToken token = new OtpToken();
         token.setUsuarioId(user.getId());
         token.setCodigo(tokenOtp);
@@ -86,10 +98,22 @@ public class AuthServiceImpl implements AuthService {
         OtpToken otpToken = this.validateOtpToken(tokenRq);
         LoginRs loginRs = new LoginRs();
         //  Genero el JWT Token para el usuario
-        String jwtToken = Utilidades.generarJwtToken(otpToken, jwtSecret);
+        String jwtToken = utilidades.crearJwtToken(otpToken, jwtSecret);
         loginRs.setToken(jwtToken);
         loginRs.setLogueoExitoso(Boolean.TRUE);
+        // Guardo el objeto de la session
+        Session session = new Session();
+        session.setUserId(otpToken.getUsuarioId());
+        session.setToken(jwtToken);
+        session.setFechaIniSesion(LocalDateTime.now());
+        session.setFechaExpiracion(LocalDateTime.now().plusMinutes(60));
+        this.sessionRepository.save(session);
         return loginRs;
+    }
+
+    @Override
+    public CloseSessionRs cerrarSesion(CloseSession closeSession) throws BadRequestException {
+        return null;
     }
 
     private String generarHtmlBodyCorreo(String username, String otpToken) {

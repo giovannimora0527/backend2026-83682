@@ -4,6 +4,8 @@ import com.uniminuto.clinica.api.AuthApi;
 import com.uniminuto.clinica.exception.BadRequestException;
 import com.uniminuto.clinica.models.AuthRq;
 import com.uniminuto.clinica.models.AuthRs;
+import com.uniminuto.clinica.models.CloseSession;
+import com.uniminuto.clinica.models.CloseSessionRs;
 import com.uniminuto.clinica.models.LoginRs;
 import com.uniminuto.clinica.models.TokenRq;
 import com.uniminuto.clinica.service.AuthService;
@@ -26,5 +28,10 @@ public class AuthApiController implements AuthApi {
     @Override
     public ResponseEntity<LoginRs> validateToken(TokenRq tokenRq) throws BadRequestException {
         return ResponseEntity.ok(this.authService.validateToken(tokenRq));
+    }
+
+    @Override
+    public ResponseEntity<CloseSessionRs> cerrarSesion(CloseSession closeSession) throws BadRequestException {
+        return ResponseEntity.ok(this.authService.cerrarSesion(closeSession));
     }
 }

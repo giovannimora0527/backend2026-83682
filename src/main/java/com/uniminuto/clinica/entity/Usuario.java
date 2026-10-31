@@ -25,8 +25,9 @@ public class Usuario {
     private String passwordHash;
 
     /** * Rol del usuario. */
-    @Column(name = "rol", nullable = false, length = 30)
-    private String rol;
+    @ManyToOne
+    @JoinColumn(name = "rol", nullable = false)
+    private Perfil perfil;
 
     /** * Fecha de creación del usuario. */
     @Column(name = "fecha_creacion")
