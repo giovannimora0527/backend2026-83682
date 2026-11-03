@@ -1,0 +1,47 @@
+{
+  "package": "backend-ai-engineering-skills",
+  "version": "1.0.0",
+  "baseline": {
+    "java": "21",
+    "spring_boot": "4.0.4"
+  },
+  "target": {
+    "status": "not-approved",
+    "java": null,
+    "spring_boot": null
+  },
+  "skills": [
+    "clean-architecture-design",
+    "code-review-quality",
+    "docker-cicd-engineering",
+    "hibernate-jackson-modernization",
+    "jakarta-ee-migration",
+    "java21-best-practices",
+    "maven-dependency-audit",
+    "migration-impact-analysis",
+    "observability-resilience",
+    "rest-api-design",
+    "spring-data-jpa-optimization",
+    "spring-security-hardening",
+    "springboot-4-migration",
+    "springboot-backend-development",
+    "unit-integration-testing"
+  ],
+  "agents": [
+    "backend-architect",
+    "backend-developer",
+    "code-reviewer",
+    "database-specialist",
+    "devops-engineer",
+    "migration-analyst",
+    "qa-engineer",
+    "security-reviewer"
+  ],
+  "skill_directory": ".agents/skills/<skill-name>/SKILL.md",
+  "agent_profiles_directory": ".agents/agents/",
+  "integrations": [
+    "GitHub Copilot",
+    "OpenAI Codex",
+    "VS Code Agent Mode"
+  ]
+}

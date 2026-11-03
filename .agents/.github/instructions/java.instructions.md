@@ -1,0 +1,11 @@
+---
+applyTo: "**/*.java"
+---
+- Mantener compatibilidad con Java 17 en cambios funcionales ordinarios.
+- Aplicar SOLID y evitar complejidad accidental.
+- Preferir inyección por constructor.
+- No introducir dependencias de framework en el dominio.
+- No devolver entidades de persistencia desde controladores.
+- Usar nombres expresivos y métodos cohesivos.
+- Añadir pruebas para reglas y caminos de error.
+- No usar APIs posteriores a Java 17 salvo que la tarea sea explícitamente de modernización.
