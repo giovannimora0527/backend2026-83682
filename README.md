@@ -57,6 +57,7 @@ La aplicación usa el prefijo `/clinica/v1`. URL local base: `http://localhost:8
 | | `POST /usuario/guardar`, `/usuario/actualizar` | Crea o actualiza usuario |
 | Clientes | `GET /cliente/listar` | Lista clientes |
 | | `GET /cliente/buscar-por-documento?documento=...` | Busca por documento |
+| | `POST /cliente/{id}` | Actualiza completamente los campos editables de un cliente existente |
 | Mascotas | `GET /mascota/listar`, `/mascota/listar-ordenado?ascendente=...` | Lista mascotas |
 | | `GET /mascota/buscar-nombre?nombre=...` | Busca por nombre |
 | | `GET /mascota/buscar-by-cliente?clienteId=...` | Filtra por cliente |
@@ -81,6 +82,42 @@ La aplicación usa el prefijo `/clinica/v1`. URL local base: `http://localhost:8
 | | `POST /formula-medica/guardar`, `/formula-medica/actualizar` | Crea o actualiza fórmula |
 
 Los endpoints usan `@CrossOrigin("*")`; restringe orígenes antes de exponer el servicio en producción. Varias operaciones GET declaran `consumes: application/json`; según el cliente HTTP, puede requerirse enviar `Content-Type: application/json` incluso sin cuerpo. No hay especificación OpenAPI/Swagger configurada en las dependencias actuales.
+
+### Actualizacion de clientes
+
+`POST /clinica/v1/cliente/{id}` recibe JSON y devuelve `200 OK` con el cliente actualizado.
+El ID debe ser positivo. `tipoDocumento` (hasta 10 caracteres), `numeroDocumento`
+(hasta 20), `nombres` y `apellidos` (hasta 100 cada uno) son obligatorios y no pueden
+estar en blanco. `fechaNacimiento` es obligatoria, usa `yyyy-MM-dd` y no admite fechas futuras.
+`genero` es opcional y, si se envia, debe ser un caracter no blanco; `telefono` admite
+hasta 20 caracteres y `direccion` es opcional.
+
+```json
+{
+  "tipoDocumento": "CC",
+  "numeroDocumento": "0012345678",
+  "nombres": "Laura",
+  "apellidos": "Morales",
+  "fechaNacimiento": "1995-06-15",
+  "genero": "F",
+  "telefono": "3001234567",
+  "direccion": "Calle 10 # 20-30"
+}
+```
+
+Los campos opcionales omitidos o enviados como `null` borran su valor anterior:
+esta operacion no es una actualizacion parcial. Se eliminan espacios extremos de
+tipo/documento y nombres/apellidos antes de persistir. Se conservan `id`, `activo`
+y `usuarioId`, y se rechaza cualquier propiedad JSON fuera del DTO, incluidos esos
+tres campos. Tambien se permite actualizar clientes inactivos sin reactivarlos.
+
+Errores: `400` para entrada invalida, `404` para cliente inexistente y `409` para
+documento asociado a otro cliente. Se permite conservar el documento actual.
+La actualizacion es transaccional; los conflictos concurrentes de integridad se
+reclasifican como duplicados solo si, despues de terminar la transaccion, se encuentra
+otro cliente con ese documento. Otros errores de integridad no se ocultan como conflictos.
+La garantia frente a documentos duplicados requiere la restriccion unica fisica:
+las anotaciones JPA la declaran, pero no se incluyen migraciones que acrediten el esquema desplegado.
 
 ## Configuración
 
@@ -126,14 +163,18 @@ Ejecuta la suite con:
 .\mvnw.cmd test
 ```
 
-La suite actual incluye una prueba de carga del contexto de Spring y pruebas unitarias de utilidades para JWT (firma HS512, expiración de una hora, claims, validación de secretos) y generación de OTP. No se observan pruebas de integración de endpoints ni una base de datos de prueba dedicada; la carga de contexto puede necesitar conectividad/configuración de MySQL según el entorno.
+La suite incluye una prueba de carga del contexto de Spring, pruebas unitarias de utilidades para JWT y OTP,
+y pruebas de servicio y HTTP de clientes con Mockito, Bean Validation y MockMvc sin una base de datos real.
+Las pruebas de clientes cubren actualizacion completa, preservacion de atributos no editables,
+documentos duplicados, entrada invalida y respuestas HTTP. La carga de contexto puede necesitar
+conectividad/configuracion de MySQL; no se incluye una base de datos de prueba dedicada.
 
 ## Seguridad y operación
 
 - Las rutas habilitan CORS para cualquier origen y no se observa una cadena de filtros Spring Security que proteja globalmente los recursos. No asumas que el JWT se valida automáticamente en cada endpoint.
 - El flujo de autenticación usa OTP con expiración de 15 minutos y límite de intentos, y crea JWT con expiración de una hora. Revisa el estado de cierre de sesión: `cerrarSesion` devuelve actualmente `null` en el servicio.
 - `PasswordUtil` usa MD5 para las contraseñas, algoritmo inadecuado para almacenamiento de credenciales. Migra a BCrypt, Argon2 o scrypt antes de un despliegue real.
-- El manejador global devuelve `ex.getMessage()` para errores internos; evita filtrar detalles de implementación al cliente y registra detalles de forma segura en servidor.
+- El manejador global devuelve un mensaje generico para errores internos y registra la excepcion en servidor; protege el acceso a esos registros.
 - SQL detallado está habilitado en configuración. Desactívalo en producción y evita registrar credenciales/datos personales.
 - Usa TLS, cuenta de base de datos con privilegios mínimos, secretos gestionados por el entorno, copias de seguridad y restricciones de red. No versionar secretos ni guardar archivos locales de secretos en Git.
 - Hay credenciales y secretos sensibles en la configuración actualmente versionada. Deben considerarse expuestos: rótalos y elimina su uso; moverlos a variables de entorno no invalida los valores ya expuestos.
