@@ -13,7 +13,6 @@ import com.uniminuto.clinica.entity.Medico;
 import org.springframework.http.ResponseEntity;
 
 // Anotaciones para definir las rutas de la API.
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
@@ -38,10 +37,6 @@ import java.util.List;
  * La ruta /clinica/v1 corresponde al
  * contexto configurado en Spring Boot.
  */
-@CrossOrigin(
-        origins = "*",
-        allowedHeaders = "*"
-)
 @RequestMapping("/medico")
 public interface MedicoApi {
 

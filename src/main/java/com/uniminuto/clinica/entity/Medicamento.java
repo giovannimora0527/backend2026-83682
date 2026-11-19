@@ -152,8 +152,7 @@ public class Medicamento {
      * Es obligatoria.
      */
     @Column(
-            name = "fecha_vence",
-            nullable = false
+            name = "fecha_vence"
     )
     private LocalDate fechaVence;
 

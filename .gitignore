@@ -31,3 +31,10 @@ build/
 
 ### VS Code ###
 .vscode/
+
+/.env
+
+/out/
+/src/main/resources/application*.properties.bak
+/error-backend.log
+/classpath.txt

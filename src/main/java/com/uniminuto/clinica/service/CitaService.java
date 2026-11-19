@@ -11,6 +11,7 @@ import com.uniminuto.clinica.entity.Cita;
 
 // Excepción utilizada por el backend actual.
 import org.apache.coyote.BadRequestException;
+import com.uniminuto.clinica.calendario.AgendaDatos.Cambio;
 
 // Manejo de fechas y horas.
 import java.time.LocalDateTime;
@@ -51,6 +52,8 @@ import java.util.List;
  * en la capa de servicios.
  */
 public interface CitaService {
+    Cita cambiarAgenda(Long id, Cambio cambio);
+
 
     // ======================================================
     // 1. BUSCAR CITAS POR RANGO DE FECHAS

@@ -1,6 +1,8 @@
 
 package com.uniminuto.clinica.serviceimpl;
 
+import com.uniminuto.clinica.service.AlcanceMedico;
+
 import com.uniminuto.clinica.entity.FormulaMedica;
 import com.uniminuto.clinica.repository.FormulaMedicaRepository;
 import com.uniminuto.clinica.service.FormulaMedicaService;
@@ -11,6 +13,7 @@ import jakarta.persistence.PersistenceContext;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
@@ -37,9 +40,13 @@ public class FormulaMedicaServiceImpl
     @PersistenceContext
     private EntityManager entityManager;
 
+    private final AlcanceMedico alcance;
+
     public FormulaMedicaServiceImpl(
+            AlcanceMedico alcance,
             FormulaMedicaRepository formulaMedicaRepository
     ) {
+        this.alcance = alcance;
         this.formulaMedicaRepository = formulaMedicaRepository;
     }
 
@@ -52,8 +59,13 @@ public class FormulaMedicaServiceImpl
     public List<FormulaMedica> obtenerFormulasMedicas() {
 
         // Mantiene el orden que ya teníamos funcionando.
-        return formulaMedicaRepository
-                .findAllByOrderByFechaCreacionRegistroDesc();
+        Integer medicoId = alcance.medicoId();
+        var formulas = formulaMedicaRepository.findAllByOrderByFechaCreacionRegistroDesc();
+        if (medicoId == null) {
+            return formulas;
+        }
+        var citas = alcance.citas(medicoId);
+        return formulas.stream().filter(formula -> citas.contains(formula.getCitaId())).toList();
     }
 
     // ================================================
@@ -64,11 +76,13 @@ public class FormulaMedicaServiceImpl
     @Transactional(readOnly = true)
     public FormulaMedica obtenerFormulaPorId(Long id) {
 
-        return formulaMedicaRepository.findById(id)
+        FormulaMedica formula = formulaMedicaRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
                         "No existe una fórmula médica con ID: " + id
                 ));
+        alcance.exigirCita(formula.getCitaId());
+        return formula;
     }
 
     // ================================================
@@ -76,10 +90,12 @@ public class FormulaMedicaServiceImpl
     // ================================================
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public FormulaMedica crearFormula(FormulaMedica formula) {
 
         // Revisar que la información sea válida.
+        alcance.exigirCita(formula == null ? null : formula.getCitaId());
+        protegerCitas(formula == null ? null : formula.getCitaId());
         validarFormula(formula);
 
         // El identificador lo genera MySQL.
@@ -106,7 +122,7 @@ public class FormulaMedicaServiceImpl
     // ================================================
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public FormulaMedica actualizarFormula(
             Long id,
             FormulaMedica formula
@@ -116,6 +132,8 @@ public class FormulaMedicaServiceImpl
         FormulaMedica existente = obtenerFormulaPorId(id);
 
         // Validar la nueva información.
+        alcance.exigirCita(formula == null ? null : formula.getCitaId());
+        protegerCitas(existente.getCitaId(), formula == null ? null : formula.getCitaId());
         validarFormula(formula);
 
         // Actualizar únicamente los campos permitidos.
@@ -147,6 +165,23 @@ public class FormulaMedicaServiceImpl
     // ================================================
     // 5. VALIDAR INFORMACIÓN DE LA FÓRMULA
     // ================================================
+
+    private void protegerCitas(Integer... ids) {
+        for (Integer id : java.util.Arrays.stream(ids).filter(java.util.Objects::nonNull).distinct().sorted().toList()) {
+            var estados = entityManager.createNativeQuery("SELECT estado FROM cita WHERE id = :id FOR UPDATE")
+                    .setParameter("id", id).getResultList();
+            if (!estados.isEmpty() && java.util.Set.of("cancelada","finalizada")
+                    .contains(String.valueOf(estados.getFirst()).strip().toLowerCase(java.util.Locale.ROOT))) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "La cita está cerrada.");
+            }
+            Number atenciones = (Number) entityManager
+                    .createNativeQuery("SELECT COUNT(*) FROM atencion_veterinaria WHERE cita_id = :id")
+                    .setParameter("id", id).getSingleResult();
+            if (atenciones.longValue() > 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Registra la fórmula desde la atención clínica.");
+            }
+        }
+    }
 
     private void validarFormula(FormulaMedica formula) {
 

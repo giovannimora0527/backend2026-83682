@@ -1,0 +1,49 @@
+services:
+  backend:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${BACKEND_BIND_ADDRESS:-127.0.0.1}:${BACKEND_PORT:-18081}:8080"
+    volumes:
+      - ./docker/schema.sql:/app/schema.sql:ro
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      SPRING_DATASOURCE_URL: "jdbc:mysql://db:3306/clinica?zeroDateTimeBehavior=convertToNull&serverTimezone=America/Bogota&useSSL=false&allowPublicKeyRetrieval=true"
+      SPRING_DATASOURCE_USERNAME: clinica_app
+      SPRING_DATASOURCE_PASSWORD: "${MYSQL_PASSWORD:?Define MYSQL_PASSWORD en .env}"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: "${HIBERNATE_DDL_AUTO:-none}"
+      SPRING_JPA_SHOW_SQL: "false"
+      SPRING_JPA_DEFER_DATASOURCE_INITIALIZATION: "true"
+      SPRING_SQL_INIT_MODE: "${CLINICA_SQL_INIT_MODE:-never}"
+      SPRING_SQL_INIT_SCHEMA_LOCATIONS: file:/app/schema.sql
+
+      JWT_SECRET: "${JWT_SECRET:-${APP_JWT_SECRET:?Define JWT_SECRET en el entorno}}"
+    healthcheck:
+      test: ["CMD-SHELL", "test \"$$(curl -sS -o /dev/null -w '%{http_code}' --max-time 4 http://127.0.0.1:8080/clinica/v1/clinica/test)\" = 200"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: clinica
+      MYSQL_USER: clinica_app
+      MYSQL_PASSWORD: "${MYSQL_PASSWORD:?Define MYSQL_PASSWORD en .env}"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD:?Define MYSQL_ROOT_PASSWORD en .env}"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_PASSWORD\" mysql --protocol=TCP -h 127.0.0.1 -u \"$$MYSQL_USER\" \"$$MYSQL_DATABASE\" --execute='SELECT 1'"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+volumes:
+  mysql_data:

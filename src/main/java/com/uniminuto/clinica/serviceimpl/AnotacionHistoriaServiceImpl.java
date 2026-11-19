@@ -4,7 +4,8 @@ import com.uniminuto.clinica.entity.AnotacionHistoria;
 import com.uniminuto.clinica.repository.AnotacionHistoriaRepository;
 import com.uniminuto.clinica.service.AnotacionHistoriaService;
 import org.apache.coyote.BadRequestException;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.uniminuto.clinica.service.AlcanceMedico;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -22,8 +23,13 @@ public class AnotacionHistoriaServiceImpl
      * Repositorio utilizado para consultar y guardar
      * las anotaciones en la base de datos.
      */
-    @Autowired
-    private AnotacionHistoriaRepository anotacionHistoriaRepository;
+    private final AnotacionHistoriaRepository anotacionHistoriaRepository;
+    private final AlcanceMedico alcance;
+
+    public AnotacionHistoriaServiceImpl(AnotacionHistoriaRepository repositorio, AlcanceMedico alcance) {
+        this.anotacionHistoriaRepository = repositorio;
+        this.alcance = alcance;
+    }
 
     /**
      * Crea una nueva anotación de historia médica.
@@ -32,9 +38,12 @@ public class AnotacionHistoriaServiceImpl
      * @return anotación almacenada.
      */
     @Override
+    @Transactional
     public AnotacionHistoria crearAnotacion(
             AnotacionHistoria anotacion) {
 
+        alcance.exigirMedico(anotacion.getMedicoId());
+        alcance.exigirHistoria(anotacion.getHistoriaId());
         anotacion.setId(null);
 
         return anotacionHistoriaRepository.save(anotacion);
@@ -53,11 +62,11 @@ public class AnotacionHistoriaServiceImpl
             LocalDateTime fechaInicial,
             LocalDateTime fechaFinal) {
 
-        return anotacionHistoriaRepository
+        return filtrarAnotaciones(anotacionHistoriaRepository
                 .findByFechaBetweenOrderByFechaDesc(
                         fechaInicial,
                         fechaFinal
-                );
+                ));
     }
 
     /**
@@ -69,6 +78,7 @@ public class AnotacionHistoriaServiceImpl
      * @throws BadRequestException si la anotación no existe.
      */
     @Override
+    @Transactional
     public AnotacionHistoria actualizarAnotacion(
             Long id,
             AnotacionHistoria anotacion)
@@ -82,6 +92,10 @@ public class AnotacionHistoriaServiceImpl
                                 )
                         );
 
+        alcance.exigirMedico(anotacionExistente.getMedicoId());
+        alcance.exigirHistoria(anotacionExistente.getHistoriaId());
+        alcance.exigirMedico(anotacion.getMedicoId());
+        alcance.exigirHistoria(anotacion.getHistoriaId());
         anotacionExistente.setHistoriaId(
                 anotacion.getHistoriaId()
         );
@@ -114,8 +128,18 @@ public class AnotacionHistoriaServiceImpl
     @Override
     public List<AnotacionHistoria> listarTodasLasAnotaciones() {
 
-        return anotacionHistoriaRepository.findAll();
+        return filtrarAnotaciones(anotacionHistoriaRepository.findAll());
 
     }
 
+    private List<AnotacionHistoria> filtrarAnotaciones(List<AnotacionHistoria> anotaciones) {
+        Integer medicoId = alcance.medicoId();
+        if (medicoId == null) {
+            return anotaciones;
+        }
+        var historias = alcance.historias(medicoId);
+        return anotaciones.stream().filter(anotacion -> medicoId.equals(anotacion.getMedicoId())
+                && anotacion.getHistoriaId() != null
+                && historias.contains(anotacion.getHistoriaId().longValue())).toList();
+    }
 }

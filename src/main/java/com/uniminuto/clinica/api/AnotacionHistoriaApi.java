@@ -4,7 +4,6 @@ import com.uniminuto.clinica.entity.AnotacionHistoria;
 import org.apache.coyote.BadRequestException;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,7 +19,6 @@ import java.util.List;
  * API que define los servicios relacionados
  * con las anotaciones de las historias médicas.
  */
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 @RequestMapping("/anotacion-historia")
 public interface AnotacionHistoriaApi {
 
@@ -49,8 +47,7 @@ public interface AnotacionHistoriaApi {
      */
     @GetMapping(
             value = "/filtrar-fechas",
-            produces = {"application/json"},
-            consumes = {"application/json"}
+            produces = {"application/json"}
     )
     ResponseEntity<List<AnotacionHistoria>> filtrarAnotacionesPorFechas(
 

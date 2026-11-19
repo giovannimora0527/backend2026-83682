@@ -61,6 +61,9 @@ public class Especializacion {
     @Column(name = "id")
     private Long id;
 
+    @Column(name = "activo", nullable = false)
+    private boolean activo = true;
+
     // ======================================================
     // 3. NOMBRE DE LA ESPECIALIZACIÓN
     // ======================================================

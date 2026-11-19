@@ -1,0 +1,5 @@
+services:
+  db:
+    volumes:
+      - ./docker/instalacion/001__esquema_v007.sql:/docker-entrypoint-initdb.d/001__esquema_v007.sql:ro
+      - ./docker/instalacion/002__perfiles_y_menus.sql:/docker-entrypoint-initdb.d/002__perfiles_y_menus.sql:ro

@@ -11,13 +11,13 @@ import com.uniminuto.clinica.entity.Mascota;
 import com.uniminuto.clinica.dto.MascotaDetalleDTO;
 
 // Servicio encargado de consultar las mascotas.
+import com.uniminuto.clinica.service.AlcanceMedico;
 import com.uniminuto.clinica.service.MascotaService;
 
 // Manejo de excepciones.
 import org.apache.coyote.BadRequestException;
 
 // Inyección de dependencias.
-import org.springframework.beans.factory.annotation.Autowired;
 
 // Permite devolver respuestas HTTP.
 import org.springframework.http.ResponseEntity;
@@ -46,8 +46,13 @@ public class nMascotaApiController implements MascotaApi {
      * Spring Boot proporciona automáticamente
      * una instancia de MascotaServiceImpl.
      */
-    @Autowired
-    private MascotaService mascotaService;
+    private final MascotaService mascotaService;
+    private final AlcanceMedico alcance;
+
+    public nMascotaApiController(MascotaService mascotaService, AlcanceMedico alcance) {
+        this.mascotaService = mascotaService;
+        this.alcance = alcance;
+    }
 
     /**
      * MÉTODO 1: LISTAR TODAS LAS MASCOTAS
@@ -110,9 +115,12 @@ public class nMascotaApiController implements MascotaApi {
     public ResponseEntity<List<MascotaDetalleDTO>> listarDetalle()
             throws BadRequestException {
 
-        // Obtener las mascotas con sus datos relacionados.
-        List<MascotaDetalleDTO> mascotas =
-                mascotaService.listarDetalle();
+        Integer medicoId = alcance.medicoId();
+        List<MascotaDetalleDTO> mascotas = mascotaService.listarDetalle();
+        if (medicoId != null) {
+            var asignadas = alcance.mascotas(medicoId);
+            mascotas = mascotas.stream().filter(mascota -> asignadas.contains(mascota.mascotaId())).toList();
+        }
 
         // Devolver la información en formato JSON.
         return ResponseEntity.ok(mascotas);

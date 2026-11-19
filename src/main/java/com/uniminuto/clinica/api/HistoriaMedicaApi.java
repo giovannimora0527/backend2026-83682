@@ -31,10 +31,6 @@ import java.util.List;
  * /historia-medica
  */
 
-@CrossOrigin(
-        origins = "*",
-        allowedHeaders = "*"
-)
 @RequestMapping("/historia-medica")
 public interface HistoriaMedicaApi {
 

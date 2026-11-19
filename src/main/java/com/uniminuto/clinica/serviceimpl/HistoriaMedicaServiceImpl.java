@@ -1,6 +1,8 @@
 
 package com.uniminuto.clinica.serviceimpl;
 
+import com.uniminuto.clinica.service.AlcanceMedico;
+
 // ==========================================================
 // CLÍNICA VETERINARIA - UNIMINUTO
 // IMPLEMENTACIÓN DEL SERVICIO DE HISTORIAS MÉDICAS
@@ -45,9 +47,13 @@ public class HistoriaMedicaServiceImpl
      * una instancia del repositorio.
      */
 
+    private final AlcanceMedico alcance;
+
     public HistoriaMedicaServiceImpl(
+            AlcanceMedico alcance,
             HistoriaMedicaRepository historiaMedicaRepository
     ) {
+        this.alcance = alcance;
 
         this.historiaMedicaRepository =
                 historiaMedicaRepository;
@@ -66,8 +72,7 @@ public class HistoriaMedicaServiceImpl
     @Override
     public List<HistoriaMedica> obtenerHistoriasMedicas() {
 
-        return historiaMedicaRepository
-                .findAllByOrderByIdAsc();
+        return filtrarHistorias(historiaMedicaRepository.findAllByOrderByIdAsc());
 
     }
 
@@ -85,9 +90,16 @@ public class HistoriaMedicaServiceImpl
             Integer pacienteId
     ) {
 
-        return historiaMedicaRepository
-                .findByPacienteId(pacienteId);
+        return filtrarHistorias(historiaMedicaRepository.findByPacienteId(pacienteId));
 
     }
 
+    private List<HistoriaMedica> filtrarHistorias(List<HistoriaMedica> historias) {
+        Integer medicoId = alcance.medicoId();
+        if (medicoId == null) {
+            return historias;
+        }
+        var autorizadas = alcance.historias(medicoId);
+        return historias.stream().filter(historia -> autorizadas.contains(historia.getId())).toList();
+    }
 }

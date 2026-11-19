@@ -163,6 +163,18 @@ public class Cita {
     )
     private LocalDateTime fechaHora;
 
+    @Column(name = "fecha_fin")
+    private LocalDateTime fechaFin;
+
+    public LocalDateTime getFechaFin() {
+        return fechaFin == null && fechaHora != null ? fechaHora.plusMinutes(30) : fechaFin;
+    }
+
+    public LocalDateTime fechaFinRegistrada() {
+        return fechaFin;
+    }
+
+
 
     // ======================================================
     // 6. ESTADO DE LA CITA
@@ -195,6 +207,12 @@ public class Cita {
             length = 20
     )
     private String estado;
+
+    public String getEstado() {
+        if (estado == null) return null;
+        String normal = estado.strip().toLowerCase(java.util.Locale.ROOT);
+        return normal.equals("programada") ? "pendiente" : normal;
+    }
 
 
     // ======================================================

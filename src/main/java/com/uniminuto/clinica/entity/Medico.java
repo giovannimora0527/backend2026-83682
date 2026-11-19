@@ -44,6 +44,9 @@ public class Medico {
     @Column(name = "id")
     private Long id;
 
+    @Column(name = "activo", nullable = false)
+    private boolean activo = true;
+
     // ======================================================
     // 2. TIPO DE DOCUMENTO
     // ======================================================

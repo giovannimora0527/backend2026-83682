@@ -1,776 +1,201 @@
-
 package com.uniminuto.clinica.serviceimpl;
 
-// ==========================================================
-// CLÍNICA VETERINARIA - UNIMINUTO
-// IMPLEMENTACIÓN DEL SERVICIO DE CITAS MÉDICAS
-// ==========================================================
+import static com.uniminuto.clinica.calendario.AgendaServicio.*;
 
-// Entidad de citas.
+import com.uniminuto.clinica.calendario.AgendaRepositorio;
+import com.uniminuto.clinica.calendario.AgendaDatos.Cambio;
+import com.uniminuto.clinica.calendario.AgendaServicio;
 import com.uniminuto.clinica.entity.Cita;
-
-// Repositorio de citas.
 import com.uniminuto.clinica.repository.CitaRepository;
-
-// Interfaz del servicio.
+import com.uniminuto.clinica.service.AlcanceMedico;
 import com.uniminuto.clinica.service.CitaService;
-
-// Excepción utilizada en el proyecto.
-import org.apache.coyote.BadRequestException;
-
-// Herramientas de Spring Boot.
-import org.springframework.http.HttpStatus;
-import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
-
-// Herramientas de Java.
+import com.uniminuto.clinica.service.IdentidadService.Rol;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
+import java.util.stream.Stream;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
-/**
- * ==========================================================
- * SERVICIO: CitaServiceImpl
- * ==========================================================
- *
- * Implementa las operaciones de Gestión de Citas:
- *
- * 1. Buscar citas por fechas.
- * 2. Crear citas.
- * 3. Actualizar citas.
- * 4. Listar todas las citas.
- * 5. Consultar una cita por ID.
- *
- * También valida:
- *
- * - Existencia del cliente.
- * - Existencia de la mascota.
- * - Relación entre cliente y mascota.
- * - Existencia del veterinario.
- * - Fechas de programación.
- * - Conflictos de horarios.
- * - Estados permitidos.
- *
- * Las validaciones se realizan en el backend
- * para mantener la integridad de la información.
- */
 @Service
 public class CitaServiceImpl implements CitaService {
+    private final CitaRepository citas;
+    private final AgendaRepositorio datos;
+    private final AgendaServicio agenda;
+    private final AlcanceMedico alcance;
 
-    // ======================================================
-    // 1. DEPENDENCIAS
-    // ======================================================
-
-    /**
-     * Repositorio para consultar y guardar citas.
-     */
-    private final CitaRepository citaRepository;
-
-    /**
-     * Permite ejecutar consultas SQL para comprobar
-     * las relaciones existentes en la base de datos.
-     */
-    private final JdbcTemplate jdbcTemplate;
-
-    /**
-     * Constructor que recibe las dependencias.
-     *
-     * @param citaRepository Repositorio de citas.
-     * @param jdbcTemplate Herramienta de consultas SQL.
-     */
-    public CitaServiceImpl(
-            CitaRepository citaRepository,
-            JdbcTemplate jdbcTemplate
-    ) {
-        this.citaRepository = citaRepository;
-        this.jdbcTemplate = jdbcTemplate;
+    public CitaServiceImpl(CitaRepository citas, AgendaRepositorio datos, AgendaServicio agenda, AlcanceMedico alcance) {
+        this.citas=citas;
+        this.datos=datos;
+        this.agenda=agenda;
+        this.alcance=alcance;
     }
 
-
-    // ======================================================
-    // 2. BUSCAR CITAS POR FECHAS
-    // ======================================================
-
-    /**
-     * Busca las citas dentro de un rango de fechas.
-     *
-     * Verifica que:
-     *
-     * - Ambas fechas estén presentes.
-     * - La fecha inicial no supere la fecha final.
-     *
-     * @param fechaInicial Inicio del rango.
-     * @param fechaFinal Final del rango.
-     * @return Citas ordenadas por fecha descendente.
-     */
     @Override
-    @Transactional(readOnly = true)
-    public List<Cita> buscarCitasPorFechas(
-            LocalDateTime fechaInicial,
-            LocalDateTime fechaFinal
-    ) {
-
-        // Validar que las fechas no sean nulas.
-        if (fechaInicial == null || fechaFinal == null) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Debes indicar las dos fechas."
-            );
-        }
-
-        // Validar el orden de las fechas.
-        if (fechaInicial.isAfter(fechaFinal)) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "La fecha inicial no puede superar la fecha final."
-            );
-        }
-
-        // Consultar la base de datos.
-        return citaRepository
-                .findByFechaHoraBetweenOrderByFechaHoraDesc(
-                        fechaInicial,
-                        fechaFinal
-                );
+    @Transactional(readOnly=true)
+    public List<Cita> buscarCitasPorFechas(LocalDateTime desde, LocalDateTime hasta) {
+        if (desde==null || hasta==null || hasta.isBefore(desde)) throw invalido("El rango de fechas no es válido.");
+        Integer medico=alcance.medicoId();
+        return medico==null ? citas.findByFechaHoraBetweenOrderByFechaHoraDesc(desde,hasta)
+                : citas.findByMedicoIdAndFechaHoraBetweenOrderByFechaHoraDesc(medico,desde,hasta);
     }
 
-
-    // ======================================================
-    // 3. CREAR UNA NUEVA CITA
-    // ======================================================
-
-    /**
-     * Registra una cita veterinaria en MySQL.
-     *
-     * Antes de guardar valida los datos,
-     * las relaciones y la disponibilidad.
-     *
-     * @param cita Información de la nueva cita.
-     * @return Cita registrada en MySQL.
-     */
     @Override
-    @Transactional
+    @Transactional(readOnly=true)
+    public List<Cita> listarCitas() {
+        Integer medico=alcance.medicoId();
+        return medico==null ? citas.findAllByOrderByFechaHoraDesc() : citas.findByMedicoIdOrderByFechaHoraDesc(medico);
+    }
+
+    @Override
+    @Transactional(readOnly=true)
+    public Cita consultarCitaPorId(Long id) {
+        Cita cita=citas.findById(id).orElseThrow(()->noExiste("Cita"));
+        alcance.exigirMedico(cita.getMedicoId());
+        return cita;
+    }
+
+    @Override
+    @Transactional(isolation=Isolation.READ_COMMITTED)
     public Cita crearCita(Cita cita) {
-
-        // Paso 1: Validar los campos obligatorios.
         validarCampos(cita);
-
-        // Paso 2: Normalizar el estado recibido.
-        String estado = normalizarEstado(
-                cita.getEstado()
-        );
-
-        // Una cita nueva no puede comenzar
-        // directamente como atendida o cancelada.
-        if (estado.equals("atendida")
-                || estado.equals("cancelada")) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Una cita nueva debe iniciar en un estado activo."
-            );
-        }
-
-        cita.setEstado(estado);
-
-        // Paso 3: Comprobar que la fecha sea futura.
-        validarFechaFutura(cita.getFechaHora());
-
-        // Paso 4: Comprobar cliente, mascota y médico.
-        validarRelaciones(cita);
-
-        // Paso 5: Comprobar que el horario esté libre.
-        validarDisponibilidad(cita, 0L);
-
-        // Paso 6: El ID se genera automáticamente.
+        String estado=estado(cita.getEstado());
+        if (!reserva(estado)) throw invalido("Una cita nueva debe iniciar como pendiente o confirmada.");
+        LocalDateTime fin=cita.getFechaFin();
+        var periodo=intervalo(cita.getFechaHora(),fin);
+        validarFutura(periodo.inicio());
+        bloquearRecursos(cita,cita,true);
+        agenda.validarReserva(cita.getMedicoId(),cita.getMascotaId(),null,periodo);
         cita.setId(null);
-
-        // Paso 7: Guardar en MySQL.
-        return citaRepository.save(cita);
+        cita.setEstado(estado);
+        cita.setFechaFin(fin);
+        Cita guardada=citas.saveAndFlush(cita);
+        registrar(guardada,null);
+        return guardada;
     }
 
-
-    // ======================================================
-    // 4. ACTUALIZAR UNA CITA EXISTENTE
-    // ======================================================
-
-    /**
-     * Modifica una cita existente.
-     *
-     * No permite modificar citas que ya estén
-     * canceladas o atendidas.
-     *
-     * Al cerrar una cita, únicamente permite
-     * cambiar su estado, conservando sus datos.
-     *
-     * @param id Identificador de la cita.
-     * @param cita Información actualizada.
-     * @return Cita modificada.
-     * @throws BadRequestException Si la cita no existe.
-     */
     @Override
-    @Transactional
-    public Cita actualizarCita(
-            Long id,
-            Cita cita
-    ) throws BadRequestException {
+    @Transactional(isolation=Isolation.READ_COMMITTED)
+    public Cita actualizarCita(Long id,Cita cambios) {
+        validarCampos(cambios);
+        return actualizar(citas.bloquearPorId(id).orElseThrow(()->noExiste("Cita")),cambios);
+    }
 
-        // Paso 1: Comprobar que la cita exista.
-        Cita citaExistente = citaRepository.findById(id)
-                .orElseThrow(() ->
-                        new BadRequestException(
-                                "No existe una cita con el ID: " + id
-                        )
-                );
+    @Override
+    @Transactional(isolation=Isolation.READ_COMMITTED)
+    public Cita cambiarAgenda(Long id,Cambio cambio) {
+        if (cambio==null) throw invalido("Debes enviar los cambios de la cita.");
+        Cita actual=citas.bloquearPorId(id).orElseThrow(()->noExiste("Cita"));
+        alcance.exigirMedico(actual.getMedicoId());
+        Cita cambios=new Cita();
+        cambios.setMedicoId(actual.getMedicoId());
+        cambios.setMascotaId(actual.getMascotaId());
+        cambios.setClienteId(actual.getClienteId());
+        cambios.setMotivo(actual.getMotivo());
+        cambios.setFechaHora(cambio.inicio()==null ? actual.getFechaHora() : cambio.inicio());
+        cambios.setFechaFin(cambio.fin());
+        cambios.setEstado(cambio.estado()==null ? actual.getEstado() : cambio.estado());
+        return actualizar(actual,cambios);
+    }
 
-        // Paso 2: Revisar el estado anterior.
-        String estadoAnterior = normalizarEstado(
-                citaExistente.getEstado()
-        );
-
-        // Las citas finalizadas no pueden modificarse.
-        if (estadoAnterior.equals("cancelada")
-                || estadoAnterior.equals("atendida")) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "No puedes modificar una cita cancelada o atendida."
-            );
+    private Cita actualizar(Cita actual,Cita cambios) {
+        alcance.exigirEdicionCita(actual,cambios);
+        String anterior=estado(actual.getEstado());
+        String siguiente=estado(cambios.getEstado());
+        validarTransicion(anterior,siguiente);
+        LocalDateTime fin=cambios.fechaFinRegistrada();
+        if (fin==null) fin=cambios.getFechaHora().plus(Duration.between(actual.getFechaHora(),actual.getFechaFin()));
+        var periodo=intervalo(cambios.getFechaHora(),fin);
+        boolean reprograma=!Objects.equals(actual.getFechaHora(),periodo.inicio())
+                || !Objects.equals(actual.getFechaFin(),periodo.fin())
+                || !Objects.equals(actual.getMascotaId(),cambios.getMascotaId())
+                || !Objects.equals(actual.getMedicoId(),cambios.getMedicoId())
+                || !Objects.equals(actual.getClienteId(),cambios.getClienteId());
+        int atencion=datos.estadoAtencion(actual.getId());
+        if (atencion!=0 && (reprograma || siguiente.equals("cancelada"))) {
+            throw conflicto("La cita tiene una atención clínica y sus datos de reserva están protegidos.");
         }
+        if (atencion==1 && siguiente.equals("finalizada")) {
+            throw conflicto("Completa la atención clínica antes de finalizar la cita.");
+        }
+        boolean cambiaMotivo=!Objects.equals(actual.getMotivo(),cambios.getMotivo());
+        if (!reserva(siguiente) && (reprograma || cambiaMotivo)) {
+            throw invalido("Para cerrar la cita, conserva sus datos originales.");
+        }
+        // Cerrar o anotar citas previas sigue siendo posible si su franja ya no existe.
+        boolean verificarReserva=reserva(siguiente) && (reprograma || !anterior.equals(siguiente));
+        bloquearRecursos(actual,cambios,verificarReserva);
+        if (verificarReserva) {
+            validarFutura(periodo.inicio());
+            agenda.validarReserva(cambios.getMedicoId(),cambios.getMascotaId(),actual.getId(),periodo);
+        }
+        if (!reprograma && !cambiaMotivo && actual.getEstado().equals(siguiente)) return actual;
 
-        // Paso 3: Validar los datos recibidos.
-        validarCampos(cita);
+        Foto foto=Foto.de(actual);
+        actual.setClienteId(cambios.getClienteId());
+        actual.setMascotaId(cambios.getMascotaId());
+        actual.setMedicoId(cambios.getMedicoId());
+        actual.setFechaHora(periodo.inicio());
+        if (reprograma || cambios.fechaFinRegistrada()!=null) actual.setFechaFin(periodo.fin());
+        actual.setEstado(siguiente);
+        actual.setMotivo(cambios.getMotivo());
+        Cita guardada=citas.saveAndFlush(actual);
+        registrar(guardada,foto);
+        return guardada;
+    }
 
-        // Paso 4: Obtener el estado solicitado.
-        String nuevoEstado = normalizarEstado(
-                cita.getEstado()
-        );
-
-        cita.setEstado(nuevoEstado);
-
-        // Paso 5: Comprobar cambios de horario.
-        boolean cambioHorario = !Objects.equals(
-                citaExistente.getFechaHora(),
-                cita.getFechaHora()
-        );
-
-        // Paso 6: Si se cierra una cita, no permitir
-        // modificaciones simultáneas de otros datos.
-        if (nuevoEstado.equals("atendida")
-                || nuevoEstado.equals("cancelada")) {
-
-            boolean cambioCliente = !Objects.equals(
-                    citaExistente.getClienteId(),
-                    cita.getClienteId()
-            );
-
-            boolean cambioMascota = !Objects.equals(
-                    citaExistente.getMascotaId(),
-                    cita.getMascotaId()
-            );
-
-            boolean cambioMedico = !Objects.equals(
-                    citaExistente.getMedicoId(),
-                    cita.getMedicoId()
-            );
-
-            boolean cambioMotivo = !Objects.equals(
-                    citaExistente.getMotivo(),
-                    cita.getMotivo()
-            );
-
-            if (cambioHorario
-                    || cambioCliente
-                    || cambioMascota
-                    || cambioMedico
-                    || cambioMotivo) {
-
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        "Para cerrar la cita, conserva sus datos originales."
-                );
+    private void bloquearRecursos(Cita anterior,Cita nueva,boolean exigeActivo) {
+        // Todas las escrituras toman los médicos y después las mascotas, en orden de ID.
+        // READ COMMITTED vuelve a leer los intervalos después de adquirir los bloqueos.
+        for (int medico:Stream.of(anterior.getMedicoId(),nueva.getMedicoId()).distinct().sorted().toList()) {
+            boolean activo=datos.medicoActivo(medico,true);
+            if (exigeActivo && medico==nueva.getMedicoId() && !activo) throw conflicto("El médico seleccionado está inactivo.");
+        }
+        for (int mascota:Stream.of(anterior.getMascotaId(),nueva.getMascotaId()).distinct().sorted().toList()) {
+            int propietario=datos.propietario(mascota);
+            if (mascota==nueva.getMascotaId() && propietario!=nueva.getClienteId()) {
+                throw invalido("La mascota no pertenece al cliente seleccionado.");
             }
         }
-
-        // Paso 7: Validar fechas de citas activas.
-        if (!nuevoEstado.equals("atendida")
-                && !nuevoEstado.equals("cancelada")) {
-
-            validarFechaFutura(cita.getFechaHora());
-        }
-
-        // Paso 8: Validar relaciones.
-        validarRelaciones(cita);
-
-        // Paso 9: Verificar disponibilidad solo
-        // cuando la cita continúa activa.
-        if (!nuevoEstado.equals("cancelada")
-                && !nuevoEstado.equals("atendida")) {
-
-            validarDisponibilidad(cita, id);
-        }
-
-        // Paso 10: Actualizar los campos permitidos.
-        citaExistente.setClienteId(
-                cita.getClienteId()
-        );
-
-        citaExistente.setMascotaId(
-                cita.getMascotaId()
-        );
-
-        citaExistente.setMedicoId(
-                cita.getMedicoId()
-        );
-
-        citaExistente.setFechaHora(
-                cita.getFechaHora()
-        );
-
-        citaExistente.setEstado(
-                nuevoEstado
-        );
-
-        citaExistente.setMotivo(
-                cita.getMotivo()
-        );
-
-        // Paso 11: Guardar los cambios.
-        return citaRepository.save(citaExistente);
+        if (!datos.clienteExiste(nueva.getClienteId())) throw invalido("El cliente seleccionado no existe.");
     }
 
-
-    // ======================================================
-    // 5. LISTAR TODAS LAS CITAS - NUEVO
-    // ======================================================
-
-    /**
-     * Obtiene todas las citas médicas.
-     *
-     * Las devuelve ordenadas por fecha
-     * y hora de forma descendente.
-     *
-     * Este método permitirá alimentar
-     * el DataTable de Angular.
-     *
-     * @return Lista completa de citas.
-     */
-    @Override
-    @Transactional(readOnly = true)
-    public List<Cita> listarCitas() {
-
-        // Consultar todas las citas ordenadas
-        // desde la más reciente.
-        return citaRepository
-                .findAllByOrderByFechaHoraDesc();
+    private static void validarCampos(Cita cita) {
+        if (cita==null || cita.getClienteId()==null || cita.getClienteId()<=0
+                || cita.getMascotaId()==null || cita.getMascotaId()<=0
+                || cita.getMedicoId()==null || cita.getMedicoId()<=0 || cita.getFechaHora()==null) {
+            throw invalido("Selecciona cliente, mascota, médico y fecha de inicio.");
+        }
+        if (cita.getMotivo()!=null && cita.getMotivo().length()>5000) throw invalido("El motivo supera 5000 caracteres.");
     }
 
-
-    // ======================================================
-    // 6. CONSULTAR UNA CITA POR ID - NUEVO
-    // ======================================================
-
-    /**
-     * Obtiene una cita mediante su identificador.
-     *
-     * Si la cita no existe, devuelve
-     * el código HTTP 404 Not Found.
-     *
-     * @param id Identificador de la cita.
-     * @return Cita encontrada.
-     */
-    @Override
-    @Transactional(readOnly = true)
-    public Cita consultarCitaPorId(Long id) {
-
-        // Validar identificador.
-        if (id == null || id <= 0) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "El identificador de la cita no es válido."
-            );
-        }
-
-        // Buscar la cita o devolver 404.
-        return citaRepository.findById(id)
-                .orElseThrow(() ->
-                        new ResponseStatusException(
-                                HttpStatus.NOT_FOUND,
-                                "No existe una cita con el ID: " + id
-                        )
-                );
+    private static void validarFutura(LocalDateTime inicio) {
+        if (inicio.isBefore(ahora())) throw invalido("No puedes agendar una cita en el pasado.");
     }
 
-
-    // ======================================================
-    // 7. VALIDAR CAMPOS OBLIGATORIOS
-    // ======================================================
-
-    /**
-     * Verifica los campos necesarios para
-     * registrar o modificar una cita.
-     *
-     * @param cita Información recibida.
-     */
-    private void validarCampos(Cita cita) {
-
-        // Comprobar que exista el objeto.
-        if (cita == null) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Debes enviar los datos de la cita."
-            );
+    static void validarTransicion(String anterior,String siguiente) {
+        var usuario=identidad();
+        if (usuario!=null && usuario.rol()==Rol.RECEPCION && ("atendida".equals(siguiente) || "finalizada".equals(siguiente))) {
+            throw prohibido("Recepción no puede marcar atención ni finalizar citas.");
         }
-
-        // Validar cliente.
-        if (cita.getClienteId() == null
-                || cita.getClienteId() <= 0) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Selecciona un cliente válido."
-            );
-        }
-
-        // Validar mascota.
-        if (cita.getMascotaId() == null
-                || cita.getMascotaId() <= 0) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Selecciona una mascota válida."
-            );
-        }
-
-        // Validar médico.
-        if (cita.getMedicoId() == null
-                || cita.getMedicoId() <= 0) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Selecciona un veterinario válido."
-            );
-        }
-
-        // Validar fecha y hora.
-        if (cita.getFechaHora() == null) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Debes indicar la fecha y hora de la cita."
-            );
-        }
-
-        // Validar estado.
-        normalizarEstado(cita.getEstado());
+        if (reserva(anterior) && reserva(siguiente)) return;
+        if (reserva(anterior) && ("cancelada".equals(siguiente) || "atendida".equals(siguiente))) return;
+        if ("atendida".equals(anterior) && "finalizada".equals(siguiente)) return;
+        throw conflicto("El estado actual no permite esa transición.");
     }
 
-
-    // ======================================================
-    // 8. VALIDAR FECHA FUTURA
-    // ======================================================
-
-    /**
-     * Impide programar citas en el pasado.
-     *
-     * @param fechaHora Fecha solicitada.
-     */
-    private void validarFechaFutura(
-            LocalDateTime fechaHora
-    ) {
-
-        if (fechaHora == null
-                || fechaHora.isBefore(LocalDateTime.now())) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "No puedes programar una cita en el pasado."
-            );
-        }
+    private void registrar(Cita cita,Foto antes) {
+        var usuario=identidad();
+        datos.registrarHistorial(cita.getId(),usuario==null ? null : usuario.usuarioId(),ahora(),antes,Foto.de(cita));
     }
 
-
-    // ======================================================
-    // 9. VALIDAR ESTADOS DE LA CITA
-    // ======================================================
-
-    /**
-     * Comprueba que el estado sea válido.
-     *
-     * Estados permitidos:
-     *
-     * - pendiente
-     * - programada
-     * - confirmada
-     * - atendida
-     * - cancelada
-     *
-     * @param estado Estado recibido.
-     * @return Estado normalizado.
-     */
-    private String normalizarEstado(String estado) {
-
-        if (estado == null || estado.isBlank()) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "El estado de la cita es obligatorio."
-            );
-        }
-
-        // Convertir a minúsculas.
-        String valor = estado.trim()
-                .toLowerCase(Locale.ROOT);
-
-        // Verificar los valores permitidos.
-        if (!valor.equals("pendiente")
-                && !valor.equals("programada")
-                && !valor.equals("confirmada")
-                && !valor.equals("atendida")
-                && !valor.equals("cancelada")) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "El estado de la cita no es válido."
-            );
-        }
-
-        return valor;
-    }
-
-
-    // ======================================================
-    // 10. VALIDAR RELACIONES
-    // ======================================================
-
-    /**
-     * Verifica que:
-     *
-     * - El cliente exista.
-     * - La mascota exista.
-     * - La mascota pertenezca al cliente.
-     * - El médico exista.
-     *
-     * @param cita Datos de la cita.
-     */
-    private void validarRelaciones(Cita cita) {
-
-        // --------------------------------------------------
-        // 10.1. COMPROBAR EXISTENCIA DEL CLIENTE
-        // --------------------------------------------------
-
-        Integer totalClientes = jdbcTemplate.queryForObject(
-                """
-                SELECT COUNT(*)
-                FROM cliente
-                WHERE cliente_id = ?
-                """,
-                Integer.class,
-                cita.getClienteId()
-        );
-
-        if (totalClientes == null || totalClientes == 0) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "El cliente seleccionado no existe."
-            );
-        }
-
-        // --------------------------------------------------
-        // 10.2. COMPROBAR EXISTENCIA DE LA MASCOTA
-        // --------------------------------------------------
-
-        Integer totalMascotas = jdbcTemplate.queryForObject(
-                """
-                SELECT COUNT(*)
-                FROM mascota
-                WHERE mascota_id = ?
-                """,
-                Integer.class,
-                cita.getMascotaId()
-        );
-
-        if (totalMascotas == null || totalMascotas == 0) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "La mascota seleccionada no existe."
-            );
-        }
-
-        // --------------------------------------------------
-        // 10.3. VERIFICAR QUE LA MASCOTA SEA DEL CLIENTE
-        // --------------------------------------------------
-
-        Integer relaciones = jdbcTemplate.queryForObject(
-                """
-                SELECT COUNT(*)
-                FROM mascota
-                WHERE mascota_id = ?
-                  AND cliente_id = ?
-                """,
-                Integer.class,
-                cita.getMascotaId(),
-                cita.getClienteId()
-        );
-
-        if (relaciones == null || relaciones == 0) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "La mascota no pertenece al cliente seleccionado."
-            );
-        }
-
-        // --------------------------------------------------
-        // 10.4. VALIDAR EXISTENCIA DEL MÉDICO
-        // --------------------------------------------------
-
-        validarMedico(cita.getMedicoId());
-    }
-
-
-    // ======================================================
-    // 11. VALIDAR EXISTENCIA DEL VETERINARIO
-    // ======================================================
-
-    /**
-     * Comprueba que el médico esté registrado.
-     *
-     * Identifica la columna de su llave primaria
-     * a partir de la estructura real de MySQL.
-     *
-     * @param medicoId Identificador del médico.
-     */
-    private void validarMedico(Integer medicoId) {
-
-        // Consultar el nombre de la llave primaria.
-        String columnaId = jdbcTemplate.query(
-                """
-                SELECT COLUMN_NAME
-                FROM information_schema.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE()
-                  AND TABLE_NAME = 'medico'
-                  AND COLUMN_KEY = 'PRI'
-                ORDER BY ORDINAL_POSITION
-                LIMIT 1
-                """,
-                rs -> rs.next() ? rs.getString(1) : null
-        );
-
-        // Verificar que la columna sea válida.
-        if (columnaId == null
-                || !columnaId.matches("[A-Za-z_][A-Za-z0-9_]*")) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.INTERNAL_SERVER_ERROR,
-                    "No se pudo identificar la llave primaria de medico."
-            );
-        }
-
-        // Consultar el médico en MySQL.
-        Integer totalMedicos = jdbcTemplate.queryForObject(
-                "SELECT COUNT(*) FROM medico WHERE `"
-                        + columnaId + "` = ?",
-                Integer.class,
-                medicoId
-        );
-
-        if (totalMedicos == null || totalMedicos == 0) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "El veterinario seleccionado no existe."
-            );
+    private record Foto(Integer medicoId,Integer mascotaId,Integer clienteId,LocalDateTime inicio,
+            LocalDateTime fin,String estado,String motivo) {
+        static Foto de(Cita c) {
+            return new Foto(c.getMedicoId(),c.getMascotaId(),c.getClienteId(),c.getFechaHora(),c.getFechaFin(),
+                    AgendaServicio.estado(c.getEstado()),c.getMotivo());
         }
     }
-
-
-    // ======================================================
-    // 12. VALIDAR DISPONIBILIDAD DE CITAS
-    // ======================================================
-
-    /**
-     * Comprueba los conflictos de horarios.
-     *
-     * Reglas:
-     *
-     * 1. Un veterinario no podrá tener
-     *    otra cita dentro de los 15 minutos
-     *    anteriores o posteriores.
-     *
-     * 2. Una mascota no podrá tener
-     *    dos citas simultáneas.
-     *
-     * 3. Las citas canceladas no bloquean
-     *    horarios disponibles.
-     *
-     * @param cita Cita solicitada.
-     * @param idExcluir Cita que se debe excluir
-     *                  durante una actualización.
-     */
-    private void validarDisponibilidad(
-            Cita cita,
-            Long idExcluir
-    ) {
-
-        // Obtener fecha y hora solicitadas.
-        LocalDateTime fecha = cita.getFechaHora();
-
-        // Calcular margen del veterinario.
-        LocalDateTime inicio = fecha.minusMinutes(15);
-
-        LocalDateTime fin = fecha.plusMinutes(15);
-
-        // --------------------------------------------------
-        // 12.1. BUSCAR CONFLICTOS DEL VETERINARIO
-        // --------------------------------------------------
-
-        long conflictosMedico =
-                citaRepository.contarConflictosMedico(
-                        cita.getMedicoId(),
-                        inicio,
-                        fin,
-                        idExcluir
-                );
-
-        // Rechazar si el veterinario está ocupado.
-        if (conflictosMedico > 0) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "El veterinario ya tiene una cita en ese horario."
-            );
-        }
-
-        // --------------------------------------------------
-        // 12.2. BUSCAR CONFLICTOS DE LA MASCOTA
-        // --------------------------------------------------
-
-        long conflictosMascota =
-                citaRepository.contarConflictosMascota(
-                        cita.getMascotaId(),
-                        fecha,
-                        idExcluir
-                );
-
-        // Rechazar si la mascota tiene otra cita
-        // exactamente a la misma hora.
-        if (conflictosMascota > 0) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT,
-                    "La mascota ya tiene una cita en ese horario."
-            );
-        }
-    }
-
 }

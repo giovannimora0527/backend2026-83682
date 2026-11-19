@@ -5,7 +5,6 @@ import com.uniminuto.clinica.entity.Mascota;
 import com.uniminuto.clinica.dto.MascotaDetalleDTO;
 import org.apache.coyote.BadRequestException;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,7 +19,6 @@ import java.util.List;
  * API encargada de exponer los endpoints
  * relacionados con las mascotas.
  */
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 @RequestMapping("/mascota")
 public interface MascotaApi {
 
