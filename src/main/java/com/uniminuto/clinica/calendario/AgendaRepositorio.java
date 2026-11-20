@@ -40,6 +40,11 @@ public class AgendaRepositorio {
                 .orElseThrow(() -> AgendaServicio.invalido("La mascota seleccionada no existe."));
     }
 
+    public boolean clienteActivoParaAlta(int cliente) {
+        return jdbc.query("SELECT activo FROM cliente WHERE cliente_id=? FOR UPDATE",
+                (r, i) -> r.getBoolean(1), cliente).stream().findFirst().orElse(false);
+    }
+
     public boolean clienteExiste(int cliente) {
         return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM cliente WHERE cliente_id=?)",
                 Boolean.class, cliente));
@@ -97,7 +102,7 @@ public class AgendaRepositorio {
 
     List<Evento> eventos(int medico, Intervalo rango, String estado) {
         return jdbc.query("""
-                SELECT c.id,c.fecha_hora,%s AS fin,%s AS estado,
+                SELECT c.id,c.mascota_id,c.fecha_hora,%s AS fin,%s AS estado,
                        CONCAT_WS(' ', m.nombres, m.apellidos) AS medico,
                        p.nombre_mascota, CONCAT_WS(' ', cl.nombres, cl.apellidos) AS propietario,c.motivo
                 FROM cita c JOIN medico m ON m.id=c.medico_id
@@ -108,7 +113,8 @@ public class AgendaRepositorio {
                 """.formatted(FIN_CITA,ESTADO,FIN_CITA,ESTADO),
                 (r,i)->new Evento(r.getLong("id"),r.getObject("fecha_hora",LocalDateTime.class),
                         r.getObject("fin",LocalDateTime.class),r.getString("estado"),r.getString("medico"),
-                        r.getString("nombre_mascota"),r.getString("propietario"),r.getString("motivo")),
+                        r.getString("nombre_mascota"),r.getString("propietario"),r.getString("motivo"),
+                        r.getObject("mascota_id",Integer.class)),
                 medico,rango.fin(),rango.inicio(),estado,estado);
     }
 

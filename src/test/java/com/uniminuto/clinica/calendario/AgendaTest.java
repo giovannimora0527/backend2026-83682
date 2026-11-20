@@ -56,7 +56,7 @@ class AgendaTest {
                 ()->agenda.eventos(lunes,lunes,null)).getStatusCode().value());
         when(alcance.medicoId()).thenReturn(7);
         var evento=new Evento(1,lunes.atTime(9,0),lunes.atTime(9,30),"confirmada",
-                "Médico QA","Paciente QA","Propietario QA","=texto clínico");
+                "Médico QA","Paciente QA","Propietario QA","=texto clínico", 9);
         when(datos.eventos(eq(7),any(),eq("confirmada"))).thenReturn(List.of(evento));
         var eventos=agenda.eventos(lunes,lunes,"confirmada");
         byte[] bytes=new AgendaExcel().generar(eventos);

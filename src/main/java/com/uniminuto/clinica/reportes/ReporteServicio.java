@@ -39,15 +39,25 @@ class ReporteServicio {
         if(pagina<0 || pagina>MAX_FILAS/PAGINA) throw invalido("Página inválida.");
         validar(tipo,f);
         String grupo=f.agrupacion()==null?"DIA":f.agrupacion();
-        var consulta=ConsultasReporte.consulta(tipo,grupo);
         LocalDateTime generado=ahora();
+        boolean historico=tipo==Tipo.EXISTENCIAS && f.desde()!=null;
+        if(historico && f.hasta().isAfter(generado.toLocalDate())) {
+            throw invalido("La fecha de cierre no puede ser futura.");
+        }
         var parametros=parametros(f,generado.toLocalDate());
+        if(historico) {
+            var lotes=jdbc.queryForList(ExistenciasHistoricas.LOTE_SIN_CONCILIAR,parametros,Long.class);
+            if(!lotes.isEmpty()) {
+                throw conflicto("No se pudo conciliar el historial del lote " + lotes.getFirst() + ".");
+            }
+        }
+        var consulta=historico?ExistenciasHistoricas.consulta():ConsultasReporte.consulta(tipo,grupo);
         var filas=jdbc.queryForList(consulta.sql()+" LIMIT "+(MAX_FILAS+1),parametros);
         if(filas.size()>MAX_FILAS) throw invalido("El resultado supera 10.000 filas. Acota el período o agrega filtros.");
         var totales=totales(tipo,consulta.columnas(),filas,parametros);
         int comienzo=Math.min(pagina*PAGINA,filas.size());
         var seleccion=exportar?filas:filas.subList(comienzo,Math.min(comienzo+PAGINA,filas.size()));
-        return new Resultado(titulo(tipo),generado,etiquetas(tipo,f,grupo),consulta.columnas(),totales,
+        return new Resultado(historico?"Existencias históricas por lote":titulo(tipo),generado,etiquetas(tipo,f,grupo),consulta.columnas(),totales,
                 seleccion.stream().map(ReporteServicio::normalizar).toList(),filas.size(),pagina);
     }
 
@@ -63,7 +73,9 @@ class ReporteServicio {
         if(fechas && (f.hasta().isBefore(f.desde()) || f.desde().getYear()<1000 || f.hasta().getYear()>9998)) {
             throw invalido("Revisa el rango de fechas.");
         }
-        if(tipo==Tipo.EXISTENCIAS && fechas) throw invalido("Existencias corresponde a la fecha actual de Bogotá.");
+        if(tipo==Tipo.EXISTENCIAS && fechas && f.estado()!=null) {
+            throw invalido("El filtro de estado solo se aplica a existencias actuales.");
+        }
         if(f.agrupacion()!=null && (tipo!=Tipo.FINANCIERO || !Set.of("DIA","MES","ANIO").contains(f.agrupacion()))) {
             throw invalido("Agrupación inválida para el reporte.");
         }
@@ -129,7 +141,13 @@ class ReporteServicio {
             salida.put(tipo==Tipo.LOTES?"Vencimiento hasta":"Hasta",f.hasta().toString());
         }
         if(tipo==Tipo.FINANCIERO) salida.put("Agrupación",grupo);
-        if(tipo==Tipo.EXISTENCIAS || tipo==Tipo.LOTES) salida.put("Valoración","Saldo actual al momento de generar");
+        if(tipo==Tipo.EXISTENCIAS && f.desde()!=null) {
+            salida.put("Corte","Apertura antes del primer día y cierre inclusivo en Bogotá");
+            salida.put("Cobertura","Lotes con movimientos registrados hasta el cierre");
+            salida.put("Valoración","Saldo físico al costo registrado del lote");
+        } else if(tipo==Tipo.EXISTENCIAS || tipo==Tipo.LOTES) {
+            salida.put("Valoración","Saldo actual al momento de generar");
+        }
         var valores=new Object[]{f.medico(),f.especialidad(),f.medicamento(),f.lote(),f.mascota(),f.propietario(),f.estado()};
         var nombres=List.of("ID médico","ID especialidad","ID medicamento","ID lote","ID mascota","ID propietario","Estado");
         for(int i=0;i<valores.length;i++) if(valores[i]!=null) salida.put(nombres.get(i),valores[i].toString());

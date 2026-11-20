@@ -67,6 +67,9 @@ public class CitaServiceImpl implements CitaService {
         var periodo=intervalo(cita.getFechaHora(),fin);
         validarFutura(periodo.inicio());
         bloquearRecursos(cita,cita,true);
+        if (!datos.clienteActivoParaAlta(cita.getClienteId())) {
+            throw conflicto("El cliente está archivado y no puede recibir nuevas citas.");
+        }
         agenda.validarReserva(cita.getMedicoId(),cita.getMascotaId(),null,periodo);
         cita.setId(null);
         cita.setEstado(estado);

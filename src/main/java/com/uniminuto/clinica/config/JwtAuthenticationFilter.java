@@ -122,6 +122,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
         boolean citas = ruta.startsWith("/cita/") && (lectura || Set.of("POST", "PUT").contains(metodo));
         if (rol == Rol.RECEPCION) {
+            if (ruta.equals("/cliente") && "POST".equals(metodo)) return true;
+            if (ruta.matches("/cliente/[0-9]+")) return lectura || "PUT".equals(metodo);
             return (lectura && (CATALOGOS.contains(ruta) || RECEPCION.contains(ruta)))
                     || ("POST".equals(metodo) && ruta.equals("/mascota/crear")) || citas;
         }

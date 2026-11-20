@@ -13,7 +13,7 @@ public final class AgendaDatos {
     public record Intervalo(LocalDateTime inicio, LocalDateTime fin) {}
     public record Disponibilidad(LocalDate fecha, boolean activo, List<Intervalo> libres) {}
     public record Evento(long id, LocalDateTime inicio, LocalDateTime fin, String estado,
-            String medico, String mascota, String propietario, String motivo) {}
+            String medico, String mascota, String propietario, String motivo, Integer mascotaId) {}
     public record Cambio(String estado, LocalDateTime inicio, LocalDateTime fin) {}
     public record Historial(long id, Long usuarioId, LocalDateTime fecha,
             tools.jackson.databind.JsonNode anterior, tools.jackson.databind.JsonNode actual) {}
