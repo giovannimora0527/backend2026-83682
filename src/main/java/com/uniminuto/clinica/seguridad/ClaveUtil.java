@@ -18,12 +18,21 @@ import java.util.HexFormat;
  */
 public final class ClaveUtil {
 
+    /** Iteraciones de PBKDF2 (costo de cálculo frente a ataques de fuerza bruta). */
     private static final int ITERACIONES = 120_000;
+    /** Generador criptográfico para las sales. */
     private static final SecureRandom ALEATORIO = new SecureRandom();
 
+    /** Clase de utilidades: no se instancia. */
     private ClaveUtil() {
     }
 
+    /**
+     * Calcula el hash PBKDF2-HMAC-SHA256 de una contraseña con sal aleatoria.
+     *
+     * @param clave contraseña en texto plano.
+     * @return texto con el formato pbkdf2$iteraciones$sal$hash.
+     */
     public static String hash(String clave) {
         byte[] sal = new byte[16];
         ALEATORIO.nextBytes(sal);
@@ -32,6 +41,13 @@ public final class ClaveUtil {
                 + Base64.getEncoder().encodeToString(hash);
     }
 
+    /**
+     * Verifica una contraseña contra el hash almacenado (PBKDF2 o MD5 heredado) en tiempo constante.
+     *
+     * @param clave contraseña ingresada.
+     * @param almacenado hash guardado en la base de datos.
+     * @return true si la contraseña es correcta.
+     */
     public static boolean verificar(String clave, String almacenado) {
         if (clave == null || almacenado == null || almacenado.isBlank()) {
             return false;
@@ -61,6 +77,14 @@ public final class ClaveUtil {
         return HexFormat.of().formatHex(digest("SHA-256", texto));
     }
 
+    /**
+     * Deriva la clave con PBKDF2-HMAC-SHA256.
+     *
+     * @param clave contraseña.
+     * @param sal sal aleatoria.
+     * @param iteraciones número de iteraciones.
+     * @return hash de 256 bits.
+     */
     private static byte[] pbkdf2(String clave, byte[] sal, int iteraciones) {
         try {
             PBEKeySpec spec = new PBEKeySpec(clave.toCharArray(), sal, iteraciones, 256);
@@ -70,6 +94,13 @@ public final class ClaveUtil {
         }
     }
 
+    /**
+     * Calcula un resumen criptográfico.
+     *
+     * @param algoritmo nombre del algoritmo (MD5, SHA-256).
+     * @param texto texto a resumir en UTF-8.
+     * @return bytes del resumen.
+     */
     private static byte[] digest(String algoritmo, String texto) {
         try {
             return MessageDigest.getInstance(algoritmo).digest(texto.getBytes(StandardCharsets.UTF_8));

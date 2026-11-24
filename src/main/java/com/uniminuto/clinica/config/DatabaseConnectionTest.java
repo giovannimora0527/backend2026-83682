@@ -5,15 +5,26 @@ import org.springframework.stereotype.Component;
 
 import javax.sql.DataSource;
 
+/** Al iniciar, muestra en el log los datos de la conexión a la base de datos (verificación de arranque). */
 @Component
 public class DatabaseConnectionTest implements CommandLineRunner {
 
+    /** Fuente de datos configurada por Spring Boot. */
     private final DataSource dataSource;
 
+    /**
+     * @param dataSource fuente de datos.
+     */
     public DatabaseConnectionTest(DataSource dataSource) {
         this.dataSource = dataSource;
     }
 
+    /**
+     * Abre una conexión y escribe en el log la URL, el usuario y el driver.
+     *
+     * @param args argumentos de arranque.
+     * @throws Exception si no es posible conectarse.
+     */
     @Override
     public void run(String... args) throws Exception {
 

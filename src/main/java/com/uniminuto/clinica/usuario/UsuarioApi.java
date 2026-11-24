@@ -23,22 +23,49 @@ public interface UsuarioApi {
     record UsuarioRq(Long id, String username, String password, Long rol, String email, Boolean activo) {
     }
 
+    /**
+     * Listar usuarios (sin contraseñas).
+     *
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Listar usuarios (sin contraseñas)")
     @GetMapping({"/listar", "/listar-ordenado"})
     ResponseEntity<List<Map<String, Object>>> listar();
 
+    /**
+     * Listar perfiles del sistema.
+     *
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Listar perfiles del sistema")
     @GetMapping("/perfiles")
     ResponseEntity<List<Map<String, Object>>> perfiles();
 
+    /**
+     * Crear usuario.
+     *
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Crear usuario")
     @PostMapping("/guardar")
     ResponseEntity<Map<String, Object>> guardar(@RequestBody UsuarioRq datos);
 
+    /**
+     * Actualizar usuario (la contraseña es opcional).
+     *
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Actualizar usuario (la contraseña es opcional)")
     @PostMapping("/actualizar")
     ResponseEntity<Map<String, Object>> actualizar(@RequestBody UsuarioRq datos);
 
+    /**
+     * Prueba de conectividad del servicio.
+     *
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Prueba de conectividad del servicio")
     @GetMapping("/test")
     ResponseEntity<Map<String, Object>> test();

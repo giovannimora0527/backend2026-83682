@@ -31,9 +31,20 @@ public final class ExcelLibro {
     public record Columna(String clave, String titulo, Formato formato) {
     }
 
+    /** Clase de utilidades: no se instancia. */
     private ExcelLibro() {
     }
 
+    /**
+     * Genera un libro de Excel con encabezado, filtros, tabla y totales.
+     *
+     * @param titulo título del reporte.
+     * @param filtros filtros aplicados (etiqueta → valor).
+     * @param columnas columnas a mostrar.
+     * @param filas datos.
+     * @param totales totales por columna.
+     * @return bytes del archivo .xlsx.
+     */
     public static byte[] generar(String titulo, Map<String, String> filtros, List<Columna> columnas,
                                  List<Map<String, Object>> filas, Map<String, Object> totales) {
         try (XSSFWorkbook libro = new XSSFWorkbook(); ByteArrayOutputStream salida = new ByteArrayOutputStream()) {
@@ -110,6 +121,16 @@ public final class ExcelLibro {
         }
     }
 
+    /**
+     * Escribe una celda con el formato de la columna (número, moneda o texto).
+     *
+     * @param fila fila de la hoja.
+     * @param i índice de la columna.
+     * @param valor valor a escribir.
+     * @param formato formato de la columna.
+     * @param moneda estilo de moneda.
+     * @param entero estilo de entero.
+     */
     private static void escribir(Row fila, int i, Object valor, Formato formato, CellStyle moneda, CellStyle entero) {
         Cell celda = fila.createCell(i);
         if (valor == null) {
@@ -128,6 +149,14 @@ public final class ExcelLibro {
         celda.setCellValue(texto);
     }
 
+    /**
+     * Escribe una celda de texto.
+     *
+     * @param fila fila de la hoja.
+     * @param i índice de la columna.
+     * @param valor texto.
+     * @param estilo estilo opcional.
+     */
     private static void celda(Row fila, int i, String valor, CellStyle estilo) {
         Cell celda = fila.createCell(i);
         celda.setCellValue(valor);

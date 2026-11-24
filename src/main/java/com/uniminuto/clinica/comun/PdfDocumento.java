@@ -24,23 +24,43 @@ import java.util.List;
  */
 public class PdfDocumento {
 
+    /** Nombre de la clínica para los encabezados. */
     public static final String CLINICA = "Clínica Veterinaria Uniminuto";
+    /** NIT de la clínica. */
     public static final String NIT = "NIT 900.123.456-7";
+    /** Dirección y teléfono de la clínica. */
     public static final String DIRECCION = "Calle 80 # 73-49, Bogotá D.C. · Tel. (601) 291 6520";
 
+    /** Color institucional de títulos y cabeceras. */
     private static final Color PRIMARIO = new Color(4, 169, 245);
+    /** Color de fondo de etiquetas. */
     private static final Color GRIS = new Color(240, 243, 246);
+    /** Fuente del título del documento. */
     private static final Font TITULO = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 15, new Color(33, 37, 41));
+    /** Fuente de los títulos de sección. */
     private static final Font SUBTITULO = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 11, new Color(33, 37, 41));
+    /** Fuente del texto normal. */
     private static final Font NORMAL = FontFactory.getFont(FontFactory.HELVETICA, 9);
+    /** Fuente de etiquetas y totales. */
     private static final Font NEGRITA = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9);
+    /** Fuente de las cabeceras de tabla. */
     private static final Font CABECERA = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 8, Color.WHITE);
+    /** Fuente de las celdas de tabla. */
     private static final Font CELDA = FontFactory.getFont(FontFactory.HELVETICA, 8);
+    /** Fuente de notas y datos secundarios. */
     private static final Font PEQUENA = FontFactory.getFont(FontFactory.HELVETICA, 7, Color.GRAY);
 
+    /** Contenido del PDF en memoria. */
     private final ByteArrayOutputStream salida = new ByteArrayOutputStream();
+    /** Documento OpenPDF en construcción. */
     private final Document documento;
 
+    /**
+     * Crea el documento con el encabezado institucional.
+     *
+     * @param titulo título del documento.
+     * @param horizontal true para orientación horizontal.
+     */
     public PdfDocumento(String titulo, boolean horizontal) {
         documento = new Document(horizontal ? PageSize.A4.rotate() : PageSize.A4, 36, 36, 36, 36);
         PdfWriter.getInstance(documento, salida);
@@ -48,10 +68,20 @@ public class PdfDocumento {
         encabezado(titulo);
     }
 
+    /**
+     * Crea un documento vertical con el encabezado institucional.
+     *
+     * @param titulo título del documento.
+     */
     public PdfDocumento(String titulo) {
         this(titulo, false);
     }
 
+    /**
+     * Agrega el encabezado con los datos de la clínica, el título y la fecha de generación.
+     *
+     * @param titulo título del documento.
+     */
     private void encabezado(String titulo) {
         PdfPTable tabla = new PdfPTable(new float[]{3, 2});
         tabla.setWidthPercentage(100);
@@ -76,6 +106,12 @@ public class PdfDocumento {
         documento.add(linea);
     }
 
+    /**
+     * Agrega un título de sección.
+     *
+     * @param texto título.
+     * @return el mismo documento (encadenable).
+     */
     public PdfDocumento seccion(String texto) {
         Paragraph p = new Paragraph(texto, SUBTITULO);
         p.setSpacingBefore(8);
@@ -84,6 +120,12 @@ public class PdfDocumento {
         return this;
     }
 
+    /**
+     * Agrega un párrafo de texto.
+     *
+     * @param texto contenido.
+     * @return el mismo documento (encadenable).
+     */
     public PdfDocumento parrafo(String texto) {
         documento.add(new Paragraph(texto == null ? "" : texto, NORMAL));
         return this;
@@ -166,6 +208,12 @@ public class PdfDocumento {
         return this;
     }
 
+    /**
+     * Agrega una nota al pie en letra pequeña.
+     *
+     * @param texto contenido.
+     * @return el mismo documento (encadenable).
+     */
     public PdfDocumento nota(String texto) {
         Paragraph p = new Paragraph(texto, PEQUENA);
         p.setSpacingBefore(10);
@@ -173,11 +221,20 @@ public class PdfDocumento {
         return this;
     }
 
+    /**
+     * Cierra el documento.
+     *
+     * @return bytes del PDF generado.
+     */
     public byte[] cerrar() {
         documento.close();
         return salida.toByteArray();
     }
 
+    /**
+     * @param n número de columnas.
+     * @return anchos iguales para n columnas.
+     */
     private static float[] uniforme(int n) {
         float[] a = new float[n];
         java.util.Arrays.fill(a, 1f);

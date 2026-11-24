@@ -21,22 +21,47 @@ import java.util.Map;
 @RequestMapping("/mascota")
 public interface MascotaApi {
 
+    /** Datos de una mascota: nombre, edad, raza, propietario y estado. */
     record MascotaRq(String nombreMascota, Integer edad, Integer razaId, Long clienteId, Boolean activo) {
     }
 
+    /**
+     * Listar mascotas con raza y propietario.
+     *
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Listar mascotas con raza y propietario")
     @GetMapping({"/listar-detalle", "/listar"})
     ResponseEntity<List<Map<String, Object>>> listar();
 
+    /**
+     * Consultar una mascota.
+     *
+     * @param id identificador del registro.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Consultar una mascota")
     @GetMapping("/{id}")
     ResponseEntity<Map<String, Object>> consultar(@PathVariable int id);
 
+    /**
+     * Registrar mascota.
+     *
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Registrar mascota")
     @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
     @PostMapping("/crear")
     ResponseEntity<Map<String, Object>> crear(@RequestBody MascotaRq datos);
 
+    /**
+     * Actualizar mascota.
+     *
+     * @param id identificador del registro.
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Actualizar mascota")
     @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
     @PutMapping("/actualizar/{id}")

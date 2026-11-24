@@ -7,6 +7,9 @@ import org.springframework.http.HttpStatus;
  */
 public class BadRequestException extends ClinicaException {
 
+    /**
+     * @param message mensaje para el usuario.
+     */
     public BadRequestException(String message) {
         super(HttpStatus.BAD_REQUEST, message);
     }

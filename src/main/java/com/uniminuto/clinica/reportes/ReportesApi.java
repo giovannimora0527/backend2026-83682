@@ -26,16 +26,38 @@ import java.util.Map;
 @RequestMapping("/reportes")
 public interface ReportesApi {
 
+    /**
+     * Consultar reporte (vista previa paginada, 50 filas por página, con totales).
+     *
+     * @param tipo tipo de reporte (FINANCIERO, FACTURAS, CITAS, etc.).
+     * @param filtros filtros del reporte enviados en la consulta (desde, hasta, medico, estado, etc.).
+     * @param pagina número de página (desde 0); opcional.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Consultar reporte (vista previa paginada, 50 filas por página, con totales)")
     @GetMapping("/{tipo}")
     ResponseEntity<Map<String, Object>> consultar(@PathVariable String tipo,
                                                   @Parameter(hidden = true) @RequestParam Map<String, String> filtros,
                                                   @RequestParam(required = false) Integer pagina);
 
+    /**
+     * Descargar reporte en PDF.
+     *
+     * @param tipo tipo de reporte (FINANCIERO, FACTURAS, CITAS, etc.).
+     * @param filtros filtros del reporte enviados en la consulta (desde, hasta, medico, estado, etc.).
+     * @return archivo generado (PDF o Excel) para descargar.
+     */
     @Operation(summary = "Descargar reporte en PDF")
     @GetMapping("/{tipo}/pdf")
     ResponseEntity<byte[]> pdf(@PathVariable String tipo, @Parameter(hidden = true) @RequestParam Map<String, String> filtros);
 
+    /**
+     * Descargar reporte en Excel (.xlsx).
+     *
+     * @param tipo tipo de reporte (FINANCIERO, FACTURAS, CITAS, etc.).
+     * @param filtros filtros del reporte enviados en la consulta (desde, hasta, medico, estado, etc.).
+     * @return archivo generado (PDF o Excel) para descargar.
+     */
     @Operation(summary = "Descargar reporte en Excel (.xlsx)")
     @GetMapping("/{tipo}/excel")
     ResponseEntity<byte[]> excel(@PathVariable String tipo, @Parameter(hidden = true) @RequestParam Map<String, String> filtros);

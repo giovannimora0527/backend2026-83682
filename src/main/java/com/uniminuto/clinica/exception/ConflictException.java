@@ -8,6 +8,9 @@ import org.springframework.http.HttpStatus;
  */
 public class ConflictException extends ClinicaException {
 
+    /**
+     * @param message mensaje para el usuario.
+     */
     public ConflictException(String message) {
         super(HttpStatus.CONFLICT, message);
     }

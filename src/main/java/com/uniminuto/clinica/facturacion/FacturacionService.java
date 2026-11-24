@@ -40,10 +40,14 @@ import java.util.Set;
 @Service
 public class FacturacionService {
 
+    /** Registros por página. */
     private static final int TAMANO = 50;
+    /** Métodos de pago permitidos. */
     private static final Set<String> METODOS = Set.of("EFECTIVO", "TARJETA", "TRANSFERENCIA", "OTRO");
+    /** Formato de moneda colombiana. */
     private static final NumberFormat COP = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-CO"));
 
+    /** Consulta de la atención que origina la factura. */
     private static final String ORIGEN = """
             SELECT a.id, a.cita_id AS cita, CONCAT(cl.nombres, ' ', cl.apellidos) AS propietario,
                    m.nombre_mascota AS mascota, CONCAT(md.nombres, ' ', md.apellidos) AS veterinario,
@@ -56,6 +60,7 @@ public class FacturacionService {
             JOIN especializacion e ON e.id = a.especializacion_id
             """;
 
+    /** Consulta base de facturas. */
     private static final String FACTURA = """
             SELECT f.id, f.numero, f.atencion_id AS atencion, f.cita_id AS cita, f.fecha_emision AS emitida,
                    f.propietario, f.documento, f.mascota, f.veterinario, f.especialidad, f.subtotal, f.descuento,
@@ -64,14 +69,22 @@ public class FacturacionService {
             FROM factura f JOIN usuario u ON u.id = f.usuario_id
             """;
 
+    /** Acceso a datos. */
     private final Db db;
 
+    /**
+     * @param db acceso a datos.
+     */
     public FacturacionService(Db db) {
         this.db = db;
     }
 
     // ------------------------------------------------------------------ Emisión
 
+    /**
+     * @param pagina página.
+     * @return atenciones finalizadas sin factura.
+     */
     public List<Map<String, Object>> elegibles(Integer pagina) {
         return db.lista(ORIGEN + """
                 WHERE a.fecha_finalizacion IS NOT NULL
@@ -80,6 +93,13 @@ public class FacturacionService {
                 """, Db.p("limite", TAMANO, "desde", Validar.pagina(pagina) * TAMANO));
     }
 
+    /**
+     * Vista previa de la liquidación de una atención.
+     *
+     * @param atencionId identificador de la atención.
+     * @param rq descuento opcional.
+     * @return importes calculados.
+     */
     public Map<String, Object> previa(long atencionId, FacturacionApi.PreviaRq rq) {
         Map<String, Object> origen = origen(atencionId);
         BigDecimal descuento = descuento(rq == null ? null : rq.descuento(), rq == null ? null : rq.motivo());
@@ -87,6 +107,13 @@ public class FacturacionService {
         return vistaPrevia(origen, r, descuento);
     }
 
+    /**
+     * Emite la factura de una atención validando la huella de la vista previa.
+     *
+     * @param atencionId identificador de la atención.
+     * @param rq datos de emisión.
+     * @return factura emitida.
+     */
     @Transactional
     public Map<String, Object> emitir(long atencionId, FacturacionApi.EmitirRq rq) {
         if (rq == null || rq.clave() == null || rq.clave().isBlank() || rq.clave().length() > 64) {
@@ -152,6 +179,18 @@ public class FacturacionService {
 
     // ------------------------------------------------------------------ Consulta
 
+    /**
+     * Busca facturas con filtros.
+     *
+     * @param desde fecha inicial.
+     * @param hasta fecha final.
+     * @param propietario propietario.
+     * @param mascota mascota.
+     * @param estado estado.
+     * @param numero número de factura.
+     * @param pagina página.
+     * @return facturas.
+     */
     public List<Map<String, Object>> listar(String desde, String hasta, String propietario, String mascota, String estado,
                                             Integer pagina) {
         LocalDate d = Validar.fecha(desde, "desde", false);
@@ -172,6 +211,10 @@ public class FacturacionService {
                 "mascotaId", numero(mascota), "estado", est, "limite", TAMANO, "pag", Validar.pagina(pagina) * TAMANO));
     }
 
+    /**
+     * @param id identificador de la factura.
+     * @return factura con líneas, pagos e historial.
+     */
     public Map<String, Object> detalle(long id) {
         Map<String, Object> factura = db.requerido(FACTURA + " WHERE f.id = :id", Db.p("id", id), "La factura no existe.");
         Map<String, Object> r = new LinkedHashMap<>();
@@ -195,6 +238,13 @@ public class FacturacionService {
 
     // ------------------------------------------------------------------ Pagos y anulación
 
+    /**
+     * Registra un pago sin superar el saldo.
+     *
+     * @param id identificador de la factura.
+     * @param rq método y valor.
+     * @return factura actualizada.
+     */
     @Transactional
     public Map<String, Object> pagar(long id, FacturacionApi.PagoRq rq) {
         if (rq == null || rq.clave() == null || rq.clave().isBlank() || rq.clave().length() > 64) {
@@ -248,6 +298,13 @@ public class FacturacionService {
         return detalle(id);
     }
 
+    /**
+     * Anula una factura sin pagos.
+     *
+     * @param id identificador de la factura.
+     * @param motivoRq motivo.
+     * @return factura anulada.
+     */
     @Transactional
     public Map<String, Object> anular(long id, String motivoRq) {
         if (!SesionActual.obtener().esAdmin()) {
@@ -265,6 +322,10 @@ public class FacturacionService {
         return detalle(id);
     }
 
+    /**
+     * @param id identificador de la factura.
+     * @return factura en PDF.
+     */
     public byte[] pdf(long id) {
         Map<String, Object> d = detalle(id);
         @SuppressWarnings("unchecked")
@@ -342,6 +403,12 @@ public class FacturacionService {
         return conceptos;
     }
 
+    /**
+     * @param origen atención de origen.
+     * @param r resultado de la liquidación.
+     * @param descuento descuento global.
+     * @return vista previa con huella.
+     */
     private Map<String, Object> vistaPrevia(Map<String, Object> origen, Liquidador.Resultado r, BigDecimal descuento) {
         List<Map<String, Object>> lineas = new ArrayList<>();
         for (Liquidador.Linea l : r.lineas()) {
@@ -377,6 +444,14 @@ public class FacturacionService {
         return ClaveUtil.sha256(sb.toString());
     }
 
+    /**
+     * @param subtotal subtotal.
+     * @param descuento descuento.
+     * @param iva IVA.
+     * @param otros otros impuestos.
+     * @param total total.
+     * @return mapa de importes.
+     */
     private static Map<String, Object> importes(BigDecimal subtotal, BigDecimal descuento, BigDecimal iva, BigDecimal otros,
                                                 BigDecimal total) {
         Map<String, Object> i = new LinkedHashMap<>();
@@ -388,6 +463,10 @@ public class FacturacionService {
         return i;
     }
 
+    /**
+     * @param atencionId identificador de la atención.
+     * @return atención finalizada a facturar.
+     */
     private Map<String, Object> origen(long atencionId) {
         Map<String, Object> o = db.requerido(ORIGEN + " WHERE a.id = :id", Db.p("id", atencionId), "La atención no existe.");
         if (o.get("finalizada") == null) {
@@ -408,6 +487,10 @@ public class FacturacionService {
         return d;
     }
 
+    /**
+     * @param valor texto numérico.
+     * @return importe con dos decimales.
+     */
     private static BigDecimal importe(String valor) {
         if (valor == null || !valor.trim().matches("\\d{1,12}(\\.\\d{1,2})?")) {
             throw new BadRequestException("El importe debe ser un número positivo con máximo dos decimales.");
@@ -415,6 +498,14 @@ public class FacturacionService {
         return new BigDecimal(valor.trim()).setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
+    /**
+     * Registra un cambio de estado de la factura.
+     *
+     * @param factura identificador.
+     * @param anterior estado anterior.
+     * @param nuevo estado nuevo.
+     * @param motivo motivo.
+     */
     private void historial(long factura, String anterior, String nuevo, String motivo) {
         db.insertar("""
                 INSERT INTO factura_estado_historial (factura_id, estado_anterior, estado_nuevo, fecha, motivo, usuario_id)
@@ -423,18 +514,34 @@ public class FacturacionService {
                 "u", SesionActual.usuarioId()));
     }
 
+    /**
+     * @param valor texto de búsqueda.
+     * @return patrón LIKE o null.
+     */
     private static String like(String valor) {
         return valor == null || valor.isBlank() ? null : "%" + valor.trim().replace("%", "\\%").replace("_", "\\_") + "%";
     }
 
+    /**
+     * @param valor texto.
+     * @return número o null si no es numérico.
+     */
     private static Long numero(String valor) {
         return valor != null && valor.trim().matches("\\d{1,18}") ? Long.parseLong(valor.trim()) : null;
     }
 
+    /**
+     * @param v valor.
+     * @return texto o cadena vacía.
+     */
     private static String texto(Object v) {
         return v == null ? "—" : v.toString().replace('T', ' ');
     }
 
+    /**
+     * @param v valor monetario.
+     * @return valor en pesos colombianos.
+     */
     private static String cop(Object v) {
         BigDecimal b = v == null ? BigDecimal.ZERO : (v instanceof BigDecimal x ? x : new BigDecimal(v.toString()));
         synchronized (COP) {

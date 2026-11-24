@@ -30,8 +30,10 @@ import java.util.Set;
 @Service
 public class InventarioService {
 
+    /** Tipos de producto. */
     static final Set<String> TIPOS = Set.of("MEDICAMENTO", "PRODUCTO", "UTENSILIO");
 
+    /** Consulta base de la ficha de producto con existencias. */
     private static final String FICHA = """
             SELECT m.*,
                    COALESCE(SUM(l.cantidad), 0) AS existencia,
@@ -43,24 +45,39 @@ public class InventarioService {
             LEFT JOIN medicamento_lote l ON l.medicamento_id = m.id
             """;
 
+    /** Acceso a datos. */
     private final Db db;
 
+    /**
+     * @param db acceso a datos.
+     */
     public InventarioService(Db db) {
         this.db = db;
     }
 
     // ------------------------------------------------------------------ Consultas
 
+    /**
+     * @return productos con existencias.
+     */
     public List<Map<String, Object>> listar() {
         return db.lista(FICHA + " GROUP BY m.id ORDER BY m.nombre", fechas()).stream().map(this::ficha).toList();
     }
 
+    /**
+     * @param id identificador del producto.
+     * @return ficha del producto.
+     */
     public Map<String, Object> ficha(long id) {
         Map<String, Object> fila = db.requerido(FICHA + " WHERE m.id = :id GROUP BY m.id",
                 with(fechas(), "id", id), "El producto no existe.");
         return ficha(fila);
     }
 
+    /**
+     * @param f fila del producto.
+     * @return ficha con lotes y alertas.
+     */
     private Map<String, Object> ficha(Map<String, Object> f) {
         LocalDate hoy = Tiempo.hoy();
         LocalDate vence = (LocalDate) f.get("fecha_vence");
@@ -76,6 +93,10 @@ public class InventarioService {
         return r;
     }
 
+    /**
+     * @param f fila del producto.
+     * @return datos del producto para la respuesta.
+     */
     static Map<String, Object> producto(Map<String, Object> f) {
         Map<String, Object> p = new LinkedHashMap<>();
         p.put("codigo", f.get("codigo"));
@@ -96,6 +117,10 @@ public class InventarioService {
         return p;
     }
 
+    /**
+     * @param producto identificador del producto.
+     * @return lotes con estado de vencimiento.
+     */
     public List<Map<String, Object>> lotes(long producto) {
         ficha(producto);
         LocalDate hoy = Tiempo.hoy();
@@ -115,6 +140,10 @@ public class InventarioService {
         return lotes;
     }
 
+    /**
+     * @param producto identificador del producto.
+     * @return movimientos de inventario.
+     */
     public List<Map<String, Object>> movimientos(long producto) {
         ficha(producto);
         return db.lista("""
@@ -131,6 +160,10 @@ public class InventarioService {
 
     // ------------------------------------------------------------------ Registro y edición
 
+    /**
+     * @param datos datos del producto.
+     * @return producto creado.
+     */
     @Transactional
     public Map<String, Object> crear(ProductoRq datos) {
         Producto p = validarProducto(datos, null, true);
@@ -144,6 +177,11 @@ public class InventarioService {
         return ficha(id);
     }
 
+    /**
+     * @param id identificador del producto.
+     * @param datos nuevos datos.
+     * @return producto actualizado.
+     */
     @Transactional
     public Map<String, Object> actualizar(long id, ProductoRq datos) {
         db.requerido("SELECT id FROM medicamento WHERE id = :id FOR UPDATE", Db.p("id", id), "El producto no existe.");
@@ -161,6 +199,13 @@ public class InventarioService {
         return ficha(id);
     }
 
+    /**
+     * Registra un lote con su entrada inicial.
+     *
+     * @param producto identificador del producto.
+     * @param l datos del lote.
+     * @return ficha actualizada.
+     */
     @Transactional
     public Map<String, Object> registrarLote(long producto, InventarioApi.LoteRq l) {
         Map<String, Object> m = db.requerido("SELECT tipo, activo, codigo FROM medicamento WHERE id = :id FOR UPDATE",
@@ -196,6 +241,14 @@ public class InventarioService {
         return Map.of("id", lote, "numero", numero, "cantidad", cantidad);
     }
 
+    /**
+     * Registra entrada, salida o ajuste sin dejar existencias negativas.
+     *
+     * @param producto identificador del producto.
+     * @param lote identificador del lote.
+     * @param mv datos del movimiento.
+     * @return ficha actualizada.
+     */
     @Transactional
     public Map<String, Object> registrarMovimiento(long producto, long lote, InventarioApi.MovimientoRq mv) {
         Map<String, Object> l = db.requerido("SELECT medicamento_id FROM medicamento_lote WHERE id = :id",
@@ -282,6 +335,14 @@ public class InventarioService {
         return p;
     }
 
+    /**
+     * Valida los datos del producto acumulando errores.
+     *
+     * @param d datos.
+     * @param id producto actualizado o null.
+     * @param errores lista de errores.
+     * @return producto validado.
+     */
     Producto validarProducto(ProductoRq d, Long id, List<String> errores) {
         if (d == null) {
             errores.add("Los datos del producto son obligatorios.");
@@ -362,6 +423,12 @@ public class InventarioService {
                 d.activo() == null || d.activo());
     }
 
+    /**
+     * @param valor valor.
+     * @param campo campo.
+     * @param errores lista de errores.
+     * @return valor válido o null.
+     */
     private static BigDecimal dinero(BigDecimal valor, String campo, List<String> errores) {
         if (valor == null) {
             errores.add("El " + campo + " es obligatorio.");
@@ -378,6 +445,13 @@ public class InventarioService {
         return valor.setScale(2, RoundingMode.HALF_UP);
     }
 
+    /**
+     * @param valor texto.
+     * @param campo campo.
+     * @param obligatorio si es obligatorio.
+     * @param errores lista de errores.
+     * @return fecha o null.
+     */
     private static LocalDate fecha(String valor, String campo, boolean obligatorio, List<String> errores) {
         try {
             return Validar.fecha(valor, campo, obligatorio);
@@ -387,10 +461,19 @@ public class InventarioService {
         }
     }
 
+    /**
+     * @return parámetros con hoy y la fecha límite de próximo a vencer.
+     */
     private static Map<String, Object> fechas() {
         return Db.p("hoy", Tiempo.hoy(), "limite", Tiempo.limiteProximoVencer());
     }
 
+    /**
+     * @param mapa mapa base.
+     * @param clave clave.
+     * @param valor valor.
+     * @return copia del mapa con la clave agregada.
+     */
     private static Map<String, Object> with(Map<String, Object> mapa, String clave, Object valor) {
         mapa.put(clave, valor);
         return mapa;

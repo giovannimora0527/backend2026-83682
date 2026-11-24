@@ -11,26 +11,39 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Controlador REST del módulo: implementa {@link RazaApi} (rutas, permisos y documentación Swagger)
+ * y delega la lógica en la capa de servicio.
+ */
 @RestController
 public class RazaApiController implements RazaApi {
 
+    /** Consulta SQL base reutilizada por los métodos del controlador. */
     private static final String CONSULTA = """
             SELECT raza_id AS razaId, raza_id AS id, nombre, especie, fecha_creacion AS fechaCreacion,
                    fecha_modificacion AS fechaModificacion
             FROM raza
             """;
 
+    /** Dependencia inyectada por constructor: db. */
     private final Db db;
 
+    /**
+     * Crea el controlador con sus dependencias (inyección por constructor).
+     *
+     * @param db dependencia db.
+     */
     public RazaApiController(Db db) {
         this.db = db;
     }
 
+    /** {@inheritDoc} */
     @Override
     public ResponseEntity<List<Map<String, Object>>> listar() {
         return ResponseEntity.ok(db.lista(CONSULTA + " ORDER BY especie, nombre"));
     }
 
+    /** {@inheritDoc} */
     @Override
     public ResponseEntity<Map<String, Object>> guardar(RazaRq datos) {
         if (datos == null) {

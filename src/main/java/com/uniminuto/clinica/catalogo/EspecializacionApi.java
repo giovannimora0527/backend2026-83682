@@ -20,6 +20,11 @@ import java.util.Map;
 @RequestMapping("/especializacion")
 public interface EspecializacionApi {
 
+    /**
+     * Listar especialidades.
+     *
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Listar especialidades")
     @GetMapping("/listar")
     ResponseEntity<List<Map<String, Object>>> listar();

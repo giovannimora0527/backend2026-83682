@@ -36,10 +36,13 @@ import java.util.Set;
 @Service
 public class DespachoService {
 
+    /** Estados de despacho de una fórmula. */
     static final Set<String> ESTADOS = Set.of("PENDIENTE_DESPACHO", "EN_PREPARACION", "DESPACHO_PARCIAL", "DESPACHADO",
             "PENDIENTE_DISPONIBILIDAD", "CANCELADO");
+    /** Registros por página. */
     private static final int TAMANO = 50;
 
+    /** Consulta base de fórmulas para despacho. */
     private static final String FORMULA = """
             SELECT f.id, COALESCE(f.fecha_confirmacion, f.fecha_creacion) AS fecha,
                    CONCAT(md.nombres, ' ', md.apellidos) AS veterinario,
@@ -52,9 +55,15 @@ public class DespachoService {
             JOIN cliente cl ON cl.cliente_id = c.cliente_id
             """;
 
+    /** Acceso a datos. */
     private final Db db;
+    /** Movimientos de inventario. */
     private final InventarioService inventario;
 
+    /**
+     * @param db acceso a datos.
+     * @param inventario servicio de inventario.
+     */
     public DespachoService(Db db, InventarioService inventario) {
         this.db = db;
         this.inventario = inventario;
@@ -62,6 +71,17 @@ public class DespachoService {
 
     // ------------------------------------------------------------------ Consultas
 
+    /**
+     * Busca fórmulas para despacho con filtros.
+     *
+     * @param id número de fórmula.
+     * @param propietario nombre o documento del propietario.
+     * @param mascota nombre de la mascota.
+     * @param fecha fecha de emisión.
+     * @param estado estado de despacho.
+     * @param pagina página.
+     * @return fórmulas.
+     */
     public List<Map<String, Object>> formulas(String id, String propietario, String mascota, String fecha, String estado,
                                               Integer pagina) {
         Long formulaId = Validar.id(id, "número de fórmula");
@@ -88,6 +108,12 @@ public class DespachoService {
                 "estado", est, "limite", TAMANO, "desplazamiento", Validar.pagina(pagina) * TAMANO));
     }
 
+    /**
+     * Detalle de la fórmula con líneas, lotes vigentes (FEFO) y entregas.
+     *
+     * @param formulaId identificador de la fórmula.
+     * @return detalle.
+     */
     public Map<String, Object> detalle(long formulaId) {
         Map<String, Object> formula = db.requerido(FORMULA + " WHERE f.id = :id AND f.estado = 'CONFIRMADA'",
                 Db.p("id", formulaId), "La fórmula no existe o no está confirmada.");
@@ -133,6 +159,15 @@ public class DespachoService {
         return r;
     }
 
+    /**
+     * Historial de entregas.
+     *
+     * @param desde fecha inicial.
+     * @param hasta fecha final.
+     * @param medicamento texto del medicamento.
+     * @param pagina página.
+     * @return entregas.
+     */
     public List<Map<String, Object>> historial(String desde, String hasta, String medicamento, Integer pagina) {
         LocalDate d = Validar.fecha(desde, "desde", false);
         LocalDate h = Validar.fecha(hasta, "hasta", false);
@@ -148,6 +183,13 @@ public class DespachoService {
 
     // ------------------------------------------------------------------ Preparación
 
+    /**
+     * Prepara un despacho validando lotes, vencimientos y existencias.
+     *
+     * @param formulaId identificador de la fórmula.
+     * @param rq selección de lotes.
+     * @return plan de preparación.
+     */
     @Transactional
     public Map<String, Object> preparar(long formulaId, DespachoApi.PrepararRq rq) {
         if (rq == null || rq.clave() == null || rq.clave().isBlank() || rq.clave().length() > 64) {
@@ -256,6 +298,12 @@ public class DespachoService {
 
     // ------------------------------------------------------------------ Confirmación
 
+    /**
+     * Confirma el plan, descuenta inventario y actualiza el estado de la fórmula.
+     *
+     * @param planId identificador del plan.
+     * @return entrega.
+     */
     @Transactional
     public Map<String, Object> confirmar(long planId) {
         Map<String, Object> plan = db.requerido("SELECT * FROM despacho_preparacion WHERE id = :id FOR UPDATE",
@@ -318,6 +366,14 @@ public class DespachoService {
         return entrega(despacho);
     }
 
+    /**
+     * Retiene, libera o cancela una fórmula.
+     *
+     * @param formulaId identificador de la fórmula.
+     * @param accion acción solicitada.
+     * @param motivoRq motivo.
+     * @return fórmula actualizada.
+     */
     @Transactional
     public Map<String, Object> cambiar(long formulaId, String accion, String motivoRq) {
         String motivo = Validar.texto(motivoRq, "motivo", 255);
@@ -388,6 +444,12 @@ public class DespachoService {
         return entrega(despachoId);
     }
 
+    /**
+     * Comprobante de despacho en PDF.
+     *
+     * @param despachoId identificador de la entrega.
+     * @return PDF.
+     */
     public byte[] pdf(long despachoId) {
         Map<String, Object> e = entrega(despachoId);
         Map<String, Object> f = db.requerido(FORMULA + " WHERE f.id = :id", Db.p("id", e.get("formula")),
@@ -423,6 +485,10 @@ public class DespachoService {
 
     // ------------------------------------------------------------------ Utilidades
 
+    /**
+     * @param formulaId identificador de la fórmula.
+     * @return líneas con cantidades prescritas, despachadas y pendientes.
+     */
     private List<Map<String, Object>> lineas(long formulaId) {
         return db.lista("""
                 SELECT d.id AS detalle, d.medicamento_id AS medicamento, m.nombre, m.presentacion, d.dosis, d.frecuencia,
@@ -443,6 +509,10 @@ public class DespachoService {
                 """, Db.p("m", medicamento, "hoy", hoy));
     }
 
+    /**
+     * @param formulaId identificador de la fórmula.
+     * @return medicamentos con cantidad pendiente.
+     */
     private List<String> faltantes(long formulaId) {
         List<String> faltantes = new ArrayList<>();
         for (Map<String, Object> l : lineas(formulaId)) {
@@ -454,12 +524,20 @@ public class DespachoService {
         return faltantes;
     }
 
+    /**
+     * @param formulaId identificador de la fórmula.
+     * @return plan de preparación abierto o null.
+     */
     private Map<String, Object> preparacionVigente(long formulaId) {
         Long id = db.valor("SELECT id FROM despacho_preparacion WHERE formula_id = :f AND estado = 'VIGENTE'",
                 Db.p("f", formulaId), Long.class);
         return id == null ? null : plan(id);
     }
 
+    /**
+     * @param id identificador del plan.
+     * @return plan con sus líneas.
+     */
     private Map<String, Object> plan(long id) {
         Map<String, Object> p = db.requerido("SELECT id, formula_id AS formula, estado, fecha FROM despacho_preparacion WHERE id = :id",
                 Db.p("id", id), "La preparación no existe.");
@@ -471,6 +549,10 @@ public class DespachoService {
         return p;
     }
 
+    /**
+     * @param id identificador de la entrega.
+     * @return entrega.
+     */
     private Map<String, Object> entrega(long id) {
         List<Map<String, Object>> lista = entregas("WHERE d.id = :id", Db.p("id", id));
         if (lista.isEmpty()) {
@@ -479,10 +561,21 @@ public class DespachoService {
         return lista.get(0);
     }
 
+    /**
+     * @param filtro cláusula WHERE.
+     * @param params parámetros.
+     * @return entregas.
+     */
     private List<Map<String, Object>> entregas(String filtro, Map<String, Object> params) {
         return entregas(filtro, params, "");
     }
 
+    /**
+     * @param filtro cláusula WHERE.
+     * @param params parámetros.
+     * @param limite cláusula LIMIT.
+     * @return entregas con sus líneas.
+     */
     private List<Map<String, Object>> entregas(String filtro, Map<String, Object> params, String limite) {
         List<Map<String, Object>> resultado = new ArrayList<>();
         for (Map<String, Object> d : db.lista("""
@@ -514,6 +607,10 @@ public class DespachoService {
         return resultado;
     }
 
+    /**
+     * @param id identificador de la fórmula.
+     * @return fórmula bloqueada para actualización.
+     */
     private Map<String, Object> bloquearFormula(long id) {
         Map<String, Object> f = db.requerido("SELECT * FROM formula_clinica WHERE id = :id FOR UPDATE", Db.p("id", id),
                 "La fórmula no existe.");
@@ -523,6 +620,14 @@ public class DespachoService {
         return f;
     }
 
+    /**
+     * Cambia el estado de despacho y lo registra en el historial.
+     *
+     * @param formulaId identificador de la fórmula.
+     * @param anterior estado anterior.
+     * @param nuevo estado nuevo.
+     * @param motivo motivo.
+     */
     private void cambiarEstado(long formulaId, String anterior, String nuevo, String motivo) {
         if (nuevo.equals(anterior)) {
             return;
@@ -535,10 +640,18 @@ public class DespachoService {
                 "m", motivo.length() > 255 ? motivo.substring(0, 255) : motivo));
     }
 
+    /**
+     * @param valor texto de búsqueda.
+     * @return patrón LIKE o null.
+     */
     private static String like(String valor) {
         return valor == null || valor.isBlank() ? null : "%" + valor.trim().replace("%", "\\%").replace("_", "\\_") + "%";
     }
 
+    /**
+     * @param v valor.
+     * @return texto o cadena vacía.
+     */
     private static String texto(Object v) {
         return v == null ? "—" : v.toString().replace('T', ' ');
     }

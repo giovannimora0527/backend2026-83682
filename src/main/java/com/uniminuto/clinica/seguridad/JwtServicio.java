@@ -21,9 +21,14 @@ import java.util.UUID;
 @Component
 public class JwtServicio {
 
+    /** Codificador Base64 URL sin relleno, el formato que exige JWT. */
     private static final Base64.Encoder B64 = Base64.getUrlEncoder().withoutPadding();
+    /** Clave secreta HMAC (variable JWT_SECRET). */
     private final byte[] secreto;
 
+    /**
+     * @param secreto clave secreta de firma (mínimo 32 caracteres).
+     */
     public JwtServicio(@Value("${clinica.jwt.secret}") String secreto) {
         if (secreto == null || secreto.length() < 32) {
             throw new IllegalStateException("clinica.jwt.secret debe tener al menos 32 caracteres");
@@ -31,6 +36,16 @@ public class JwtServicio {
         this.secreto = secreto.getBytes(StandardCharsets.UTF_8);
     }
 
+    /**
+     * Emite un token JWT firmado con HS256.
+     *
+     * @param usuarioId identificador del usuario.
+     * @param username nombre de usuario (claim sub).
+     * @param perfil código del perfil.
+     * @param emitido fecha de emisión en segundos epoch (iat).
+     * @param expira fecha de expiración en segundos epoch (exp).
+     * @return token JWT.
+     */
     public String emitir(long usuarioId, String username, String perfil, long emitido, long expira) {
         String cabecera = B64.encodeToString("{\"alg\":\"HS256\",\"typ\":\"JWT\"}".getBytes(StandardCharsets.UTF_8));
         String cuerpo = "{\"sub\":\"" + escapar(username) + "\",\"uid\":" + usuarioId
@@ -59,6 +74,12 @@ public class JwtServicio {
         return MessageDigest.isEqual(esperada, recibida);
     }
 
+    /**
+     * Firma datos con HMAC-SHA256.
+     *
+     * @param datos cabecera y cuerpo del token codificados.
+     * @return firma.
+     */
     private byte[] firmar(String datos) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
@@ -69,6 +90,12 @@ public class JwtServicio {
         }
     }
 
+    /**
+     * Escapa comillas y barras para incluir un texto en el JSON del token.
+     *
+     * @param texto texto original.
+     * @return texto escapado.
+     */
     private static String escapar(String texto) {
         return texto.replace("\\", "\\\\").replace("\"", "\\\"");
     }

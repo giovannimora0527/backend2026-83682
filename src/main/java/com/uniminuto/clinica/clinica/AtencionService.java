@@ -41,11 +41,18 @@ import java.util.Set;
 @Service
 public class AtencionService {
 
+    /** Formato de moneda colombiana para los PDF. */
     private static final NumberFormat COP = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-CO"));
 
+    /** Acceso a datos. */
     private final Db db;
+    /** Consulta de tarifas vigentes. */
     private final TarifarioService tarifario;
 
+    /**
+     * @param db acceso a datos.
+     * @param tarifario servicio de tarifas.
+     */
     public AtencionService(Db db, TarifarioService tarifario) {
         this.db = db;
         this.tarifario = tarifario;
@@ -53,6 +60,12 @@ public class AtencionService {
 
     // ------------------------------------------------------------------ Atención
 
+    /**
+     * Atención de una cita con servicios, fórmulas e historia.
+     *
+     * @param citaId identificador de la cita.
+     * @return atención o datos de la cita si aún no se abre.
+     */
     public Map<String, Object> consultar(long citaId) {
         Map<String, Object> cita = cita(citaId);
         verificarLectura(cita);
@@ -123,6 +136,12 @@ public class AtencionService {
         return r;
     }
 
+    /**
+     * Abre la atención de una cita y crea su historia médica.
+     *
+     * @param citaId identificador de la cita.
+     * @return atención abierta.
+     */
     @Transactional
     public Map<String, Object> abrir(long citaId) {
         Map<String, Object> cita = bloquearCita(citaId);
@@ -156,6 +175,13 @@ public class AtencionService {
         return consultar(citaId);
     }
 
+    /**
+     * Guarda el borrador de la atención con control de versión optimista.
+     *
+     * @param citaId identificador de la cita.
+     * @param d datos de la atención.
+     * @return atención actualizada.
+     */
     @Transactional
     public Map<String, Object> guardar(long citaId, AtencionApi.AtencionRq d) {
         Map<String, Object> cita = bloquearCita(citaId);
@@ -205,6 +231,13 @@ public class AtencionService {
         return consultar(citaId);
     }
 
+    /**
+     * Finaliza la atención, actualiza la historia y agrega la anotación clínica.
+     *
+     * @param citaId identificador de la cita.
+     * @param version versión esperada.
+     * @return atención finalizada.
+     */
     @Transactional
     public Map<String, Object> finalizar(long citaId, Integer version) {
         Map<String, Object> cita = bloquearCita(citaId);
@@ -262,10 +295,20 @@ public class AtencionService {
 
     // ------------------------------------------------------------------ Fórmulas
 
+    /**
+     * @return fórmulas emitidas por el médico autenticado.
+     */
     public List<Map<String, Object>> formulasPropias() {
         return formulas("WHERE f.medico_id = :m", Db.p("m", SesionActual.medicoId()));
     }
 
+    /**
+     * Crea una fórmula en borrador para la cita.
+     *
+     * @param citaId identificador de la cita.
+     * @param d medicamentos e indicaciones.
+     * @return fórmula creada.
+     */
     @Transactional
     public Map<String, Object> crearFormula(long citaId, AtencionApi.FormulaRq d) {
         Map<String, Object> cita = bloquearCita(citaId);
@@ -284,6 +327,14 @@ public class AtencionService {
         return formula(id);
     }
 
+    /**
+     * Actualiza una fórmula en borrador.
+     *
+     * @param citaId identificador de la cita.
+     * @param formulaId identificador de la fórmula.
+     * @param d nuevos datos.
+     * @return fórmula actualizada.
+     */
     @Transactional
     public Map<String, Object> actualizarFormula(long citaId, long formulaId, AtencionApi.FormulaRq d) {
         Map<String, Object> f = bloquearFormula(formulaId);
@@ -302,6 +353,13 @@ public class AtencionService {
         return formula(formulaId);
     }
 
+    /**
+     * Confirma la fórmula y la deja pendiente de despacho.
+     *
+     * @param formulaId identificador de la fórmula.
+     * @param revision revisión esperada.
+     * @return fórmula confirmada.
+     */
     @Transactional
     public Map<String, Object> confirmarFormula(long formulaId, Integer revision) {
         Map<String, Object> f = bloquearFormula(formulaId);
@@ -338,6 +396,13 @@ public class AtencionService {
         return formula(formulaId);
     }
 
+    /**
+     * Anula una fórmula que no ha sido despachada.
+     *
+     * @param formulaId identificador de la fórmula.
+     * @param revision revisión esperada.
+     * @return fórmula anulada.
+     */
     @Transactional
     public Map<String, Object> anularFormula(long formulaId, Integer revision) {
         Map<String, Object> f = bloquearFormula(formulaId);
@@ -351,6 +416,10 @@ public class AtencionService {
         return formula(formulaId);
     }
 
+    /**
+     * @param id identificador de la fórmula.
+     * @return fórmula con sus líneas.
+     */
     public Map<String, Object> formula(long id) {
         List<Map<String, Object>> f = formulas("WHERE f.id = :id", Db.p("id", id));
         if (f.isEmpty()) {
@@ -359,10 +428,21 @@ public class AtencionService {
         return f.get(0);
     }
 
+    /**
+     * @param cita identificador de la cita.
+     * @return fórmulas de la cita.
+     */
     private List<Map<String, Object>> formulasDeCita(long cita) {
         return formulas("WHERE f.cita_id = :c", Db.p("c", cita));
     }
 
+    /**
+     * Consulta fórmulas con sus líneas.
+     *
+     * @param filtro cláusula WHERE.
+     * @param params parámetros.
+     * @return fórmulas.
+     */
     private List<Map<String, Object>> formulas(String filtro, Map<String, Object> params) {
         List<Map<String, Object>> resultado = new ArrayList<>();
         for (Map<String, Object> f : db.lista("""
@@ -381,10 +461,17 @@ public class AtencionService {
         return resultado;
     }
 
+    /** Línea validada de una fórmula (medicamento, posología y cantidad). */
     private record Linea(long medicamento, String dosis, String frecuencia, String duracion, int cantidad, String via,
                          String indicaciones) {
     }
 
+    /**
+     * Valida las líneas de la fórmula (medicamento activo, dosis y duración con número positivo).
+     *
+     * @param d datos de la fórmula.
+     * @return líneas validadas.
+     */
     private List<Linea> validarLineas(AtencionApi.FormulaRq d) {
         if (d == null || d.medicamentos() == null || d.medicamentos().isEmpty()) {
             throw new BadRequestException("La fórmula debe tener al menos un medicamento.");
@@ -415,6 +502,12 @@ public class AtencionService {
         return lineas;
     }
 
+    /**
+     * Reemplaza las líneas de la fórmula.
+     *
+     * @param formula identificador de la fórmula.
+     * @param lineas líneas validadas.
+     */
     private void guardarLineas(long formula, List<Linea> lineas) {
         for (Linea l : lineas) {
             db.insertar("""
@@ -428,6 +521,12 @@ public class AtencionService {
 
     // ------------------------------------------------------------------ Documentos PDF
 
+    /**
+     * Genera el PDF de la fórmula médica.
+     *
+     * @param formulaId identificador de la fórmula.
+     * @return PDF.
+     */
     public byte[] formulaPdf(long formulaId) {
         Map<String, Object> f = db.requerido("""
                 SELECT f.*, c.fecha_hora, m.nombre_mascota, r.especie, r.nombre AS raza, m.edad,
@@ -475,6 +574,12 @@ public class AtencionService {
         return pdf.cerrar();
     }
 
+    /**
+     * Genera el PDF de una fórmula del módulo de historias (formula_medica).
+     *
+     * @param id identificador de la fórmula.
+     * @return PDF.
+     */
     public byte[] formulaLegadaPdf(long id) {
         Map<String, Object> f = db.requerido("""
                 SELECT fm.*, md.nombre AS medicamento, md.presentacion, c.fecha_hora, m.nombre_mascota,
@@ -555,6 +660,10 @@ public class AtencionService {
 
     // ------------------------------------------------------------------ Utilidades
 
+    /**
+     * @param id identificador de la cita.
+     * @return cita con cliente, mascota y médico.
+     */
     private Map<String, Object> cita(long id) {
         return db.requerido("""
                 SELECT c.*, m.nombre_mascota AS mascota, r.especie, r.nombre AS raza, m.edad,
@@ -570,11 +679,19 @@ public class AtencionService {
                 """, Db.p("id", id), "La cita no existe.");
     }
 
+    /**
+     * @param id identificador de la cita.
+     * @return cita bloqueada para actualización.
+     */
     private Map<String, Object> bloquearCita(long id) {
         db.requerido("SELECT id FROM cita WHERE id = :id FOR UPDATE", Db.p("id", id), "La cita no existe.");
         return cita(id);
     }
 
+    /**
+     * @param cita identificador de la cita.
+     * @return atención de la cita o null.
+     */
     private Map<String, Object> atencionDeCita(long cita) {
         return db.uno("""
                 SELECT a.*, e.nombre AS especialidad FROM atencion_medica a
@@ -582,6 +699,10 @@ public class AtencionService {
                 """, Db.p("c", cita));
     }
 
+    /**
+     * @param cita identificador de la cita.
+     * @return atención bloqueada para actualización.
+     */
     private Map<String, Object> bloquearAtencion(long cita) {
         Map<String, Object> a = db.uno("SELECT * FROM atencion_medica WHERE cita_id = :c FOR UPDATE", Db.p("c", cita));
         if (a == null) {
@@ -593,11 +714,23 @@ public class AtencionService {
         return a;
     }
 
+    /**
+     * @param id identificador de la fórmula.
+     * @return fórmula bloqueada para actualización.
+     */
     private Map<String, Object> bloquearFormula(long id) {
         return db.requerido("SELECT * FROM formula_clinica WHERE id = :id FOR UPDATE", Db.p("id", id),
                 "La fórmula no existe.");
     }
 
+    /**
+     * Agrega un servicio a la atención con la tarifa vigente.
+     *
+     * @param atencion identificador de la atención.
+     * @param servicio identificador del servicio.
+     * @param tarifa tarifa vigente.
+     * @param cantidad cantidad.
+     */
     private void insertarServicio(long atencion, long servicio, Map<String, Object> tarifa, int cantidad) {
         db.insertar("""
                 INSERT INTO atencion_servicio (atencion_id, servicio_id, tarifa_id, cantidad, valor_unitario, iva_porcentaje,
@@ -607,24 +740,46 @@ public class AtencionService {
                 "iva", tarifa.get("iva"), "imp", tarifa.get("impuesto")));
     }
 
+    /**
+     * Control de concurrencia optimista de la atención.
+     *
+     * @param atencion fila actual.
+     * @param version versión recibida.
+     */
     private void verificarVersion(Map<String, Object> atencion, Integer version) {
         if (version == null || version != Validar.numero(atencion, "version")) {
             throw new ConflictException("La atención fue modificada en otra sesión. Recarga la información.");
         }
     }
 
+    /**
+     * Control de concurrencia optimista de la fórmula.
+     *
+     * @param formula fila actual.
+     * @param revision revisión recibida.
+     */
     private void verificarRevision(Map<String, Object> formula, Integer revision) {
         if (revision == null || revision != Validar.numero(formula, "revision")) {
             throw new ConflictException("La fórmula fue modificada en otra sesión. Recarga la información.");
         }
     }
 
+    /**
+     * Verifica que la cita pertenezca al médico autenticado.
+     *
+     * @param cita fila de la cita.
+     */
     private void verificarMedico(Map<String, Object> cita) {
         if (Validar.largo(cita, "medico_id") != SesionActual.medicoId()) {
             throw new ForbiddenException("Solo el veterinario asignado puede atender esta cita.");
         }
     }
 
+    /**
+     * Verifica que el usuario pueda consultar la cita.
+     *
+     * @param cita fila de la cita.
+     */
     private void verificarLectura(Map<String, Object> cita) {
         SesionUsuario s = SesionActual.obtener();
         if (s.es(Perfiles.MEDICO)) {
@@ -632,20 +787,37 @@ public class AtencionService {
         }
     }
 
+    /**
+     * Verifica que la fórmula sea del médico autenticado.
+     *
+     * @param formula fila de la fórmula.
+     */
     private void verificarPropietario(Map<String, Object> formula) {
         if (Validar.largo(formula, "medico_id") != SesionActual.medicoId()) {
             throw new ForbiddenException("Solo el médico que formuló puede modificar la fórmula.");
         }
     }
 
+    /**
+     * @param v valor.
+     * @return texto o "—" si está vacío.
+     */
     private static String valor(Object v) {
         return v == null ? "sin registro" : v.toString();
     }
 
+    /**
+     * @param v valor.
+     * @return texto o cadena vacía.
+     */
     private static String texto(Object v) {
         return v == null ? "—" : v.toString().replace('T', ' ');
     }
 
+    /**
+     * @param v valor monetario.
+     * @return valor en formato de pesos colombianos.
+     */
     static String cop(BigDecimal v) {
         synchronized (COP) {
             return COP.format(v);

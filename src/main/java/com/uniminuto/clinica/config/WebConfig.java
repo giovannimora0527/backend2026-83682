@@ -12,12 +12,21 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
+    /** Interceptor que valida el token y los permisos. */
     private final AutenticacionInterceptor autenticacion;
 
+    /**
+     * @param autenticacion interceptor de seguridad.
+     */
     public WebConfig(AutenticacionInterceptor autenticacion) {
         this.autenticacion = autenticacion;
     }
 
+    /**
+     * Permite solicitudes del frontend Angular en localhost.
+     *
+     * @param registry registro de CORS.
+     */
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
@@ -27,6 +36,11 @@ public class WebConfig implements WebMvcConfigurer {
                 .exposedHeaders("Content-Disposition");
     }
 
+    /**
+     * Registra el interceptor de seguridad en todas las rutas excepto las públicas (autenticación, Swagger y errores).
+     *
+     * @param registry registro de interceptores.
+     */
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(autenticacion)

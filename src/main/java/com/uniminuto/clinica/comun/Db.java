@@ -27,8 +27,12 @@ import java.util.Map;
 @Component
 public class Db {
 
+    /** Plantilla JDBC con parámetros con nombre. */
     private final NamedParameterJdbcTemplate jdbc;
 
+    /**
+     * @param jdbc plantilla JDBC configurada por Spring Boot.
+     */
     public Db(NamedParameterJdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
@@ -43,6 +47,12 @@ public class Db {
         return fila;
     };
 
+    /**
+     * Convierte tipos JDBC (Timestamp, Date, Time, BigInteger) a tipos de java.time y numéricos.
+     *
+     * @param valor valor leído de la base de datos.
+     * @return valor convertido.
+     */
     static Object convertir(Object valor) {
         if (valor instanceof Timestamp t) {
             return t.toLocalDateTime();
@@ -71,10 +81,23 @@ public class Db {
         return mapa;
     }
 
+    /**
+     * Ejecuta una consulta parametrizada.
+     *
+     * @param sql consulta con parámetros :nombre.
+     * @param params valores de los parámetros.
+     * @return filas como mapas (alias → valor).
+     */
     public List<Map<String, Object>> lista(String sql, Map<String, ?> params) {
         return jdbc.query(sql, params, FILA);
     }
 
+    /**
+     * Ejecuta una consulta sin parámetros.
+     *
+     * @param sql consulta.
+     * @return filas como mapas.
+     */
     public List<Map<String, Object>> lista(String sql) {
         return lista(sql, Map.of());
     }
@@ -94,20 +117,50 @@ public class Db {
         return fila;
     }
 
+    /**
+     * Obtiene el primer valor de la primera columna.
+     *
+     * @param sql consulta.
+     * @param params parámetros.
+     * @param tipo clase del valor esperado.
+     * @param <T> tipo del valor.
+     * @return valor o null si no hay resultados.
+     */
     public <T> T valor(String sql, Map<String, ?> params, Class<T> tipo) {
         List<T> valores = jdbc.queryForList(sql, params, tipo);
         return valores.isEmpty() ? null : valores.get(0);
     }
 
+    /**
+     * Ejecuta una consulta de conteo.
+     *
+     * @param sql consulta que devuelve un número.
+     * @param params parámetros.
+     * @return número obtenido (0 si es nulo).
+     */
     public long contar(String sql, Map<String, ?> params) {
         Number n = valor(sql, params, Long.class);
         return n == null ? 0 : n.longValue();
     }
 
+    /**
+     * Indica si la consulta devuelve al menos una fila.
+     *
+     * @param sql consulta.
+     * @param params parámetros.
+     * @return true si existe algún registro.
+     */
     public boolean existe(String sql, Map<String, ?> params) {
         return !jdbc.queryForList(sql, params).isEmpty();
     }
 
+    /**
+     * Ejecuta un INSERT, UPDATE o DELETE.
+     *
+     * @param sql sentencia parametrizada.
+     * @param params parámetros.
+     * @return filas afectadas.
+     */
     public int ejecutar(String sql, Map<String, ?> params) {
         return jdbc.update(sql, params);
     }

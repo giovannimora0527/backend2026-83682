@@ -10,11 +10,19 @@ import org.springframework.web.context.request.RequestContextHolder;
  */
 public final class SesionActual {
 
+    /** Nombre del atributo de la solicitud donde el interceptor guarda la sesión. */
     static final String ATRIBUTO = "clinica.sesion";
 
+    /** Clase de utilidades: no se instancia. */
     private SesionActual() {
     }
 
+    /**
+     * Obtiene la sesión autenticada de la solicitud en curso.
+     *
+     * @return sesión del usuario.
+     * @throws com.uniminuto.clinica.exception.UnauthorizedException si no hay sesión.
+     */
     public static SesionUsuario obtener() {
         RequestAttributes atributos = RequestContextHolder.getRequestAttributes();
         Object sesion = atributos == null ? null : atributos.getAttribute(ATRIBUTO, RequestAttributes.SCOPE_REQUEST);
@@ -24,6 +32,9 @@ public final class SesionActual {
         return (SesionUsuario) sesion;
     }
 
+    /**
+     * @return identificador del usuario autenticado.
+     */
     public static long usuarioId() {
         return obtener().usuarioId();
     }

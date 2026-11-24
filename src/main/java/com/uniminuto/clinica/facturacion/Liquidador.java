@@ -17,6 +17,7 @@ import java.util.List;
  */
 public final class Liquidador {
 
+    /** Constante 100 para porcentajes. */
     private static final BigDecimal CIEN = new BigDecimal("100");
 
     /** Concepto a liquidar: un servicio de la atención o un medicamento efectivamente dispensado. */
@@ -34,9 +35,17 @@ public final class Liquidador {
                             BigDecimal otros, BigDecimal total) {
     }
 
+    /** Clase de utilidades: no se instancia. */
     private Liquidador() {
     }
 
+    /**
+     * Calcula subtotal, descuentos, IVA y total de los conceptos.
+     *
+     * @param conceptos conceptos a facturar.
+     * @param descuentoGlobal porcentaje de descuento global.
+     * @return liquidación.
+     */
     public static Resultado liquidar(List<Concepto> conceptos, BigDecimal descuentoGlobal) {
         BigDecimal descuento = escala(descuentoGlobal == null ? BigDecimal.ZERO : descuentoGlobal);
         if (descuento.signum() < 0) {
@@ -89,10 +98,18 @@ public final class Liquidador {
         return new Resultado(lineas, subtotal, asignado, totalIva, totalOtros, total);
     }
 
+    /**
+     * @param v valor.
+     * @return valor redondeado a 2 decimales (HALF_UP).
+     */
     static BigDecimal escala(BigDecimal v) {
         return v.setScale(2, RoundingMode.HALF_UP);
     }
 
+    /**
+     * @param v valor.
+     * @return el valor o cero si es nulo.
+     */
     private static BigDecimal nz(BigDecimal v) {
         return v == null ? BigDecimal.ZERO : v;
     }

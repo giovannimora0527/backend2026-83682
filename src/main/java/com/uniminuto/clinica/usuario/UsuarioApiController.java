@@ -14,30 +14,44 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Controlador REST del módulo: implementa {@link UsuarioApi} (rutas, permisos y documentación Swagger)
+ * y delega la lógica en la capa de servicio.
+ */
 @RestController
 public class UsuarioApiController implements UsuarioApi {
 
+    /** Consulta SQL base reutilizada por los métodos del controlador. */
     private static final String CONSULTA = """
             SELECT u.id, u.username, u.rol, p.nombre AS perfil, u.email, u.activo, u.fecha_creacion AS fechaCreacion
             FROM usuario u JOIN perfil p ON p.perfil_id = u.rol
             """;
 
+    /** Dependencia inyectada por constructor: db. */
     private final Db db;
 
+    /**
+     * Crea el controlador con sus dependencias (inyección por constructor).
+     *
+     * @param db dependencia db.
+     */
     public UsuarioApiController(Db db) {
         this.db = db;
     }
 
+    /** {@inheritDoc} */
     @Override
     public ResponseEntity<List<Map<String, Object>>> listar() {
         return ResponseEntity.ok(db.lista(CONSULTA + " ORDER BY u.username"));
     }
 
+    /** {@inheritDoc} */
     @Override
     public ResponseEntity<List<Map<String, Object>>> perfiles() {
         return ResponseEntity.ok(db.lista("SELECT perfil_id AS perfilId, nombre, activo FROM perfil ORDER BY perfil_id"));
     }
 
+    /** {@inheritDoc} */
     @Override
     @Transactional
     public ResponseEntity<Map<String, Object>> guardar(UsuarioRq datos) {
@@ -54,6 +68,7 @@ public class UsuarioApiController implements UsuarioApi {
         return ResponseEntity.ok(db.uno(CONSULTA + " WHERE u.id = :id", Db.p("id", id)));
     }
 
+    /** {@inheritDoc} */
     @Override
     @Transactional
     public ResponseEntity<Map<String, Object>> actualizar(UsuarioRq datos) {
@@ -81,11 +96,18 @@ public class UsuarioApiController implements UsuarioApi {
         return ResponseEntity.ok(db.uno(CONSULTA + " WHERE u.id = :id", Db.p("id", datos.id())));
     }
 
+    /** {@inheritDoc} */
     @Override
     public ResponseEntity<Map<String, Object>> test() {
         return ResponseEntity.ok(Map.of("status", 200, "message", "Servicio de usuarios disponible"));
     }
 
+    /**
+     * Valida los datos del usuario (nombre, correo, perfil y contraseña segura si es nuevo).
+     *
+     * @param datos datos recibidos.
+     * @param nuevo true si se está creando el usuario.
+     */
     private void validar(UsuarioRq datos, boolean nuevo) {
         if (datos == null) {
             throw new BadRequestException("Los datos del usuario son obligatorios.");

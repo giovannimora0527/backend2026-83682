@@ -39,6 +39,7 @@ import java.util.Set;
 @Service
 public class CitaService {
 
+    /** Estados válidos de una cita. */
     public static final Set<String> ESTADOS = Set.of("pendiente", "programada", "confirmada", "cancelada", "atendida", "finalizada");
     /** Estados de una cita reservada que aún no se ha atendido (se puede reprogramar). */
     static final Set<String> RESERVADAS = Set.of("pendiente", "programada", "confirmada");
@@ -46,8 +47,10 @@ public class CitaService {
     static final int MARGEN_MINUTOS = 15;
     /** Estados que ocupan la agenda (bloquean el horario). */
     static final String OCUPAN = "'pendiente', 'programada', 'confirmada', 'atendida'";
+    /** Duración máxima de una cita en minutos. */
     private static final int MINUTOS_MAXIMOS = 240;
 
+    /** Consulta base de las citas para la agenda (calendario) del médico. */
     private static final String EVENTO = """
             SELECT c.id, c.estado, c.fecha_hora AS inicio, c.fecha_fin AS fin, c.motivo,
                    CONCAT(md.nombres, ' ', md.apellidos) AS medico, m.nombre_mascota AS mascota,
@@ -60,8 +63,12 @@ public class CitaService {
             JOIN cliente cl ON cl.cliente_id = c.cliente_id
             """;
 
+    /** Acceso a datos. */
     private final Db db;
 
+    /**
+     * @param db acceso a datos.
+     */
     public CitaService(Db db) {
         this.db = db;
     }
@@ -171,6 +178,12 @@ public class CitaService {
         return detalle(id);
     }
 
+    /**
+     * Consulta una cita verificando que el usuario pueda verla.
+     *
+     * @param id identificador de la cita.
+     * @return cita.
+     */
     public Map<String, Object> consultar(long id) {
         return db.requerido("""
                 SELECT id, cliente_id AS clienteId, mascota_id AS mascotaId, medico_id AS medicoId,
@@ -179,6 +192,12 @@ public class CitaService {
                 """, Db.p("id", id), "La cita no existe.");
     }
 
+    /**
+     * Agenda una cita validando cliente, mascota, médico, horario y margen de 15 minutos.
+     *
+     * @param d datos de la cita.
+     * @return cita creada.
+     */
     @Transactional
     public Map<String, Object> crear(CitaApi.CitaRq d) {
         Datos datos = validarDatos(d);
@@ -197,6 +216,13 @@ public class CitaService {
         return consultar(id);
     }
 
+    /**
+     * Reprograma o modifica una cita y registra la revisión.
+     *
+     * @param id identificador de la cita.
+     * @param d nuevos datos.
+     * @return cita actualizada.
+     */
     @Transactional
     public Map<String, Object> actualizar(long id, CitaApi.CitaRq d) {
         Map<String, Object> actual = bloquear(id);
@@ -234,6 +260,15 @@ public class CitaService {
 
     // ------------------------------------------------------------------ AGENDA
 
+    /**
+     * Citas de un médico en un rango de fechas (máximo un año).
+     *
+     * @param medico identificador del médico.
+     * @param desde fecha inicial AAAA-MM-DD.
+     * @param hasta fecha final AAAA-MM-DD.
+     * @param estado estado opcional.
+     * @return eventos del calendario.
+     */
     public List<Map<String, Object>> eventos(long medico, String desde, String hasta, String estado) {
         LocalDate d = Validar.fecha(desde, "desde", true);
         LocalDate h = Validar.fecha(hasta, "hasta", true);
@@ -255,6 +290,15 @@ public class CitaService {
                 "estado", filtroEstado));
     }
 
+    /**
+     * Exporta a Excel la agenda de un médico.
+     *
+     * @param medico identificador del médico.
+     * @param desde fecha inicial.
+     * @param hasta fecha final.
+     * @param estado estado opcional.
+     * @return archivo .xlsx.
+     */
     public byte[] excel(long medico, String desde, String hasta, String estado) {
         List<Map<String, Object>> citas = eventos(medico, desde, hasta, estado);
         Map<String, Object> m = db.uno("SELECT CONCAT(nombres, ' ', apellidos) AS nombre FROM medico WHERE id = :id",
@@ -278,6 +322,13 @@ public class CitaService {
                 Map.of("id", citas.size()));
     }
 
+    /**
+     * Calcula los espacios libres de un médico en un día (horario menos citas y ausencias).
+     *
+     * @param medico identificador del médico.
+     * @param fechaTexto fecha AAAA-MM-DD.
+     * @return franjas libres y ocupadas.
+     */
     public Map<String, Object> disponibilidad(long medico, String fechaTexto) {
         LocalDate fecha = Validar.fecha(fechaTexto, "fecha", true);
         Map<String, Object> m = db.requerido("SELECT activo FROM medico WHERE id = :id", Db.p("id", medico),
@@ -333,6 +384,12 @@ public class CitaService {
         return resultado;
     }
 
+    /**
+     * Horarios semanales y ausencias del médico.
+     *
+     * @param medico identificador del médico.
+     * @return configuración de agenda.
+     */
     public Map<String, Object> configuracion(long medico) {
         Map<String, Object> m = db.requerido("SELECT activo FROM medico WHERE id = :id", Db.p("id", medico),
                 "El médico no existe.");
@@ -349,6 +406,13 @@ public class CitaService {
         return r;
     }
 
+    /**
+     * Reemplaza el horario semanal del médico validando que las franjas no se crucen.
+     *
+     * @param medico identificador del médico.
+     * @param franjas franjas por día de la semana.
+     * @return configuración actualizada.
+     */
     @Transactional
     public Map<String, Object> guardarHorarios(long medico, List<CitaApi.Franja> franjas) {
         db.requerido("SELECT id FROM medico WHERE id = :id FOR UPDATE", Db.p("id", medico), "El médico no existe.");
@@ -382,6 +446,13 @@ public class CitaService {
         return configuracion(medico);
     }
 
+    /**
+     * Registra una ausencia (vacaciones, incapacidad) del médico.
+     *
+     * @param medico identificador del médico.
+     * @param a fechas y motivo.
+     * @return configuración actualizada.
+     */
     @Transactional
     public Map<String, Object> registrarAusencia(long medico, CitaApi.AusenciaRq a) {
         db.requerido("SELECT id FROM medico WHERE id = :id FOR UPDATE", Db.p("id", medico), "El médico no existe.");
@@ -411,6 +482,12 @@ public class CitaService {
         return configuracion(medico);
     }
 
+    /**
+     * Activa o inactiva al médico para recibir citas.
+     *
+     * @param medico identificador del médico.
+     * @param activo nuevo estado.
+     */
     @Transactional
     public void actividad(long medico, Boolean activo) {
         Validar.requerido(activo, "activo");
@@ -418,6 +495,13 @@ public class CitaService {
         db.ejecutar("UPDATE medico SET activo = :a WHERE id = :id", Db.p("a", activo, "id", medico));
     }
 
+    /**
+     * Cambia el estado de una cita validando la transición permitida.
+     *
+     * @param id identificador de la cita.
+     * @param cambio nuevo estado y motivo.
+     * @return cita actualizada.
+     */
     @Transactional
     public Map<String, Object> cambiar(long id, CitaApi.CambioRq cambio) {
         Map<String, Object> actual = bloquear(id);
@@ -452,6 +536,12 @@ public class CitaService {
         return db.uno(EVENTO + " WHERE c.id = :id", Db.p("id", id));
     }
 
+    /**
+     * Historial de cambios (revisiones) de una cita.
+     *
+     * @param id identificador de la cita.
+     * @return revisiones en orden cronológico.
+     */
     public List<Map<String, Object>> historial(long id) {
         Map<String, Object> cita = db.requerido("SELECT id, medico_id FROM cita WHERE id = :id", Db.p("id", id),
                 "La cita no existe.");
@@ -486,6 +576,13 @@ public class CitaService {
         return resultado;
     }
 
+    /**
+     * Historial paginado de citas de una mascota.
+     *
+     * @param mascota identificador de la mascota.
+     * @param paginaRq página solicitada.
+     * @return página de citas y total.
+     */
     public Map<String, Object> historialMascota(int mascota, Integer paginaRq) {
         db.requerido("SELECT mascota_id FROM mascota WHERE mascota_id = :m", Db.p("m", mascota), "La mascota no existe.");
         int pagina = Validar.pagina(paginaRq);
@@ -588,16 +685,35 @@ public class CitaService {
         }
     }
 
+    /**
+     * Verifica que un médico solo acceda a sus propias citas.
+     *
+     * @param cita fila de la cita.
+     * @param s sesión actual.
+     */
     private void verificarAcceso(Map<String, Object> cita, SesionUsuario s) {
         if (s.es(Perfiles.MEDICO) && Validar.largo(cita, "medico_id") != SesionActual.medicoId()) {
             throw new ForbiddenException("Solo puedes gestionar tus propias citas.");
         }
     }
 
+    /**
+     * Obtiene la cita con bloqueo de fila (SELECT ... FOR UPDATE).
+     *
+     * @param id identificador de la cita.
+     * @return fila de la cita.
+     */
     private Map<String, Object> bloquear(long id) {
         return db.requerido("SELECT * FROM cita WHERE id = :id FOR UPDATE", Db.p("id", id), "La cita no existe.");
     }
 
+    /**
+     * Franjas de horario del médico para el día de la semana de la fecha.
+     *
+     * @param medico identificador del médico.
+     * @param fecha día consultado.
+     * @return franjas de atención.
+     */
     private List<Map<String, Object>> franjas(long medico, LocalDate fecha) {
         return db.lista("""
                 SELECT hora_inicio AS inicio, hora_fin AS fin FROM medico_horario
@@ -605,6 +721,15 @@ public class CitaService {
                 """, Db.p("m", medico, "d", fecha.getDayOfWeek().getValue()));
     }
 
+    /**
+     * Guarda una revisión con los valores anteriores de la cita.
+     *
+     * @param cita identificador de la cita.
+     * @param anterior fila antes del cambio.
+     * @param estado nuevo estado.
+     * @param inicio nuevo inicio.
+     * @param fin nuevo fin.
+     */
     void registrarRevision(long cita, Map<String, Object> anterior, String estado, LocalDateTime inicio, LocalDateTime fin) {
         db.insertar("""
                 INSERT INTO cita_revision (cita_id, usuario_id, fecha, estado_anterior, inicio_anterior, fin_anterior,
@@ -617,6 +742,12 @@ public class CitaService {
                 "en", estado, "in", inicio, "fn", fin));
     }
 
+    /**
+     * Convierte un texto HH:MM en hora.
+     *
+     * @param valor texto recibido.
+     * @return hora.
+     */
     private static LocalTime hora(String valor) {
         try {
             return LocalTime.parse(valor.trim().length() == 5 ? valor.trim() + ":00" : valor.trim());
@@ -625,6 +756,12 @@ public class CitaService {
         }
     }
 
+    /**
+     * Valida los datos de la cita en orden cliente → mascota → médico → horario.
+     *
+     * @param d datos recibidos.
+     * @return datos validados.
+     */
     private Datos validarDatos(CitaApi.CitaRq d) {
         if (d == null) {
             throw new BadRequestException("Los datos de la cita son obligatorios.");
@@ -658,6 +795,7 @@ public class CitaService {
                 Validar.texto(d.motivo(), "motivo", 1000));
     }
 
+    /** Datos de una cita ya validados. */
     private record Datos(long cliente, long mascota, long medico, LocalDateTime inicio, LocalDateTime fin,
                          String estado, String motivo) {
     }

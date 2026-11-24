@@ -12,9 +12,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Controlador REST del módulo: implementa {@link MascotaApi} (rutas, permisos y documentación Swagger)
+ * y delega la lógica en la capa de servicio.
+ */
 @RestController
 public class MascotaApiController implements MascotaApi {
 
+    /** Consulta SQL base reutilizada por los métodos del controlador. */
     private static final String CONSULTA = """
             SELECT m.mascota_id, m.nombre_mascota, m.edad, m.activo, m.fecha_registro, m.fecha_modificacion,
                    r.raza_id, r.nombre AS raza_nombre, r.especie, r.fecha_creacion AS raza_creacion,
@@ -24,24 +29,33 @@ public class MascotaApiController implements MascotaApi {
             JOIN cliente c ON c.cliente_id = m.cliente_id
             """;
 
+    /** Dependencia inyectada por constructor: db. */
     private final Db db;
 
+    /**
+     * Crea el controlador con sus dependencias (inyección por constructor).
+     *
+     * @param db dependencia db.
+     */
     public MascotaApiController(Db db) {
         this.db = db;
     }
 
+    /** {@inheritDoc} */
     @Override
     public ResponseEntity<List<Map<String, Object>>> listar() {
         return ResponseEntity.ok(db.lista(CONSULTA + " ORDER BY m.nombre_mascota").stream()
                 .map(MascotaApiController::aDetalle).toList());
     }
 
+    /** {@inheritDoc} */
     @Override
     public ResponseEntity<Map<String, Object>> consultar(int id) {
         return ResponseEntity.ok(aDetalle(db.requerido(CONSULTA + " WHERE m.mascota_id = :id", Db.p("id", id),
                 "La mascota no existe.")));
     }
 
+    /** {@inheritDoc} */
     @Override
     @Transactional
     public ResponseEntity<Map<String, Object>> crear(MascotaRq datos) {
@@ -54,6 +68,7 @@ public class MascotaApiController implements MascotaApi {
         return consultar((int) id);
     }
 
+    /** {@inheritDoc} */
     @Override
     @Transactional
     public ResponseEntity<Map<String, Object>> actualizar(int id, MascotaRq datos) {
@@ -70,6 +85,12 @@ public class MascotaApiController implements MascotaApi {
         return consultar(id);
     }
 
+    /**
+     * Valida los datos de la mascota (cliente y raza existentes, fecha de nacimiento no futura).
+     *
+     * @param d datos recibidos.
+     * @return parámetros listos para la sentencia SQL.
+     */
     private Map<String, Object> validar(MascotaRq d) {
         if (d == null) {
             throw new BadRequestException("Los datos de la mascota son obligatorios.");

@@ -14,34 +14,49 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Controlador REST del módulo: implementa {@link ClienteApi} (rutas, permisos y documentación Swagger)
+ * y delega la lógica en la capa de servicio.
+ */
 @RestController
 public class ClienteApiController implements ClienteApi {
 
+    /** Consulta SQL base reutilizada por los métodos del controlador. */
     static final String CONSULTA = """
             SELECT c.cliente_id AS clienteId, c.usuario_id AS usuarioId, c.tipo_documento AS tipoDocumento,
                    c.numero_documento AS numeroDocumento, c.nombres, c.apellidos,
                    c.fecha_nacimiento AS fechaNacimiento, c.genero, c.telefono, c.direccion, c.activo
             FROM cliente c
             """;
+    /** Tipos de documento de identidad permitidos. */
     private static final Set<String> TIPOS = Set.of("CC", "TI", "CE", "PA", "NIT", "PPT");
 
+    /** Dependencia inyectada por constructor: db. */
     private final Db db;
 
+    /**
+     * Crea el controlador con sus dependencias (inyección por constructor).
+     *
+     * @param db dependencia db.
+     */
     public ClienteApiController(Db db) {
         this.db = db;
     }
 
+    /** {@inheritDoc} */
     @Override
     public ResponseEntity<List<Map<String, Object>>> listar() {
         return ResponseEntity.ok(db.lista(CONSULTA + " ORDER BY c.activo DESC, c.apellidos, c.nombres"));
     }
 
+    /** {@inheritDoc} */
     @Override
     public ResponseEntity<Map<String, Object>> buscarPorDocumento(String documento) {
         return ResponseEntity.ok(db.requerido(CONSULTA + " WHERE c.numero_documento = :d",
                 Db.p("d", documento == null ? "" : documento.trim()), "No existe un cliente con ese documento."));
     }
 
+    /** {@inheritDoc} */
     @Override
     public ResponseEntity<Map<String, Object>> consultar(long id) {
         return ResponseEntity.ok(db.requerido(CONSULTA + " WHERE c.cliente_id = :id", Db.p("id", id),
@@ -65,6 +80,7 @@ public class ClienteApiController implements ClienteApi {
                 """, Db.p("id", id)));
     }
 
+    /** {@inheritDoc} */
     @Override
     @Transactional
     public ResponseEntity<Map<String, Object>> crear(ClienteRq datos) {
@@ -77,6 +93,7 @@ public class ClienteApiController implements ClienteApi {
         return consultar(id);
     }
 
+    /** {@inheritDoc} */
     @Override
     @Transactional
     public ResponseEntity<Map<String, Object>> actualizar(long id, ClienteRq datos) {
@@ -92,6 +109,7 @@ public class ClienteApiController implements ClienteApi {
         return consultar(id);
     }
 
+    /** {@inheritDoc} */
     @Override
     @Transactional
     public ResponseEntity<Void> archivar(long id) {
@@ -107,6 +125,13 @@ public class ClienteApiController implements ClienteApi {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Valida y normaliza los datos del cliente (documento único, correo y teléfono).
+     *
+     * @param d datos recibidos.
+     * @param id cliente que se actualiza, o null si es nuevo.
+     * @return parámetros listos para la sentencia SQL.
+     */
     private Map<String, Object> validar(ClienteRq d, Long id) {
         if (d == null) {
             throw new BadRequestException("Los datos del cliente son obligatorios.");

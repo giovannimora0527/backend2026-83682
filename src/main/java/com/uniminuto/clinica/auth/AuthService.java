@@ -36,18 +36,37 @@ import java.util.UUID;
 @Service
 public class AuthService {
 
+    /** Caracteres del código (sin 0, O, 1 ni I para evitar confusiones). */
     private static final String ALFABETO = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    /** Generador criptográfico de códigos. */
     private static final SecureRandom ALEATORIO = new SecureRandom();
+    /** Tiempo mínimo entre reenvíos de código. */
     private static final int SEGUNDOS_REENVIO = 30;
 
+    /** Acceso a datos. */
     private final Db db;
+    /** Emisión de tokens. */
     private final JwtServicio jwt;
+    /** Envío de códigos por correo. */
     private final CorreoService correo;
+    /** Duración de la sesión en horas. */
     private final int horas;
+    /** Si el segundo paso (código por correo) está activo. */
     private final boolean otpHabilitado;
+    /** Vigencia del código en minutos. */
     private final int minutos;
+    /** Intentos permitidos por código. */
     private final int intentos;
 
+    /**
+     * @param db acceso a datos.
+     * @param jwt servicio de tokens.
+     * @param correo servicio de correo.
+     * @param horas duración de la sesión.
+     * @param otpHabilitado si se exige el código por correo.
+     * @param minutos vigencia del código.
+     * @param intentos intentos permitidos.
+     */
     public AuthService(Db db, JwtServicio jwt, CorreoService correo, @Value("${clinica.jwt.horas}") int horas,
                        @Value("${clinica.otp.habilitado:true}") boolean otpHabilitado,
                        @Value("${clinica.otp.minutos:5}") int minutos, @Value("${clinica.otp.intentos:5}") int intentos) {
@@ -62,6 +81,12 @@ public class AuthService {
 
     // ------------------------------------------------------------------ Paso 1: credenciales
 
+    /**
+     * Paso 1: valida usuario y contraseña y envía el código al correo.
+     *
+     * @param datos credenciales.
+     * @return desafío a verificar (o la sesión si la verificación está deshabilitada).
+     */
     @Transactional
     public AuthApi.DesafioRs login(AuthApi.LoginRq datos) {
         if (datos == null || datos.username() == null || datos.username().isBlank()
@@ -97,6 +122,12 @@ public class AuthService {
         return emitirSesion(usuario);
     }
 
+    /**
+     * Genera y envía un nuevo código para el mismo desafío (invalida el anterior).
+     *
+     * @param desafio identificador del desafío.
+     * @return desafío vigente.
+     */
     @Transactional
     public AuthApi.DesafioRs reenviar(String desafio) {
         Map<String, Object> token = desafio == null ? null : db.uno(
@@ -124,6 +155,12 @@ public class AuthService {
 
     // ------------------------------------------------------------------ Recuperación de contraseña
 
+    /**
+     * Inicia la recuperación de contraseña sin revelar si la cuenta existe.
+     *
+     * @param valor usuario o correo.
+     * @return desafío de recuperación.
+     */
     @Transactional
     public AuthApi.DesafioRs recuperar(String valor) {
         if (valor == null || valor.isBlank()) {
@@ -137,6 +174,11 @@ public class AuthService {
         return enviarDesafio(usuario, "RECUPERACION");
     }
 
+    /**
+     * Cambia la contraseña con el código recibido y cierra las sesiones abiertas.
+     *
+     * @param datos desafío, código y nueva contraseña.
+     */
     @Transactional(noRollbackFor = ClinicaException.class)
     public void restablecer(AuthApi.RestablecerRq datos) {
         if (datos == null) {
@@ -155,11 +197,15 @@ public class AuthService {
 
     // ------------------------------------------------------------------ Sesión
 
+    /**
+     * @return datos de la sesión actual (sin token).
+     */
     public AuthApi.LoginRs validar() {
         SesionUsuario s = SesionActual.obtener();
         return new AuthApi.LoginRs(null, "Bearer", s.usuarioId(), s.username(), s.perfilId(), s.perfil());
     }
 
+    /** Cierra la sesión actual (el token deja de ser válido). */
     public void logout() {
         db.ejecutar("UPDATE session SET activo = 0 WHERE session_id = :id",
                 Db.p("id", SesionActual.obtener().sesionId()));
@@ -167,6 +213,13 @@ public class AuthService {
 
     // ------------------------------------------------------------------ Utilidades
 
+    /**
+     * Crea el código (guardado como hash) y lo envía al correo del usuario.
+     *
+     * @param usuario fila del usuario.
+     * @param proposito LOGIN o RECUPERACION.
+     * @return desafío creado.
+     */
     private AuthApi.DesafioRs enviarDesafio(Map<String, Object> usuario, String proposito) {
         long usuarioId = Validar.largo(usuario, "id");
         db.ejecutar("UPDATE otp_token SET usado = 1 WHERE usuario_id = :u AND proposito = :p AND usado = 0",
@@ -183,6 +236,14 @@ public class AuthService {
         return new AuthApi.DesafioRs(true, desafio, enmascarar(Validar.cadena(usuario, "email")), minutos, null);
     }
 
+    /**
+     * Valida el código: existencia, vigencia, intentos y coincidencia; lo marca como usado.
+     *
+     * @param desafio identificador del desafío.
+     * @param codigo código ingresado.
+     * @param proposito propósito esperado.
+     * @return fila del token validado.
+     */
     private Map<String, Object> validarCodigo(String desafio, String codigo, String proposito) {
         if (desafio == null || desafio.isBlank() || codigo == null || codigo.isBlank()) {
             throw new BadRequestException("Ingresa el código de 6 caracteres.");
@@ -210,6 +271,12 @@ public class AuthService {
         return token;
     }
 
+    /**
+     * Emite el JWT y registra la sesión.
+     *
+     * @param usuario fila del usuario.
+     * @return sesión iniciada.
+     */
     private AuthApi.LoginRs emitirSesion(Map<String, Object> usuario) {
         long usuarioId = Validar.largo(usuario, "id");
         String perfil = Perfiles.codigo(Validar.cadena(usuario, "perfil"));
@@ -225,6 +292,11 @@ public class AuthService {
                 Validar.largo(usuario, "perfil_id"), perfil);
     }
 
+    /**
+     * @param filtro condición SQL sobre el usuario.
+     * @param valor valor del parámetro :valor.
+     * @return usuario con su perfil o null.
+     */
     private Map<String, Object> usuario(String filtro, Object valor) {
         return db.uno("""
                 SELECT u.id, u.username, u.email, u.password_hash, u.activo, p.perfil_id, p.nombre AS perfil,
@@ -234,12 +306,20 @@ public class AuthService {
                 """ + filtro, Db.p("valor", valor));
     }
 
+    /**
+     * Verifica que el usuario y su perfil estén activos.
+     *
+     * @param usuario fila del usuario.
+     */
     private static void verificarActivo(Map<String, Object> usuario) {
         if (usuario == null || !Validar.bool(usuario, "activo") || !Validar.bool(usuario, "perfil_activo")) {
             throw new ClinicaException(HttpStatus.FORBIDDEN, "Tu perfil no está habilitado para ingresar.");
         }
     }
 
+    /**
+     * @return código aleatorio de 6 caracteres.
+     */
     static String generarCodigo() {
         StringBuilder sb = new StringBuilder(6);
         for (int i = 0; i < 6; i++) {

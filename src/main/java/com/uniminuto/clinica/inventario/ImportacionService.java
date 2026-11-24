@@ -39,14 +39,23 @@ import java.util.Set;
 @Service
 public class ImportacionService {
 
+    /** Columnas esperadas en el archivo de importación. */
     static final List<String> COLUMNAS = List.of("codigo", "nombre", "descripcion", "presentacion", "tipo", "invima",
             "precioCompra", "precioVenta", "stockMinimo", "fechaCompra", "fechaIngreso", "fechaProximoPedido",
             "fechaVence", "activo", "numeroLote", "cantidad");
 
+    /** Acceso a datos. */
     private final Db db;
+    /** Validación y registro de productos. */
     private final InventarioService inventario;
+    /** Transacción independiente por fila importada. */
     private final TransactionTemplate porFila;
 
+    /**
+     * @param db acceso a datos.
+     * @param inventario servicio de inventario.
+     * @param tm administrador de transacciones.
+     */
     public ImportacionService(Db db, InventarioService inventario, PlatformTransactionManager tm) {
         this.db = db;
         this.inventario = inventario;
@@ -54,6 +63,12 @@ public class ImportacionService {
         this.porFila.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
 
+    /**
+     * Lee y valida un archivo CSV o Excel sin modificar el inventario.
+     *
+     * @param archivo archivo cargado.
+     * @return resumen y filas con errores.
+     */
     @Transactional
     public Map<String, Object> previsualizar(MultipartFile archivo) {
         if (archivo == null || archivo.isEmpty()) {
@@ -149,6 +164,12 @@ public class ImportacionService {
         return detalle(id);
     }
 
+    /**
+     * Importa una fila válida (producto y lote).
+     *
+     * @param importacion identificador de la importación.
+     * @param f fila validada.
+     */
     private void importarFila(long importacion, Map<String, Object> f) {
         List<String> errores = new ArrayList<>();
         ProductoRq rq = new ProductoRq(Validar.cadena(f, "codigo"), Validar.cadena(f, "nombre"),
@@ -182,6 +203,9 @@ public class ImportacionService {
                 Db.p("m", medicamento, "id", f.get("id")));
     }
 
+    /**
+     * @return importaciones realizadas.
+     */
     public List<Map<String, Object>> historial() {
         return db.lista("""
                 SELECT i.id, i.usuario_id AS usuarioId, u.username AS usuario, i.archivo, i.fecha,
@@ -191,6 +215,10 @@ public class ImportacionService {
                 """);
     }
 
+    /**
+     * @param id identificador de la importación.
+     * @return importación con sus filas.
+     */
     public Map<String, Object> detalle(long id) {
         Map<String, Object> resumen = db.requerido("""
                 SELECT i.id, i.usuario_id AS usuarioId, u.username AS usuario, i.archivo, i.fecha,
@@ -232,6 +260,11 @@ public class ImportacionService {
 
     // ------------------------------------------------------------------ Conversión de valores
 
+    /**
+     * @param v valores de la fila.
+     * @param errores lista donde se agregan errores.
+     * @return datos del producto.
+     */
     private ProductoRq aProducto(Map<String, String> v, List<String> errores) {
         return new ProductoRq(v.get("codigo"), v.get("nombre"), v.get("descripcion"), v.get("presentacion"),
                 v.get("tipo"), v.get("invima"), decimal(v.get("precioCompra"), "precio de compra", errores),
@@ -240,6 +273,16 @@ public class ImportacionService {
                 v.get("fechaProximoPedido"), v.get("fechaVence"), booleano(v.get("activo"), errores), null);
     }
 
+    /**
+     * Guarda la fila con su resultado de validación.
+     *
+     * @param importacion identificador.
+     * @param numero número de fila.
+     * @param v valores.
+     * @param p producto.
+     * @param lote número de lote.
+     * @param errores errores encontrados.
+     */
     private void guardarFila(long importacion, int numero, Map<String, String> v, ProductoRq p, String lote,
                              Integer cantidad, List<String> errores) {
         db.insertar("""
@@ -258,6 +301,12 @@ public class ImportacionService {
                 "cantidad", cantidad, "errores", errores.isEmpty() ? null : String.join(" · ", errores)));
     }
 
+    /**
+     * @param valor texto.
+     * @param campo nombre del campo.
+     * @param errores lista de errores.
+     * @return número o null.
+     */
     private static BigDecimal decimal(String valor, String campo, List<String> errores) {
         if (valor == null || valor.isBlank()) {
             return null;
@@ -274,6 +323,12 @@ public class ImportacionService {
         }
     }
 
+    /**
+     * @param valor texto.
+     * @param campo nombre del campo.
+     * @param errores lista de errores.
+     * @return entero o null.
+     */
     private static Integer entero(String valor, String campo, List<String> errores) {
         if (valor == null || valor.isBlank()) {
             return "cantidad".equals(campo) ? 0 : null;
@@ -286,6 +341,11 @@ public class ImportacionService {
         }
     }
 
+    /**
+     * @param valor texto (si/no, true/false, 1/0).
+     * @param errores lista de errores.
+     * @return valor o null.
+     */
     private static Boolean booleano(String valor, List<String> errores) {
         if (valor == null || valor.isBlank()) {
             return true;
@@ -300,6 +360,10 @@ public class ImportacionService {
         };
     }
 
+    /**
+     * @param valor texto.
+     * @return fecha o null si no es válida.
+     */
     private static LocalDate fechaSegura(String valor) {
         try {
             return Validar.fecha(valor, "fecha", false);
@@ -308,6 +372,10 @@ public class ImportacionService {
         }
     }
 
+    /**
+     * @param valor número.
+     * @return número limitado al rango de la columna.
+     */
     private static BigDecimal acotar(BigDecimal valor) {
         if (valor == null || valor.abs().compareTo(new BigDecimal("999999999999")) > 0) {
             return null;
@@ -315,6 +383,11 @@ public class ImportacionService {
         return valor.setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
+    /**
+     * @param valor texto.
+     * @param maximo longitud máxima.
+     * @return texto recortado.
+     */
     private static String corto(String valor, int maximo) {
         if (valor == null || valor.isBlank()) {
             return null;
@@ -322,10 +395,18 @@ public class ImportacionService {
         return valor.length() > maximo ? valor.substring(0, maximo) : valor;
     }
 
+    /**
+     * @param valor texto.
+     * @return null si está vacío.
+     */
     private static String vacio(String valor) {
         return valor == null || valor.isBlank() ? null : valor;
     }
 
+    /**
+     * @param valor valor.
+     * @return texto o cadena vacía.
+     */
     private static String texto(Object valor) {
         return valor == null ? null : valor.toString();
     }

@@ -15,6 +15,9 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiConfig {
 
+    /**
+     * @return definición OpenAPI con la información de la API y el esquema de seguridad Bearer (JWT).
+     */
     @Bean
     public OpenAPI clinicaOpenApi() {
         return new OpenAPI()

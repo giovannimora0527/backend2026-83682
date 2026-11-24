@@ -11,9 +11,14 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Controlador REST del módulo: implementa {@link MedicoApi} (rutas, permisos y documentación Swagger)
+ * y delega la lógica en la capa de servicio.
+ */
 @RestController
 public class MedicoApiController implements MedicoApi {
 
+    /** Consulta SQL base reutilizada por los métodos del controlador. */
     private static final String CONSULTA = """
             SELECT m.id, m.activo, m.activo AS estado, m.tipo_documento AS tipoDocumento,
                    m.numero_documento AS numeroDocumento, m.nombres, m.apellidos, m.telefono,
@@ -22,22 +27,31 @@ public class MedicoApiController implements MedicoApi {
             FROM medico m JOIN especializacion e ON e.id = m.especializacion_id
             """;
 
+    /** Dependencia inyectada por constructor: db. */
     private final Db db;
 
+    /**
+     * Crea el controlador con sus dependencias (inyección por constructor).
+     *
+     * @param db dependencia db.
+     */
     public MedicoApiController(Db db) {
         this.db = db;
     }
 
+    /** {@inheritDoc} */
     @Override
     public ResponseEntity<List<Map<String, Object>>> listar() {
         return ResponseEntity.ok(db.lista(CONSULTA + " ORDER BY m.apellidos, m.nombres"));
     }
 
+    /** {@inheritDoc} */
     @Override
     public ResponseEntity<List<Map<String, Object>>> disponibles() {
         return ResponseEntity.ok(db.lista(CONSULTA + " WHERE m.activo = 1 ORDER BY m.apellidos, m.nombres"));
     }
 
+    /** {@inheritDoc} */
     @Override
     @Transactional
     public ResponseEntity<Map<String, Object>> crear(MedicoRq datos) {
@@ -50,6 +64,7 @@ public class MedicoApiController implements MedicoApi {
         return ResponseEntity.ok(db.uno(CONSULTA + " WHERE m.id = :id", Db.p("id", id)));
     }
 
+    /** {@inheritDoc} */
     @Override
     @Transactional
     public ResponseEntity<Map<String, Object>> actualizar(long id, MedicoRq datos) {
@@ -65,6 +80,13 @@ public class MedicoApiController implements MedicoApi {
         return ResponseEntity.ok(db.uno(CONSULTA + " WHERE m.id = :id", Db.p("id", id)));
     }
 
+    /**
+     * Valida los datos del médico (documento y tarjeta profesional únicos, especialización existente).
+     *
+     * @param d datos recibidos.
+     * @param id médico que se actualiza, o null si es nuevo.
+     * @return parámetros listos para la sentencia SQL.
+     */
     private Map<String, Object> validar(MedicoRq d, Long id) {
         if (d == null) {
             throw new BadRequestException("Los datos del médico son obligatorios.");

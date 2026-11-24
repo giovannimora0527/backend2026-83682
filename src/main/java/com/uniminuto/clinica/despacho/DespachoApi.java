@@ -23,15 +23,30 @@ import java.util.Map;
 @RequestMapping("/despacho")
 public interface DespachoApi {
 
+    /** Lote y cantidad elegidos para entregar un medicamento de la fórmula. */
     record SeleccionLote(Long medicamento, Long lote, Integer cantidad) {
     }
 
+    /** Preparación de despacho: clave de idempotencia y lotes seleccionados. */
     record PrepararRq(String clave, List<SeleccionLote> lotes) {
     }
 
+    /** Motivo de la operación (obligatorio para trazabilidad). */
     record MotivoRq(String motivo) {
     }
 
+    /**
+     * Fórmulas confirmadas para despacho.
+     * <p>Filtros: número, propietario (nombre o documento), mascota, fecha de generación y estado. 50 por página.</p>
+     *
+     * @param id identificador del registro.
+     * @param propietario nombre, documento o identificador del propietario; opcional.
+     * @param mascota nombre o identificador de la mascota; opcional.
+     * @param fecha fecha a consultar (AAAA-MM-DD).
+     * @param estado estado por el que se filtra; opcional.
+     * @param pagina número de página (desde 0); opcional.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Fórmulas confirmadas para despacho",
             description = "Filtros: número, propietario (nombre o documento), mascota, fecha de generación y estado. 50 por página.")
     @GetMapping("/formulas")
@@ -42,24 +57,74 @@ public interface DespachoApi {
                                                        @RequestParam(required = false) String estado,
                                                        @RequestParam(required = false) Integer pagina);
 
+    /**
+     * Detalle: prescripción, cantidades entregadas y pendientes, lotes vigentes FEFO, .
+     *
+     * @param id identificador del registro.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Detalle: prescripción, cantidades entregadas y pendientes, lotes vigentes FEFO, "
             + "preparación vigente, entregas e historial de estados")
+    /**
+     * Detalle de una fórmula para despacho con líneas, lotes sugeridos y entregas.
+     *
+     * @param id identificador de la fórmula.
+     * @return detalle de la fórmula.
+     */
     @GetMapping("/formulas/{id}")
     ResponseEntity<Map<String, Object>> detalle(@PathVariable long id);
 
+    /**
+     * Preparar despacho: seleccionar lotes y cantidades (no afecta inventario).
+     * <p>La clave hace idempotente la solicitud. Se exige prioridad FEFO.</p>
+     *
+     * @param id identificador del registro.
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Preparar despacho: seleccionar lotes y cantidades (no afecta inventario)",
             description = "La clave hace idempotente la solicitud. Se exige prioridad FEFO.")
+    /**
+     * Prepara el despacho seleccionando lotes y cantidades por medicamento.
+     *
+     * @param id identificador de la fórmula.
+     * @param datos selección de lotes.
+     * @return plan de preparación.
+     */
     @PostMapping("/formulas/{id}/preparar")
     ResponseEntity<Map<String, Object>> preparar(@PathVariable long id, @RequestBody PrepararRq datos);
 
+    /**
+     * Cancelar el despacho de una fórmula (procedimiento autorizado con motivo).
+     *
+     * @param id identificador del registro.
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Cancelar el despacho de una fórmula (procedimiento autorizado con motivo)")
     @PostMapping("/formulas/{id}/cancelar")
     ResponseEntity<Map<String, Object>> cancelar(@PathVariable long id, @RequestBody MotivoRq datos);
 
+    /**
+     * Marcar la fórmula como pendiente por disponibilidad.
+     *
+     * @param id identificador del registro.
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Marcar la fórmula como pendiente por disponibilidad")
     @PostMapping("/formulas/{id}/disponibilidad")
     ResponseEntity<Map<String, Object>> disponibilidad(@PathVariable long id, @RequestBody MotivoRq datos);
 
+    /**
+     * Historial de despachos (log de despacho de fórmulas).
+     *
+     * @param desde fecha inicial del rango (AAAA-MM-DD).
+     * @param hasta fecha final del rango (AAAA-MM-DD).
+     * @param medicamento identificador del medicamento; opcional.
+     * @param pagina número de página (desde 0); opcional.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Historial de despachos (log de despacho de fórmulas)")
     @GetMapping("/entregas")
     ResponseEntity<List<Map<String, Object>>> entregas(@RequestParam(required = false) String desde,
@@ -67,15 +132,41 @@ public interface DespachoApi {
                                                        @RequestParam(required = false) String medicamento,
                                                        @RequestParam(required = false) Integer pagina);
 
+    /**
+     * Confirmar la entrega de una preparación.
+     * <p>Transacción: descuenta lotes, genera salidas ligadas a la fórmula y al despacho y actualiza el estado.</p>
+     *
+     * @param preparacion identificador de la preparación de despacho a confirmar.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Confirmar la entrega de una preparación",
             description = "Transacción: descuenta lotes, genera salidas ligadas a la fórmula y al despacho y actualiza el estado.")
+    /**
+     * Confirma la entrega preparada y descuenta el inventario.
+     *
+     * @param preparacion identificador del plan de preparación.
+     * @return entrega registrada.
+     */
     @PostMapping("/entregas/{preparacion}/confirmar")
     ResponseEntity<Map<String, Object>> confirmar(@PathVariable long preparacion);
 
+    /**
+     * Revertir una entrega confirmada (devuelve unidades a sus lotes con movimientos trazables).
+     *
+     * @param id identificador del registro.
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Revertir una entrega confirmada (devuelve unidades a sus lotes con movimientos trazables)")
     @PostMapping("/entregas/{id}/revertir")
     ResponseEntity<Map<String, Object>> revertir(@PathVariable long id, @RequestBody MotivoRq datos);
 
+    /**
+     * Comprobante de despacho en PDF.
+     *
+     * @param id identificador del registro.
+     * @return archivo generado (PDF o Excel) para descargar.
+     */
     @Operation(summary = "Comprobante de despacho en PDF")
     @GetMapping("/entregas/{id}/pdf")
     ResponseEntity<byte[]> pdf(@PathVariable long id);

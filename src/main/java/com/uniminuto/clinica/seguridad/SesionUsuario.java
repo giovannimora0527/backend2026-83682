@@ -13,6 +13,12 @@ package com.uniminuto.clinica.seguridad;
 public record SesionUsuario(long sesionId, long usuarioId, String username, long perfilId, String perfil,
                             Long medicoId) {
 
+    /**
+     * Indica si el perfil del usuario es alguno de los indicados.
+     *
+     * @param perfiles códigos de perfil.
+     * @return true si coincide con alguno.
+     */
     public boolean es(String... perfiles) {
         for (String p : perfiles) {
             if (p.equals(perfil)) {
@@ -22,6 +28,9 @@ public record SesionUsuario(long sesionId, long usuarioId, String username, long
         return false;
     }
 
+    /**
+     * @return true si el usuario tiene perfil ADMINISTRADOR.
+     */
     public boolean esAdmin() {
         return Perfiles.ADMINISTRADOR.equals(perfil);
     }

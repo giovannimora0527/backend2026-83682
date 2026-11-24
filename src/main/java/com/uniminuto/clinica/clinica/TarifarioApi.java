@@ -25,39 +25,87 @@ import java.util.Map;
 @RequestMapping("/tarifario")
 public interface TarifarioApi {
 
+    /** Datos de una especialidad: código, nombre, descripción y estado activo. */
     record EspecialidadRq(String codigo, String nombre, String descripcion, Boolean activo) {
     }
 
+    /** Nombre de un servicio o procedimiento de la especialidad. */
     record ServicioRq(String nombre) {
     }
 
+    /** Nueva vigencia de tarifa: valor, IVA y otros impuestos (porcentajes) y fechas de vigencia. */
     record TarifaRq(BigDecimal valor, BigDecimal iva, BigDecimal impuesto, String desde, String hasta) {
     }
 
+    /**
+     * Listar especialidades.
+     *
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Listar especialidades")
     @GetMapping("/especialidades")
     ResponseEntity<List<Map<String, Object>>> especialidades();
 
+    /**
+     * Registrar especialidad.
+     *
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Registrar especialidad")
     @PostMapping("/especialidades")
     ResponseEntity<Map<String, Object>> crearEspecialidad(@RequestBody EspecialidadRq datos);
 
+    /**
+     * Editar, activar o inactivar especialidad.
+     *
+     * @param id identificador del registro.
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Editar, activar o inactivar especialidad")
     @PutMapping("/especialidades/{id}")
     ResponseEntity<Map<String, Object>> actualizarEspecialidad(@PathVariable long id, @RequestBody EspecialidadRq datos);
 
+    /**
+     * Servicios de una especialidad.
+     *
+     * @param id identificador del registro.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Servicios de una especialidad")
     @GetMapping("/especialidades/{id}/servicios")
     ResponseEntity<List<Map<String, Object>>> servicios(@PathVariable long id);
 
+    /**
+     * Agregar servicio o procedimiento a una especialidad.
+     *
+     * @param id identificador del registro.
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Agregar servicio o procedimiento a una especialidad")
     @PostMapping("/especialidades/{id}/servicios")
     ResponseEntity<Map<String, Object>> agregarServicio(@PathVariable long id, @RequestBody ServicioRq datos);
 
+    /**
+     * Historial de tarifas de un servicio (log de tarifas).
+     *
+     * @param id identificador del registro.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Historial de tarifas de un servicio (log de tarifas)")
     @GetMapping("/servicios/{id}/tarifas")
     ResponseEntity<List<Map<String, Object>>> tarifas(@PathVariable long id);
 
+    /**
+     * Registrar nueva vigencia de tarifa.
+     * <p>Cierra la vigencia anterior; no la borra.</p>
+     *
+     * @param id identificador del registro.
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Registrar nueva vigencia de tarifa", description = "Cierra la vigencia anterior; no la borra.")
     @PostMapping("/servicios/{id}/tarifas")
     ResponseEntity<Map<String, Object>> nuevaTarifa(@PathVariable long id, @RequestBody TarifaRq datos);

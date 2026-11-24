@@ -29,14 +29,28 @@ import java.util.Map;
 @Component
 public class AutenticacionInterceptor implements HandlerInterceptor {
 
+    /** Verificación de la firma de los tokens. */
     private final JwtServicio jwt;
+    /** Acceso a la tabla session. */
     private final Db db;
 
+    /**
+     * @param jwt servicio de tokens.
+     * @param db acceso a datos.
+     */
     public AutenticacionInterceptor(JwtServicio jwt, Db db) {
         this.jwt = jwt;
         this.db = db;
     }
 
+    /**
+     * Autentica la solicitud y valida el perfil contra la anotación {@link Permitido} del endpoint.
+     *
+     * @param request solicitud HTTP.
+     * @param response respuesta HTTP.
+     * @param handler método del controlador que atenderá la solicitud.
+     * @return true para continuar; las fallas se informan con excepciones (401 o 403).
+     */
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         if ("OPTIONS".equalsIgnoreCase(request.getMethod()) || !(handler instanceof HandlerMethod metodo)) {
@@ -55,6 +69,12 @@ public class AutenticacionInterceptor implements HandlerInterceptor {
         return true;
     }
 
+    /**
+     * Valida el encabezado Authorization y obtiene la sesión activa del usuario.
+     *
+     * @param encabezado valor del encabezado Authorization (Bearer token).
+     * @return sesión del usuario autenticado.
+     */
     SesionUsuario autenticar(String encabezado) {
         if (encabezado == null || !encabezado.startsWith("Bearer ")) {
             throw new UnauthorizedException("Debes iniciar sesión.");

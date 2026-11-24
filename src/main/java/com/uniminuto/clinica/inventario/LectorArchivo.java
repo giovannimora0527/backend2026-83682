@@ -26,15 +26,25 @@ import java.util.Map;
  */
 final class LectorArchivo {
 
+    /** Número máximo de filas por archivo. */
     static final int MAXIMO_FILAS = 5000;
 
     /** Fila leída con su número en el archivo (incluye la fila de encabezados como 1). */
     record Fila(int numero, Map<String, String> valores) {
     }
 
+    /** Clase de utilidades: no se instancia. */
     private LectorArchivo() {
     }
 
+    /**
+     * Lee un CSV o XLSX validando los encabezados.
+     *
+     * @param nombre nombre del archivo.
+     * @param contenido bytes.
+     * @param encabezadosEsperados columnas requeridas.
+     * @return filas con sus valores.
+     */
     static List<Fila> leer(String nombre, byte[] contenido, List<String> encabezadosEsperados) {
         String n = nombre == null ? "" : nombre.toLowerCase(Locale.ROOT);
         List<List<String>> filas;
@@ -134,6 +144,10 @@ final class LectorArchivo {
         return filas;
     }
 
+    /**
+     * @param contenido bytes del libro.
+     * @return celdas de la primera hoja como texto.
+     */
     static List<List<String>> xlsx(byte[] contenido) {
         try (Workbook libro = WorkbookFactory.create(new ByteArrayInputStream(contenido))) {
             Sheet hoja = libro.getSheetAt(0);
@@ -158,6 +172,11 @@ final class LectorArchivo {
         }
     }
 
+    /**
+     * @param celda celda de Excel.
+     * @param formato formateador.
+     * @return valor como texto.
+     */
     private static String texto(Cell celda, DataFormatter formato) {
         if (celda == null) {
             return "";

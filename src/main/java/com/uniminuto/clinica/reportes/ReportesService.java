@@ -37,11 +37,17 @@ import java.util.function.Predicate;
 @Service
 public class ReportesService {
 
+    /** Registros por página. */
     static final int TAMANO = 50;
+    /** Máximo de filas por reporte. */
     private static final int MAXIMO = 20_000;
+    /** Reportes operativos. */
     private static final Set<String> OPERATIVOS = Set.of("CITAS_OPERATIVAS");
+    /** Reportes de inventario. */
     private static final Set<String> INVENTARIO = Set.of("EXISTENCIAS", "LOTES", "MOVIMIENTOS", "DISPENSACIONES");
+    /** Estados de cita para filtrar. */
     private static final Set<String> ESTADOS_CITA = Set.of("pendiente", "confirmada", "cancelada", "atendida", "finalizada");
+    /** Formato de moneda colombiana. */
     private static final NumberFormat COP = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-CO"));
 
     /** Definición ejecutada de un reporte. */
@@ -49,12 +55,24 @@ public class ReportesService {
                    Map<String, String> filtros) {
     }
 
+    /** Acceso a datos. */
     private final Db db;
 
+    /**
+     * @param db acceso a datos.
+     */
     public ReportesService(Db db) {
         this.db = db;
     }
 
+    /**
+     * Ejecuta un reporte y devuelve una página.
+     *
+     * @param tipo tipo de reporte.
+     * @param parametros filtros.
+     * @param paginaRq página.
+     * @return filas, columnas y totales.
+     */
     public Map<String, Object> consultar(String tipo, Map<String, String> parametros, Integer paginaRq) {
         Reporte r = ejecutar(tipo, parametros);
         int pagina = Validar.pagina(paginaRq);
@@ -73,11 +91,21 @@ public class ReportesService {
         return resultado;
     }
 
+    /**
+     * @param tipo tipo de reporte.
+     * @param parametros filtros.
+     * @return reporte en Excel.
+     */
     public byte[] excel(String tipo, Map<String, String> parametros) {
         Reporte r = ejecutar(tipo, parametros);
         return ExcelLibro.generar(r.titulo(), r.filtros(), r.columnas(), r.filas(), r.totales());
     }
 
+    /**
+     * @param tipo tipo de reporte.
+     * @param parametros filtros.
+     * @return reporte en PDF.
+     */
     public byte[] pdf(String tipo, Map<String, String> parametros) {
         Reporte r = ejecutar(tipo, parametros);
         PdfDocumento pdf = new PdfDocumento(r.titulo(), r.columnas().size() > 6);
@@ -112,6 +140,13 @@ public class ReportesService {
 
     // ------------------------------------------------------------------ Ejecución
 
+    /**
+     * Valida permisos y filtros y ejecuta el reporte.
+     *
+     * @param tipoRq tipo de reporte.
+     * @param p filtros.
+     * @return reporte completo.
+     */
     Reporte ejecutar(String tipoRq, Map<String, String> p) {
         String tipo = tipoRq == null ? "" : tipoRq.trim().toUpperCase();
         SesionUsuario s = SesionActual.obtener();
@@ -231,6 +266,7 @@ public class ReportesService {
 
     // ------------------------------------------------------------------ Financieros
 
+    /** Filtro común de facturas por fecha y estado. */
     private static final String FILTRO_FACTURA = """
             f.fecha_emision >= :desde AND f.fecha_emision < :hasta
               AND (:medico IS NULL OR f.medico_id = :medico)
@@ -239,6 +275,7 @@ public class ReportesService {
               AND (:propietario IS NULL OR f.cliente_id = :propietario)
             """;
 
+    /** Subconsulta de líneas por factura. */
     private static final String LINEAS_POR_FACTURA = """
             (SELECT factura_id,
                     SUM(CASE WHEN servicio_id IS NOT NULL THEN total ELSE 0 END) AS servicios,
@@ -246,6 +283,10 @@ public class ReportesService {
              FROM factura_linea GROUP BY factura_id) l
             """;
 
+    /**
+     * @param f filtros.
+     * @return resumen financiero por día.
+     */
     private Reporte financiero(Filtros f) {
         String formato = switch (f.agrupacion) {
             case "MES" -> "%Y-%m";
@@ -283,6 +324,10 @@ public class ReportesService {
         return new Reporte("Resumen financiero de ingresos", c, filas, totales(filas, c, null), f.descripcion);
     }
 
+    /**
+     * @param f filtros.
+     * @return listado de facturas.
+     */
     private Reporte facturas(Filtros f) {
         f.estadoEn(Set.of("PENDIENTE_PAGO", "PAGO_PARCIAL", "PAGADA", "ANULADA"));
         List<Map<String, Object>> filas = db.lista("""
@@ -306,6 +351,10 @@ public class ReportesService {
         return new Reporte("Facturas y saldos al cierre (totales sin facturas anuladas)", c, filas, t, f.descripcion);
     }
 
+    /**
+     * @param f filtros.
+     * @return pagos recibidos.
+     */
     private Reporte pagos(Filtros f) {
         f.estadoEn(Set.of("EFECTIVO", "TARJETA", "TRANSFERENCIA", "OTRO"));
         List<Map<String, Object>> filas = db.lista("""
@@ -330,6 +379,12 @@ public class ReportesService {
         return new Reporte("Pagos recibidos", c, filas, t, f.descripcion);
     }
 
+    /**
+     * @param f filtros.
+     * @param campo campo de agrupación.
+     * @param titulo título del reporte.
+     * @return ventas agrupadas.
+     */
     private Reporte agrupado(Filtros f, String campo, String titulo) {
         List<Map<String, Object>> filas = db.lista("SELECT f." + campo + " AS grupo, " + """
                        COUNT(*) AS facturas,
@@ -348,6 +403,10 @@ public class ReportesService {
         return new Reporte(titulo, c, filas, totales(filas, c, null), f.descripcion);
     }
 
+    /**
+     * @param f filtros.
+     * @return ventas por concepto.
+     */
     private Reporte conceptos(Filtros f) {
         f.estadoEn(Set.of("SERVICIO", "MEDICAMENTO"));
         List<Map<String, Object>> filas = db.lista("""
@@ -379,6 +438,10 @@ public class ReportesService {
 
     // ------------------------------------------------------------------ Inventario
 
+    /**
+     * @param f filtros.
+     * @return existencias actuales.
+     */
     private Reporte existencias(Filtros f) {
         f.estadoEn(Set.of("agotado", "minimo", "vencido", "proximo"));
         List<Map<String, Object>> filas = db.lista("""
@@ -430,6 +493,10 @@ public class ReportesService {
         return new Reporte("Existencias actuales y valoración del inventario", c, resultado, t, f.descripcion);
     }
 
+    /**
+     * @param f filtros (fecha de corte).
+     * @return existencias a una fecha.
+     */
     private Reporte existenciasHistoricas(Filtros f) {
         List<Map<String, Object>> filas = db.lista("""
                 SELECT m.codigo, m.nombre, l.numero AS lote, l.fecha_vence,
@@ -453,6 +520,10 @@ public class ReportesService {
         return new Reporte("Existencias históricas por lote", c, filas, totales(filas, c, null), f.descripcion);
     }
 
+    /**
+     * @param f filtros.
+     * @return lotes y vencimientos.
+     */
     private Reporte lotes(Filtros f) {
         List<Map<String, Object>> filas = db.lista("""
                 SELECT m.codigo, m.nombre, l.id AS lote_id, l.numero AS lote, l.fecha_ingreso, l.fecha_vence, l.cantidad_inicial,
@@ -476,6 +547,10 @@ public class ReportesService {
         return new Reporte("Inventario por lote", c, filas, t, f.descripcion);
     }
 
+    /**
+     * @param f filtros.
+     * @return movimientos de inventario.
+     */
     private Reporte movimientos(Filtros f) {
         f.estadoEn(Set.of("ENTRADA", "SALIDA", "AJUSTE"));
         List<Map<String, Object>> filas = db.lista("""
@@ -506,6 +581,10 @@ public class ReportesService {
         return new Reporte("Entradas y salidas de inventario", c, filas, t, f.descripcion);
     }
 
+    /**
+     * @param f filtros.
+     * @return medicamentos dispensados.
+     */
     private Reporte dispensaciones(Filtros f) {
         f.estadoEn(Set.of("VIGENTE", "REVERTIDA"));
         List<Map<String, Object>> filas = db.lista("""
@@ -546,6 +625,7 @@ public class ReportesService {
 
     // ------------------------------------------------------------------ Gestión médica
 
+    /** Filtro común de citas por fecha, médico y estado. */
     private static final String FILTRO_CITA = """
             c.fecha_hora >= :desde AND c.fecha_hora < :hasta
               AND (:medico IS NULL OR c.medico_id = :medico)
@@ -555,6 +635,10 @@ public class ReportesService {
               AND (:estado IS NULL OR c.estado = :estado)
             """;
 
+    /**
+     * @param f filtros.
+     * @return citas.
+     */
     private Reporte citas(Filtros f) {
         f.estadoEn(ESTADOS_CITA);
         List<Map<String, Object>> filas = db.lista("""
@@ -581,6 +665,10 @@ public class ReportesService {
         return new Reporte("Gestión médica de citas", c, filas, t, f.descripcion);
     }
 
+    /**
+     * @param f filtros.
+     * @return consultas por médico.
+     */
     private Reporte consultas(Filtros f) {
         f.estadoEn(ESTADOS_CITA);
         List<Map<String, Object>> filas = db.lista("""
@@ -614,6 +702,10 @@ public class ReportesService {
         return new Reporte("Consultas por veterinario y especialidad", c, filas, t, f.descripcion);
     }
 
+    /**
+     * @param f filtros.
+     * @return atenciones.
+     */
     private Reporte atenciones(Filtros f) {
         f.estadoEn(ESTADOS_CITA);
         List<Map<String, Object>> filas = db.lista("""
@@ -642,6 +734,10 @@ public class ReportesService {
         return new Reporte("Atenciones finalizadas (mascotas atendidas por período)", c, filas, t, f.descripcion);
     }
 
+    /**
+     * @param f filtros.
+     * @return citas operativas del día.
+     */
     private Reporte operativas(Filtros f) {
         f.estadoEn(ESTADOS_CITA);
         List<Map<String, Object>> filas = db.lista("""
@@ -665,6 +761,12 @@ public class ReportesService {
 
     // ------------------------------------------------------------------ Utilidades
 
+    /**
+     * @param clave clave del dato.
+     * @param titulo título.
+     * @param formato formato.
+     * @return definición de columna.
+     */
     private static Columna col(String clave, String titulo, Formato formato) {
         return new Columna(clave, titulo, formato);
     }
@@ -683,6 +785,12 @@ public class ReportesService {
         return t;
     }
 
+    /**
+     * @param filas filas.
+     * @param clave columna a sumar.
+     * @param incluir filtro de filas.
+     * @return suma.
+     */
     static BigDecimal suma(List<Map<String, Object>> filas, String clave, Predicate<Map<String, Object>> incluir) {
         BigDecimal s = BigDecimal.ZERO;
         for (Map<String, Object> f : filas) {
@@ -693,6 +801,11 @@ public class ReportesService {
         return s;
     }
 
+    /**
+     * @param valor valor.
+     * @param formato formato.
+     * @return texto para el PDF.
+     */
     private static String formatear(Object valor, Formato formato) {
         if (valor == null) {
             return "—";

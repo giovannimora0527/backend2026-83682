@@ -15,28 +15,53 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import java.util.List;
 import java.util.Map;
 
+/** Contrato REST del catálogo de médicos veterinarios. */
 @Tag(name = "Médicos", description = "Médicos veterinarios")
 @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
 @RequestMapping("/medico")
 public interface MedicoApi {
 
+    /** Datos de un médico veterinario, su especialidad y el usuario del sistema asociado (opcional). */
     record MedicoRq(String tipoDocumento, String numeroDocumento, String nombres, String apellidos, String telefono,
                     String registroProfesional, Long especializacionId, Long usuarioId, Boolean activo) {
     }
 
+    /**
+     * Listar médicos con su especialidad.
+     *
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Listar médicos con su especialidad")
     @GetMapping("/listar")
     ResponseEntity<List<Map<String, Object>>> listar();
 
+    /**
+     * Listar médicos activos (asignables a citas).
+     *
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Listar médicos activos (asignables a citas)")
     @GetMapping("/listar-disponibles")
     ResponseEntity<List<Map<String, Object>>> disponibles();
 
+    /**
+     * Registrar médico.
+     *
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Registrar médico")
     @Permitido(Perfiles.ADMINISTRADOR)
     @PostMapping("/crear")
     ResponseEntity<Map<String, Object>> crear(@RequestBody MedicoRq datos);
 
+    /**
+     * Actualizar médico.
+     *
+     * @param id identificador del registro.
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Actualizar médico")
     @Permitido(Perfiles.ADMINISTRADOR)
     @PutMapping("/actualizar/{id}")

@@ -22,20 +22,35 @@ import java.util.Map;
 @Service
 public class TarifarioService {
 
+    /** Consulta base de especialidades con su número de servicios. */
     private static final String ESPECIALIDAD = """
             SELECT id, codigo_especializacion AS codigo, nombre, descripcion, activo FROM especializacion
             """;
 
+    /** Acceso a datos. */
     private final Db db;
 
+    /**
+     * @param db acceso a datos.
+     */
     public TarifarioService(Db db) {
         this.db = db;
     }
 
+    /**
+     * @return especialidades del tarifario.
+     */
     public List<Map<String, Object>> especialidades() {
         return db.lista(ESPECIALIDAD + " ORDER BY nombre");
     }
 
+    /**
+     * Crea o actualiza una especialidad.
+     *
+     * @param id especialidad a actualizar, o null para crear.
+     * @param d datos.
+     * @return especialidad guardada.
+     */
     @Transactional
     public Map<String, Object> guardarEspecialidad(Long id, TarifarioApi.EspecialidadRq d) {
         if (d == null) {
@@ -64,6 +79,10 @@ public class TarifarioService {
         return db.uno(ESPECIALIDAD + " WHERE id = :id", Db.p("id", id));
     }
 
+    /**
+     * @param especialidad identificador de la especialidad.
+     * @return servicios con su tarifa vigente.
+     */
     public List<Map<String, Object>> servicios(long especialidad) {
         db.requerido("SELECT id FROM especializacion WHERE id = :id", Db.p("id", especialidad), "La especialidad no existe.");
         return db.lista("""
@@ -72,6 +91,13 @@ public class TarifarioService {
                 """, Db.p("e", especialidad));
     }
 
+    /**
+     * Agrega un servicio a la especialidad.
+     *
+     * @param especialidad identificador de la especialidad.
+     * @param nombreRq nombre del servicio.
+     * @return servicio creado.
+     */
     @Transactional
     public Map<String, Object> agregarServicio(long especialidad, String nombreRq) {
         db.requerido("SELECT id FROM especializacion WHERE id = :id", Db.p("id", especialidad), "La especialidad no existe.");
@@ -86,6 +112,10 @@ public class TarifarioService {
                 Db.p("id", id));
     }
 
+    /**
+     * @param servicio identificador del servicio.
+     * @return historial de tarifas del servicio.
+     */
     public List<Map<String, Object>> tarifas(long servicio) {
         db.requerido("SELECT id FROM servicio_clinico WHERE id = :id", Db.p("id", servicio), "El servicio no existe.");
         return db.lista("""

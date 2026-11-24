@@ -24,30 +24,65 @@ import java.util.Map;
 @RequestMapping("/facturacion")
 public interface FacturacionApi {
 
+    /** Descuento global (solo ADMINISTRADOR) y su motivo para la vista previa de la factura. */
     record PreviaRq(String descuento, String motivo) {
     }
 
+    /** Emisión de factura: clave de idempotencia, huella de la vista previa, descuento y motivo. */
     record EmitirRq(String clave, String previa, String descuento, String motivo) {
     }
 
+    /** Pago de factura: clave de idempotencia, importe, saldo esperado, método y referencia. */
     record PagoRq(String clave, String importe, BigDecimal saldoEsperado, String metodo, String referencia) {
     }
 
+    /** Motivo de la operación (obligatorio para trazabilidad). */
     record MotivoRq(String motivo) {
     }
 
+    /**
+     * Atenciones finalizadas pendientes de facturar.
+     *
+     * @param pagina número de página (desde 0); opcional.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Atenciones finalizadas pendientes de facturar")
     @GetMapping("/atenciones")
     ResponseEntity<List<Map<String, Object>>> elegibles(@RequestParam(required = false) Integer pagina);
 
+    /**
+     * Vista previa de la factura con huella de importes.
+     *
+     * @param id identificador del registro.
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Vista previa de la factura con huella de importes")
     @PostMapping("/atenciones/{id}/previa")
     ResponseEntity<Map<String, Object>> previa(@PathVariable long id, @RequestBody PreviaRq datos);
 
+    /**
+     * Emitir factura (idempotente por clave; exige la huella de la vista previa).
+     *
+     * @param id identificador del registro.
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Emitir factura (idempotente por clave; exige la huella de la vista previa)")
     @PostMapping("/atenciones/{id}/facturas")
     ResponseEntity<Map<String, Object>> emitir(@PathVariable long id, @RequestBody EmitirRq datos);
 
+    /**
+     * Historial de facturación por fechas, propietario, mascota y estado.
+     *
+     * @param desde fecha inicial del rango (AAAA-MM-DD).
+     * @param hasta fecha final del rango (AAAA-MM-DD).
+     * @param propietario nombre, documento o identificador del propietario; opcional.
+     * @param mascota nombre o identificador de la mascota; opcional.
+     * @param estado estado por el que se filtra; opcional.
+     * @param pagina número de página (desde 0); opcional.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Historial de facturación por fechas, propietario, mascota y estado")
     @GetMapping("/facturas")
     ResponseEntity<List<Map<String, Object>>> listar(@RequestParam(required = false) String desde,
@@ -57,19 +92,45 @@ public interface FacturacionApi {
                                                      @RequestParam(required = false) String estado,
                                                      @RequestParam(required = false) Integer pagina);
 
+    /**
+     * Detalle de factura: líneas, pagos e historial de estados.
+     *
+     * @param id identificador del registro.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Detalle de factura: líneas, pagos e historial de estados")
     @GetMapping("/facturas/{id}")
     ResponseEntity<Map<String, Object>> detalle(@PathVariable long id);
 
+    /**
+     * Registrar pago (total o parcial).
+     *
+     * @param id identificador del registro.
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Registrar pago (total o parcial)")
     @PostMapping("/facturas/{id}/pagos")
     ResponseEntity<Map<String, Object>> pagar(@PathVariable long id, @RequestBody PagoRq datos);
 
+    /**
+     * Anular factura (procedimiento controlado; conserva el histórico).
+     *
+     * @param id identificador del registro.
+     * @param datos datos enviados en el cuerpo de la solicitud.
+     * @return respuesta HTTP con el resultado en formato JSON.
+     */
     @Operation(summary = "Anular factura (procedimiento controlado; conserva el histórico)")
     @Permitido(Perfiles.ADMINISTRADOR)
     @PostMapping("/facturas/{id}/anular")
     ResponseEntity<Map<String, Object>> anular(@PathVariable long id, @RequestBody MotivoRq datos);
 
+    /**
+     * Factura en PDF.
+     *
+     * @param id identificador del registro.
+     * @return archivo generado (PDF o Excel) para descargar.
+     */
     @Operation(summary = "Factura en PDF")
     @GetMapping("/facturas/{id}/pdf")
     ResponseEntity<byte[]> pdf(@PathVariable long id);

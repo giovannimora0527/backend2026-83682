@@ -22,12 +22,21 @@ import org.springframework.stereotype.Service;
 @Service
 public class CorreoService {
 
+    /** Registro de envíos y errores de correo. */
     private static final Logger LOG = LoggerFactory.getLogger(CorreoService.class);
 
+    /** Emisor SMTP (opcional si no hay servidor configurado). */
     private final ObjectProvider<JavaMailSender> correo;
+    /** Servidor SMTP configurado (MAIL_HOST). */
     private final String host;
+    /** Dirección del remitente (MAIL_FROM). */
     private final String remitente;
 
+    /**
+     * @param correo proveedor del emisor SMTP.
+     * @param host servidor SMTP.
+     * @param remitente dirección del remitente.
+     */
     public CorreoService(ObjectProvider<JavaMailSender> correo, @Value("${spring.mail.host:}") String host,
                          @Value("${clinica.correo.remitente}") String remitente) {
         this.correo = correo;
@@ -62,6 +71,15 @@ public class CorreoService {
         }
     }
 
+    /**
+     * Construye el cuerpo HTML del correo.
+     *
+     * @param usuario nombre de usuario.
+     * @param codigo código.
+     * @param recuperacion true si es recuperación de contraseña.
+     * @param minutos vigencia.
+     * @return HTML del mensaje.
+     */
     private static String html(String usuario, String codigo, boolean recuperacion, int minutos) {
         String accion = recuperacion ? "restablecer tu contraseña" : "completar tu inicio de sesión";
         return """
