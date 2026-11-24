@@ -43,6 +43,7 @@ public interface TarifarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Listar especialidades")
+    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
     @GetMapping("/especialidades")
     ResponseEntity<List<Map<String, Object>>> especialidades();
 
@@ -74,6 +75,7 @@ public interface TarifarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Servicios de una especialidad")
+    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
     @GetMapping("/especialidades/{id}/servicios")
     ResponseEntity<List<Map<String, Object>>> servicios(@PathVariable long id);
 
@@ -95,6 +97,7 @@ public interface TarifarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Historial de tarifas de un servicio (log de tarifas)")
+    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
     @GetMapping("/servicios/{id}/tarifas")
     ResponseEntity<List<Map<String, Object>>> tarifas(@PathVariable long id);
 

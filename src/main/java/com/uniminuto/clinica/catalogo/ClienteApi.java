@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -101,4 +102,15 @@ public interface ClienteApi {
     @Permitido(Perfiles.ADMINISTRADOR)
     @DeleteMapping("/{id}")
     ResponseEntity<Void> archivar(@PathVariable long id);
+
+    /**
+     * Reactivar un cliente archivado. Sus mascotas permanecen inactivas hasta que se activen una a una.
+     *
+     * @param id identificador del cliente.
+     * @return respuesta HTTP con el cliente reactivado.
+     */
+    @Operation(summary = "Reactivar cliente archivado")
+    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PatchMapping("/{id}/reactivar")
+    ResponseEntity<Map<String, Object>> reactivar(@PathVariable long id);
 }

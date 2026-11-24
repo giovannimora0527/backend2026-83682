@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -66,4 +67,21 @@ public interface MascotaApi {
     @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
     @PutMapping("/actualizar/{id}")
     ResponseEntity<Map<String, Object>> actualizar(@PathVariable int id, @RequestBody MascotaRq datos);
+
+    /** Nuevo estado de la mascota. */
+    record EstadoRq(Boolean activo) {
+    }
+
+    /**
+     * Activar o inactivar una mascota. No se puede inactivar con citas futuras reservadas
+     * ni activar si su propietario está archivado.
+     *
+     * @param id identificador de la mascota.
+     * @param datos nuevo estado.
+     * @return respuesta HTTP con la mascota actualizada.
+     */
+    @Operation(summary = "Activar o inactivar mascota")
+    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PatchMapping("/{id}/estado")
+    ResponseEntity<Map<String, Object>> cambiarEstado(@PathVariable int id, @RequestBody EstadoRq datos);
 }

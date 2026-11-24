@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -15,7 +16,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import java.util.List;
 import java.util.Map;
 
-/** Contrato REST del catálogo de médicos veterinarios. */
+/**
+ * Contrato REST del catálogo de médicos veterinarios.
+ *
+ * <p>Reglas: documento y registro profesional únicos, especialidad activa, usuario asociado con perfil
+ * Médico y sin otro médico, y no se puede inactivar a un médico con citas futuras reservadas.</p>
+ */
 @Tag(name = "Médicos", description = "Médicos veterinarios")
 @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
 @RequestMapping("/medico")
@@ -66,4 +72,21 @@ public interface MedicoApi {
     @Permitido(Perfiles.ADMINISTRADOR)
     @PutMapping("/actualizar/{id}")
     ResponseEntity<Map<String, Object>> actualizar(@PathVariable long id, @RequestBody MedicoRq datos);
+
+    /** Nuevo estado del médico. */
+    record EstadoRq(Boolean activo) {
+    }
+
+    /**
+     * Activar o inactivar un médico. No se puede inactivar si tiene citas futuras pendientes,
+     * programadas o confirmadas; primero deben reasignarse o cancelarse.
+     *
+     * @param id identificador del médico.
+     * @param datos nuevo estado.
+     * @return respuesta HTTP con el médico actualizado.
+     */
+    @Operation(summary = "Activar o inactivar médico")
+    @Permitido(Perfiles.ADMINISTRADOR)
+    @PatchMapping("/{id}/estado")
+    ResponseEntity<Map<String, Object>> cambiarEstado(@PathVariable long id, @RequestBody EstadoRq datos);
 }

@@ -115,14 +115,27 @@ public class ClienteApiController implements ClienteApi {
     public ResponseEntity<Void> archivar(long id) {
         consultar(id);
         if (db.existe("""
-                SELECT 1 FROM cita WHERE cliente_id = :id AND estado IN ('pendiente', 'confirmada') AND fecha_hora >= :ahora
+                SELECT 1 FROM cita WHERE cliente_id = :id AND estado IN ('pendiente', 'programada', 'confirmada') AND fecha_hora >= :ahora
                 """, Db.p("id", id, "ahora", Tiempo.ahora()))) {
-            throw new ConflictException("El cliente tiene citas pendientes o confirmadas. Cancélalas antes de archivarlo.");
+            throw new ConflictException("El cliente tiene citas futuras reservadas (pendientes, programadas o confirmadas). Cancélalas antes de archivarlo.");
         }
         db.ejecutar("UPDATE cliente SET activo = 0 WHERE cliente_id = :id", Db.p("id", id));
         db.ejecutar("UPDATE mascota SET activo = 0, fecha_modificacion = :f WHERE cliente_id = :id",
                 Db.p("id", id, "f", Tiempo.ahora()));
         return ResponseEntity.noContent().build();
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    @Transactional
+    public ResponseEntity<Map<String, Object>> reactivar(long id) {
+        Map<String, Object> c = db.requerido("SELECT activo FROM cliente WHERE cliente_id = :id FOR UPDATE",
+                Db.p("id", id), "El cliente no existe.");
+        if (Validar.bool(c, "activo")) {
+            throw new ConflictException("El cliente ya está activo.");
+        }
+        db.ejecutar("UPDATE cliente SET activo = 1 WHERE cliente_id = :id", Db.p("id", id));
+        return consultar(id);
     }
 
     /**
