@@ -285,17 +285,6 @@ Rol: ADMINISTRADOR. Cuerpo `{ "activo": false }`. `GET /especializacion/listar` 
   "data": { "id": 2, "nombre": "Cirugía veterinaria", "descripcion": "Procedimientos quirúrgicos", "codigoEspecializacion": "VET_CIR", "activo": false } }
 ```
 
-## `GET /factura/cliente/{clienteId}` y `GET /factura/mascota/{mascotaId}`
-
-Rol: ADMINISTRADOR, SECRETARIA. Lista vacía mientras no haya facturas; 404 si el cliente o la mascota no existe.
-
-```json
-[{ "id": 1, "numero": "FV-000001", "fecha": "2026-11-16T10:00:00", "citaId": 5, "clienteId": 1, "clienteNombre": "Juan Pérez",
-   "clienteDocumento": "9000000001", "mascotaId": 3, "mascotaNombre": "Luna", "medicoNombre": "Sofía Ramírez",
-   "especialidadNombre": "Medicina general veterinaria", "subtotal": 50000.00, "descuentos": 0.00, "iva": 9500.00,
-   "total": 59500.00, "pagado": 0.00, "saldo": 59500.00, "estado": "PENDIENTE", "observacion": null }]
-```
-
 # Tarifas y configuración
 
 Lectura: cualquier usuario autenticado. Escritura: ADMINISTRADOR. Crear, editar y cambiar estado devuelven `{ status, message, data }` con el mismo objeto del listado.
@@ -924,6 +913,208 @@ Arreglo como el `data` de confirmar, el más reciente primero, sin preparaciones
 ## `GET /despacho/{despachoId}/comprobante/pdf`
 
 Solo de despachos confirmados o revertidos (409 si no). Descarga `despacho_<numero>.pdf`.
+
+# Facturación
+
+Rol: ADMINISTRADOR y SECRETARIA; anular, solo ADMINISTRADOR.
+
+## `GET /factura/citas-pendientes`
+
+Citas ATENDIDAS, con atención finalizada y sin factura vigente.
+
+```json
+[
+  {
+    "citaId": 8,
+    "fecha": "2026-11-24T14:36:15",
+    "clienteId": 1,
+    "clienteNombre": "Juan Pérez",
+    "clienteDocumento": "9000000001",
+    "mascotaId": 1,
+    "mascotaNombre": "Firulais",
+    "medicoNombre": "Sofía Ramírez",
+    "motivo": "Control",
+    "despachoPendiente": true
+  }
+]
+```
+
+## `GET /factura/previsualizar/{citaId}`
+
+Servicios con su tarifa vigente y medicamentos dispensados con el precio congelado en el despacho. `topeDescuento` es el máximo del usuario que consulta. 409 si la cita no se puede facturar.
+
+```json
+{
+  "citaId": 8,
+  "fechaCita": "2026-11-24T14:36:15",
+  "clienteId": 1,
+  "clienteNombre": "Juan Pérez",
+  "clienteDocumento": "9000000001",
+  "mascotaId": 1,
+  "mascotaNombre": "Firulais",
+  "medicoNombre": "Sofía Ramírez",
+  "especialidadNombre": "Medicina general veterinaria",
+  "detalles": [
+    {
+      "itemRef": "SERVICIO-1",
+      "tipoItem": "SERVICIO",
+      "descripcion": "Consulta general",
+      "cantidad": 1,
+      "precioUnitario": 50000.0,
+      "subtotal": 50000.0,
+      "porcentajeDescuento": 0,
+      "valorDescuento": 0.0,
+      "motivoDescuento": null,
+      "porcentajeIva": 19.0,
+      "valorIva": 9500.0,
+      "total": 59500.0
+    },
+    {
+      "itemRef": "MEDICAMENTO-2",
+      "tipoItem": "MEDICAMENTO",
+      "descripcion": "Jeringa 5 ml",
+      "cantidad": 2,
+      "precioUnitario": 900.0,
+      "subtotal": 1800.0,
+      "porcentajeDescuento": 0,
+      "valorDescuento": 0.0,
+      "motivoDescuento": null,
+      "porcentajeIva": 19.0,
+      "valorIva": 342.0,
+      "total": 2142.0
+    }
+  ],
+  "subtotal": 139300.0,
+  "descuentos": 0.0,
+  "iva": 25042.0,
+  "total": 164342.0,
+  "topeDescuento": 10.0,
+  "advertencias": [
+    "Hay medicamentos pendientes de despacho: los no despachados no se facturan."
+  ]
+}
+```
+
+## `POST /factura/generar`
+
+Cuerpo: `{ "citaId", "observacion", "descuentos": [{ "itemRef", "porcentaje", "motivo" }] }`. `descuentos` es opcional. 409 si ya tiene factura, si un servicio no tiene tarifa o si el descuento supera el tope (con `detalles`, por ejemplo `descuentos[0].porcentaje`). `data` es la factura completa, igual que `GET /factura/{id}`; en los listados no vienen `detalles` ni `pagos`.
+
+```json
+{
+  "status": 200,
+  "message": "Factura generada correctamente.",
+  "data": {
+    "id": 1,
+    "numero": "FV-000001",
+    "fecha": "2026-11-24T14:36:16",
+    "citaId": 8,
+    "clienteId": 1,
+    "clienteNombre": "Juan Pérez",
+    "clienteDocumento": "CC 9000000001",
+    "mascotaId": 1,
+    "mascotaNombre": "Firulais",
+    "medicoNombre": "Sofía Ramírez",
+    "especialidadNombre": "Medicina general veterinaria",
+    "subtotal": 139300.0,
+    "descuentos": 5000.0,
+    "iva": 24092.0,
+    "total": 158392.0,
+    "pagado": 0.0,
+    "saldo": 158392.0,
+    "estado": "PENDIENTE",
+    "observacion": "Gracias",
+    "usuario": "secretaria",
+    "fechaAnulacion": null,
+    "usuarioAnulacion": null,
+    "motivoAnulacion": null,
+    "detalles": [
+      {
+        "itemRef": "SERVICIO-1",
+        "tipoItem": "SERVICIO",
+        "descripcion": "Consulta general",
+        "cantidad": 1,
+        "precioUnitario": 50000.0,
+        "subtotal": 50000.0,
+        "porcentajeDescuento": 10,
+        "valorDescuento": 5000.0,
+        "motivoDescuento": "Cliente frecuente",
+        "porcentajeIva": 19.0,
+        "valorIva": 8550.0,
+        "total": 53550.0
+      }
+    ],
+    "pagos": []
+  }
+}
+```
+
+## `POST /factura/{id}/pagos`
+
+Cuerpo: `{ "valor", "medioPago", "referencia" }`. `data` es la factura completa actualizada. 409 si supera el saldo o la factura está PAGADA o ANULADA.
+
+## `GET /factura/{id}/pagos`
+
+```json
+[
+  {
+    "id": 1,
+    "fecha": "2026-11-24T14:36:17",
+    "valor": 47517.6,
+    "medioPago": "TARJETA_DEBITO",
+    "referencia": "T-5",
+    "usuario": "secretaria",
+    "anulado": false
+  }
+]
+```
+
+## `POST /factura/{id}/anular`
+
+Cuerpo `{ "motivo" }`. `data` es la factura completa; `message` avisa si hay pagos que se conservan.
+
+```json
+{
+  "status": 200,
+  "message": "Factura anulada. Tiene pagos por $ 142.552,80 que se conservan y debe gestionar con el propietario.",
+  "data": {
+    "id": 1,
+    "numero": "FV-000001",
+    "estado": "ANULADA",
+    "fechaAnulacion": "2026-11-24T14:36:18",
+    "usuarioAnulacion": "admin",
+    "motivoAnulacion": "Error en el servicio"
+  }
+}
+```
+
+## `GET /factura/{id}/historial-estados`
+
+```json
+[
+  {
+    "id": 1,
+    "estadoAnterior": null,
+    "estadoNuevo": "PENDIENTE",
+    "motivo": null,
+    "usuario": "secretaria",
+    "fecha": "2026-11-24T14:36:17"
+  },
+  {
+    "id": 2,
+    "estadoAnterior": "PENDIENTE",
+    "estadoNuevo": "PAGO_PARCIAL",
+    "motivo": "Pago de $ 47.517,60 (TARJETA_DEBITO)",
+    "usuario": "secretaria",
+    "fecha": "2026-11-24T14:36:17"
+  }
+]
+```
+
+## Otras consultas
+
+- `GET /factura/listar?numero=&estado=&desde=&hasta=&clienteId=&mascotaId=`
+- `GET /factura/cliente/{clienteId}` y `GET /factura/mascota/{mascotaId}`
+- `GET /factura/{id}/pdf`: descarga `factura_<numero>.pdf`, con marca de agua si está ANULADA.
 
 # Citas, horarios y calendario
 

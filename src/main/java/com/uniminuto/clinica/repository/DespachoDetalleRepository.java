@@ -24,4 +24,10 @@ public interface DespachoDetalleRepository extends JpaRepository<DespachoDetalle
             "despacho.formula.cliente", "despacho.formula.mascota", "lote"})
     @Query("SELECT x FROM DespachoDetalle x WHERE x.medicamento.id = :medicamentoId ORDER BY x.id DESC")
     List<DespachoDetalle> historial(@Param("medicamentoId") Long medicamentoId);
+
+    /** Lo dispensado de una cita que aun se puede facturar. */
+    @EntityGraph(attributePaths = {"medicamento", "lote"})
+    @Query("SELECT x FROM DespachoDetalle x WHERE x.despacho.formula.cita.id = :citaId AND x.facturado = false "
+            + "AND x.despacho.estado = com.uniminuto.clinica.entity.enums.EstadoPreparacion.CONFIRMADO ORDER BY x.id")
+    List<DespachoDetalle> porFacturar(@Param("citaId") Long citaId);
 }

@@ -50,4 +50,9 @@ public interface FormulaMedicaRepository extends JpaRepository<FormulaMedica, Lo
             """)
     List<FormulaMedica> bandeja(@Param("estados") Collection<EstadoDespacho> estados,
                                 @Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
+
+    /** Bloquea las formulas de la cita, por id, para que no cambie lo despachado mientras se factura. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT f FROM FormulaMedica f WHERE f.cita.id = :citaId ORDER BY f.id")
+    List<FormulaMedica> bloquearPorCita(@Param("citaId") Long citaId);
 }

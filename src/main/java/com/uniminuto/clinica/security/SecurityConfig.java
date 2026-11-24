@@ -53,6 +53,7 @@ public class SecurityConfig {
                         // Segunda barrera por modulo; el detalle por metodo esta en @PreAuthorize (C6).
                         .requestMatchers("/usuario/**", "/perfil/**", "/reporte/**", "/email/**",
                                 "/inventario/carga/**").hasRole(Rol.ADMINISTRADOR)
+                        .requestMatchers("/factura/*/anular").hasRole(Rol.ADMINISTRADOR)
                         .requestMatchers("/factura/**").hasAnyRole(Rol.ADMINISTRADOR, Rol.SECRETARIA)
                         .requestMatchers("/cita/**", "/medico/**", "/cliente/**", "/mascota/**", "/raza/**")
                         .hasAnyRole(Rol.ADMINISTRADOR, Rol.SECRETARIA, Rol.MEDICO)

@@ -79,6 +79,16 @@ El código del menú de citas es `cita`, no `citas`; la ruta sigue siendo `/inic
 - 409 por duplicado con `detalles`. Las restricciones de la base y los choques de versión también responden 409.
 - `FormulaRs` usa los nombres del frontend: `fecha`, `medicamentoCodigo`, `medicamentoNombre`.
 
+## Fase 8: facturación y pagos
+
+- `/factura` completo según C6. Al generar se bloquean la cita y sus fórmulas: dos facturas simultáneas o facturar mientras se revierte un despacho no dejan datos incoherentes (probado en MySQL 8.4).
+- Solo se facturan citas con atención finalizada; las ATENDIDAS antiguas sin atención no aparecen como pendientes.
+- Un servicio sin tarifa vigente impide facturar; con descuento total la factura nace PAGADA.
+- Lo que se despache después de facturar no entra en esa factura: para cobrarlo se anula y se genera otra.
+- Anular conserva renglones, pagos e historial, y libera la cita y lo despachado.
+- El PDF usa los nombres y valores congelados.
+- Campos adicionales en la previsualización: `topeDescuento`, documento, especialidad y fecha de la cita.
+
 ## Fase 7: despacho
 
 - Todo `/despacho` según C6. Las operaciones bloquean siempre en el mismo orden (fórmula, despacho, productos, lotes), así que no se interbloquean. Probado en MySQL 8.4 con peticiones simultáneas: no hay doble descuento ni entregas por encima de lo disponible.

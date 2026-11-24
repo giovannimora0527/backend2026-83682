@@ -31,3 +31,19 @@ Se completa con los demás módulos en la fase 10.
 | Algo | No | Sí (solo tras liberar o revertir) | `PENDIENTE_DESPACHO` |
 
 Al revertir se conserva `CANCELADO` o `EN_PREPARACION` si la fórmula estaba así.
+
+## Facturación y pagos
+
+| # | Regla | Dónde se valida |
+|---|---|---|
+| F1 | Solo se facturan citas ATENDIDAS con atención finalizada | `FacturaServiceImpl.exigirFacturable` |
+| F2 | Una sola factura vigente por cita | `exigirFacturable`; `factura.cita_vigente` única |
+| F3 | Un servicio no se cobra dos veces en una atención | `atencion_servicio` única por atención y servicio |
+| F4 | Solo se cobra lo dispensado, no revertido ni facturado | `DespachoDetalleRepository.porFacturar`; `despacho_detalle_vigente` única |
+| F5 | Los valores se congelan | `FacturaServiceImpl.guardar`, `DespachoServiceImpl.entregar` |
+| F6 | IVA según la configuración, sobre la base con descuento, redondeo HALF_UP | `RenglonCobro` |
+| F7 | Descuento con motivo; SECRETARIA hasta el tope | `FacturaServiceImpl.validarDescuentos` |
+| F8 | El pago es mayor que 0 y no supera el saldo | `FacturaServiceImpl.pagar`, `CHECK` de `factura` y `pago` |
+| F9 | PENDIENTE, PAGO_PARCIAL y PAGADA según el saldo | `FacturaServiceImpl.pagar` |
+| F10 | Anular es del ADMINISTRADOR, con motivo, y no borra nada | `SecurityConfig`, `FacturaServiceImpl.anular` |
+| F11 | Cada cambio guarda usuario y fecha | `factura_historial_estado` |
