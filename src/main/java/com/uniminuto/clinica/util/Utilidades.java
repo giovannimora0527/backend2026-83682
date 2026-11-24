@@ -1,9 +1,12 @@
 package com.uniminuto.clinica.util;
 
+import com.uniminuto.clinica.entity.Medico;
 import com.uniminuto.clinica.entity.Menu;
 import com.uniminuto.clinica.entity.OtpToken;
 import com.uniminuto.clinica.entity.Usuario;
+import com.uniminuto.clinica.repository.MedicoRepository;
 import com.uniminuto.clinica.repository.UsuarioRepository;
+import com.uniminuto.clinica.security.Rol;
 import com.uniminuto.clinica.service.MenuService;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -16,6 +19,7 @@ import tools.jackson.databind.ObjectMapper;
 import javax.crypto.SecretKey;
 import java.security.SecureRandom;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.List;
@@ -39,11 +43,14 @@ public class Utilidades {
 
     private final MenuService menuService;
     private final UsuarioRepository usuarioRepository;
+    private final MedicoRepository medicoRepository;
     private final ObjectMapper objectMapper;
 
     public Utilidades(MenuService menuService,
                       UsuarioRepository usuarioRepository,
+                      MedicoRepository medicoRepository,
                       ObjectMapper objectMapper) {
+        this.medicoRepository = medicoRepository;
         this.menuService = menuService;
         this.usuarioRepository = usuarioRepository;
         this.objectMapper = objectMapper;
@@ -72,18 +79,37 @@ public class Utilidades {
                 .orElseThrow(() -> new IllegalArgumentException("El usuario del token no existe."));
         List<Menu> menus = menuService.obtenerListaMenus(otpToken.getUsuarioId());
         String menusJson = serializarMenus(menus);
-        return firmarJwtToken(otpToken, usuario, key, menusJson, jti);
+        return firmarJwtToken(otpToken, usuario, medicoId(usuario), key, menusJson, jti);
     }
 
     private String serializarMenus(List<Menu> menus) {
         try {
-            return objectMapper.writeValueAsString(menus);
+            return objectMapper.writeValueAsString(menus.stream()
+                    .map(MenuClaim::new)
+                    .toList());
         } catch (JacksonException e) {
             throw new IllegalStateException("No se pudieron serializar los menús del usuario.", e);
         }
     }
 
-    private static String firmarJwtToken(OtpToken otpToken, Usuario usuario,
+    /** Menu dentro del JWT: name es el campo de C3; los demas son los que ya consume el frontend. */
+    private record MenuClaim(String code, String name, Boolean activo, Integer menuId, String title, String url,
+                             String icon, LocalDateTime fechaCreacion, LocalDateTime fechaModificacion) {
+
+        MenuClaim(Menu menu) {
+            this(menu.getCode(), menu.getTitle(), menu.getActivo(), menu.getMenuId(), menu.getTitle(), menu.getUrl(),
+                    menu.getIcon(), menu.getFechaCreacion(), menu.getFechaModificacion());
+        }
+    }
+
+    private Long medicoId(Usuario usuario) {
+        if (!Rol.MEDICO.equals(usuario.getPerfil().getCodigo())) {
+            return null;
+        }
+        return medicoRepository.findByUsuarioId(usuario.getId()).map(Medico::getId).orElse(null);
+    }
+
+    private static String firmarJwtToken(OtpToken otpToken, Usuario usuario, Long medicoId,
                                          SecretKey key, String menusJson, String jti) {
         Instant now = Instant.now();
         return Jwts.builder()
@@ -91,8 +117,9 @@ public class Utilidades {
                 .subject(otpToken.getUsuarioId().toString())
                 .claim("username", usuario.getUsername())
                 .claim("email", usuario.getEmail())
-                .claim("rol", usuario.getPerfil().getNombre())
+                .claim("rol", usuario.getPerfil().getCodigo())
                 .claim("menus", menusJson)
+                .claim("medicoId", medicoId)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plus(1, ChronoUnit.HOURS)))
                 .signWith(key, SignatureAlgorithm.HS512)

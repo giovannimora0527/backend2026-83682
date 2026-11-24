@@ -6,6 +6,7 @@ import com.uniminuto.clinica.service.EmailService;
 import org.apache.coyote.BadRequestException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
@@ -25,6 +26,7 @@ public class EmailApiController implements EmailApi {
     private EmailService emailService;
 
     @Override
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<TestRs> testEmail() throws BadRequestException {
       return ResponseEntity.ok(emailService.testService());
     }

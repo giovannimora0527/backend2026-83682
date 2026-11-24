@@ -120,7 +120,7 @@ public class ClienteServiceImpl implements ClienteService {
         if (clienteOptional.isPresent()) {
             return clienteOptional.get();
         } else {
-            throw new BadRequestException("Cliente no encontrado con el documento: " + documento);
+            throw new NotFoundException("Cliente no encontrado con el documento: " + documento);
         }
     }
 }

@@ -13,14 +13,15 @@ import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.uniminuto.clinica.entity.Medico;
+import com.uniminuto.clinica.entity.Usuario;
+import com.uniminuto.clinica.repository.MedicoRepository;
 import com.uniminuto.clinica.repository.SessionRepository;
 import com.uniminuto.clinica.repository.UsuarioRepository;
 
 import java.io.IOException;
-import java.text.Normalizer;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -34,9 +35,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtValidator jwtValidator;
     private final SessionRepository sessionRepository;
     private final UsuarioRepository usuarioRepository;
+    private final MedicoRepository medicoRepository;
 
     public JwtAuthenticationFilter(JwtValidator jwtValidator, SessionRepository sessionRepository,
-                                   UsuarioRepository usuarioRepository) {
+                                   UsuarioRepository usuarioRepository, MedicoRepository medicoRepository) {
+        this.medicoRepository = medicoRepository;
         this.jwtValidator = jwtValidator;
         this.sessionRepository = sessionRepository;
         this.usuarioRepository = usuarioRepository;
@@ -76,14 +79,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 .filter(sesion -> sesion.getFechaExpiracion().isAfter(LocalDateTime.now()))
                 .flatMap(sesion -> usuarioRepository.findById(usuarioId))
                 .filter(usuario -> Boolean.TRUE.equals(usuario.getActivo()))
+                .filter(usuario -> usuario.getPerfil().getCodigo() != null
+                        && Boolean.TRUE.equals(usuario.getPerfil().getActivo()))
                 .map(usuario -> new UsuarioAutenticado(usuario.getId(), usuario.getUsername(),
-                        normalizarRol(usuario.getPerfil().getNombre()), jti));
+                        usuario.getPerfil().getCodigo(), medicoId(usuario), jti));
     }
 
-    static String normalizarRol(String nombre) {
-        return Normalizer.normalize(nombre.trim(), Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "")
-                .replaceAll("\\s+", "_")
-                .toUpperCase(Locale.ROOT);
+    private Long medicoId(Usuario usuario) {
+        if (!Rol.MEDICO.equals(usuario.getPerfil().getCodigo())) {
+            return null;
+        }
+        return medicoRepository.findByUsuarioId(usuario.getId()).map(Medico::getId).orElse(null);
     }
 }

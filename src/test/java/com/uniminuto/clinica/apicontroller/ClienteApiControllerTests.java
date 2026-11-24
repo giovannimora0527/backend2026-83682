@@ -92,7 +92,7 @@ class ClienteApiControllerTests {
         mvc.perform(post("/cliente/7").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.status").value(404))
-                .andExpect(jsonPath("$.error").value("NOT FOUND"));
+                .andExpect(jsonPath("$.error").value("Not Found"));
     }
 
     @Test
@@ -101,7 +101,7 @@ class ClienteApiControllerTests {
         mvc.perform(post("/cliente/7").contentType(MediaType.APPLICATION_JSON).content(BODY))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.status").value(409))
-                .andExpect(jsonPath("$.error").value("CONFLICT"));
+                .andExpect(jsonPath("$.error").value("Conflict"));
     }
 
     @ParameterizedTest

@@ -9,8 +9,11 @@ import com.uniminuto.clinica.models.MiRespuestaRS;
 import com.uniminuto.clinica.repository.CitaRepository;
 import com.uniminuto.clinica.repository.MascotaRepository;
 import com.uniminuto.clinica.repository.MedicoRepository;
+import com.uniminuto.clinica.security.UsuarioActual;
 import com.uniminuto.clinica.service.CitaService;
 import com.uniminuto.clinica.exception.BadRequestException;
+import com.uniminuto.clinica.exception.ConflictException;
+import com.uniminuto.clinica.exception.NotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +28,9 @@ public class CitaServiceImpl implements CitaService {
     private static final String ESTADO_CANCELADA = "CANCELADA";
     /** Duracion por defecto; pasa a salir del servicio cuando exista ese modelo. */
     private static final int DURACION_MINUTOS = 30;
+
+    @Autowired
+    private UsuarioActual usuarioActual;
 
     @Autowired
     private CitaRepository citaRepository;
@@ -58,7 +64,7 @@ public class CitaServiceImpl implements CitaService {
         }
         Optional<Mascota> mascotaOptional = mascotaRepository.findById(mascotaId);
         if (mascotaOptional.isEmpty()) {
-            throw new BadRequestException("La mascota no existe");
+            throw new NotFoundException("La mascota no existe");
         }
         return citaRepository.findByMascotaOrderByFechaHoraDesc(mascotaOptional.get());
     }
@@ -77,12 +83,12 @@ public class CitaServiceImpl implements CitaService {
         this.validarCita(citaRq);
         Optional<Mascota> mascotaOptional = mascotaRepository.findById(citaRq.getMascotaId());
         if (mascotaOptional.isEmpty()) {
-            throw new BadRequestException("La mascota no existe");
+            throw new NotFoundException("La mascota no existe");
         }
 
         Optional<Medico> medicoOptional = medicoRepository.findById(citaRq.getMedicoId());
         if (medicoOptional.isEmpty()) {
-            throw new BadRequestException("El médico no existe");
+            throw new NotFoundException("El médico no existe");
         }
 
         if (citaRq.getId() == null) {
@@ -90,10 +96,12 @@ public class CitaServiceImpl implements CitaService {
         }
         Optional<Cita> optCita = this.citaRepository.findById(citaRq.getId());
         if (optCita.isEmpty()) {
-            throw new BadRequestException("La cita no existe");
+            throw new NotFoundException("La cita no existe");
         }
 
         Cita citaActualizar = optCita.get();
+        usuarioActual.verificarPropiedad(citaActualizar.getMedico().getId());
+        usuarioActual.verificarPropiedad(citaRq.getMedicoId());
         String estado = citaRq.getEstado() == null || citaRq.getEstado().isBlank()
                 ? citaActualizar.getEstado() : citaRq.getEstado();
         if (!ESTADO_CANCELADA.equalsIgnoreCase(estado)) {
@@ -120,14 +128,15 @@ public class CitaServiceImpl implements CitaService {
         this.validarCita(citaRq);
         Optional<Mascota> mascotaOptional = mascotaRepository.findById(citaRq.getMascotaId());
         if (mascotaOptional.isEmpty()) {
-            throw new BadRequestException("La mascota no existe");
+            throw new NotFoundException("La mascota no existe");
         }
 
         Optional<Medico> medicoOptional = medicoRepository.findById(citaRq.getMedicoId());
         if (medicoOptional.isEmpty()) {
-            throw new BadRequestException("El médico no existe");
+            throw new NotFoundException("El médico no existe");
         }
 
+        usuarioActual.verificarPropiedad(citaRq.getMedicoId());
         citaRq.setId(null);
         this.validarSolapamiento(citaRq, medicoOptional.get(), mascotaOptional.get());
 
@@ -154,7 +163,7 @@ public class CitaServiceImpl implements CitaService {
         LocalDateTime inicio = citaRq.getFechaHora();
         if (citaRepository.existeSolapamiento(medico, mascota, inicio.minusMinutes(DURACION_MINUTOS),
                 inicio.plusMinutes(DURACION_MINUTOS), citaRq.getId())) {
-            throw new BadRequestException("El médico o la mascota ya tienen una cita en ese rango de hora.");
+            throw new ConflictException("El médico o la mascota ya tienen una cita en ese rango de hora.");
         }
     }
 
@@ -177,5 +186,13 @@ public class CitaServiceImpl implements CitaService {
         if (citaRq.getMotivo() == null || citaRq.getMotivo().isEmpty()) {
             throw new BadRequestException("El motivo de la cita no puede ser nulo o vacio");
         }
+    }
+
+    @Override
+    public Cita obtenerCita(Long id) {
+        Cita cita = citaRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("La cita no existe"));
+        usuarioActual.verificarPropiedad(cita.getMedico().getId());
+        return cita;
     }
 }

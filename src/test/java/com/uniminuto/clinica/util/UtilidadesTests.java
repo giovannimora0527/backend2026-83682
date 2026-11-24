@@ -1,9 +1,11 @@
 package com.uniminuto.clinica.util;
 
+import com.uniminuto.clinica.entity.Medico;
 import com.uniminuto.clinica.entity.Menu;
 import com.uniminuto.clinica.entity.OtpToken;
 import com.uniminuto.clinica.entity.Perfil;
 import com.uniminuto.clinica.entity.Usuario;
+import com.uniminuto.clinica.repository.MedicoRepository;
 import com.uniminuto.clinica.repository.UsuarioRepository;
 import com.uniminuto.clinica.service.MenuService;
 import io.jsonwebtoken.Claims;
@@ -91,6 +93,7 @@ class UtilidadesTests {
         menu.setMenuId(7);
         menu.setCode("DASHBOARD");
         menu.setTitle("Dashboard");
+        menu.setActivo(true);
         MenuService menuService = usuarioId -> {
             assertEquals(42L, usuarioId);
             return List.of(menu);
@@ -109,6 +112,8 @@ class UtilidadesTests {
         assertEquals(7, menuClaim.get("menuId"));
         assertEquals("DASHBOARD", menuClaim.get("code"));
         assertEquals("Dashboard", menuClaim.get("title"));
+        assertEquals("Dashboard", menuClaim.get("name"));
+        assertEquals(true, menuClaim.get("activo"));
     }
 
     @Test
@@ -145,7 +150,8 @@ class UtilidadesTests {
 
         assertEquals("luna", claims.get("username", String.class));
         assertEquals("luna@example.com", claims.get("email", String.class));
-        assertEquals("Administrador", claims.get("rol", String.class));
+        assertEquals("MEDICO", claims.get("rol", String.class));
+        assertEquals(9, claims.get("medicoId", Integer.class));
     }
 
     private static Utilidades crearUtilidades(MenuService menuService) {
@@ -155,12 +161,17 @@ class UtilidadesTests {
     private static Utilidades crearUtilidades(MenuService menuService, Usuario usuario) {
         UsuarioRepository usuarioRepository = mock(UsuarioRepository.class);
         when(usuarioRepository.findById(42L)).thenReturn(Optional.of(usuario));
-        return new Utilidades(menuService, usuarioRepository, new ObjectMapper());
+        Medico medico = new Medico();
+        medico.setId(9L);
+        MedicoRepository medicoRepository = mock(MedicoRepository.class);
+        when(medicoRepository.findByUsuarioId(42L)).thenReturn(Optional.of(medico));
+        return new Utilidades(menuService, usuarioRepository, medicoRepository, new ObjectMapper());
     }
 
     private static Usuario usuario() {
         Perfil perfil = new Perfil();
-        perfil.setNombre("Administrador");
+        perfil.setNombre("Veterinario");
+        perfil.setCodigo("MEDICO");
         Usuario usuario = new Usuario();
         usuario.setId(42L);
         usuario.setUsername("luna");

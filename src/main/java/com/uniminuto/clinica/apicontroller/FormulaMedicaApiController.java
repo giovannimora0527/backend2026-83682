@@ -8,6 +8,7 @@ import com.uniminuto.clinica.models.MiRespuestaRS;
 import com.uniminuto.clinica.service.FormulaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -19,16 +20,19 @@ public class FormulaMedicaApiController implements FormulaMedicaApi {
     private FormulaService formulaService;
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'MEDICO')")
     public ResponseEntity<List<FormulaMedica>> listarFormulas() {
         return ResponseEntity.ok(this.formulaService.findAllFormulas());
     }
 
     @Override
+    @PreAuthorize("hasRole('MEDICO')")
     public ResponseEntity<MiRespuestaRS> guardarFormula(FormulaRq formulaRq) throws BadRequestException {
         return ResponseEntity.ok(this.formulaService.guardarFormula(formulaRq));
     }
 
     @Override
+    @PreAuthorize("hasRole('MEDICO')")
     public ResponseEntity<MiRespuestaRS> actualizarFormula(FormulaRq formulaRq) throws BadRequestException {
         return ResponseEntity.ok(this.formulaService.actualizarFormula(formulaRq));
     }

@@ -32,13 +32,31 @@
 - Eliminado sin uso: `CitaMedica`, `CitaRequest`, `AnotacionRq`, `FormulaMedicaService` y su implementación, `EmailConfig`.
 - Tests con perfil `test` sobre H2 en modo MySQL.
 
-### Pendiente para cuando exista el contrato o el modelo
+## Fase 2: permisos y contrato
 
-- `@PreAuthorize` por rol (C6) y verificación de propiedad del médico (requiere `medico.usuario_id`). Hoy cualquier usuario autenticado accede a todas las rutas protegidas.
-- Rol por `perfil.codigo` (C2). Provisionalmente es el nombre del perfil en mayúsculas, sin tildes.
-- Duración de la cita según `servicio.duracionMinutos`. Provisionalmente 30 minutos.
-- Bloqueo frente a dos citas creadas a la vez (fase de citas).
+- Roles por `perfil.codigo` (C2), leídos de la base en cada petición. Un perfil sin código o inactivo no puede entrar.
+- `@PreAuthorize` en todos los controladores y una segunda barrera por módulo en `SecurityConfig`, que ya protege las rutas aún no implementadas.
+- Propiedad: un MEDICO solo crea, ve o modifica sus citas y fórmulas, y solo anota en sus citas (403 si son de otro médico).
+- JWT según C3: `rol`, `medicoId`, `menus` con `code`, `name` y `activo`. Solo se incluyen menús activos.
+- `medico.usuario_id`: `POST /medico/crear` y `/medico/actualizar` aceptan `usuarioId` (debe tener rol MEDICO y estar libre).
+- Errores según C1 (`Bad Request`, `Conflict`, `detalles`). Los inexistentes pasan de 400 a 404 y los duplicados o cruces de 400 a 409. Rutas inexistentes: 404 en lugar de 500.
+- Nuevo `GET /cita/{id}`; el detalle completo llega en la fase 5.
+
+### Decisiones donde el contrato no fija el rol
+
+- `/cita/listar` y `/cita/listar-rango`: ADMINISTRADOR y SECRETARIA (el médico usará el calendario).
+- Mascotas y razas: lectura ADMINISTRADOR, SECRETARIA y MEDICO; escritura ADMINISTRADOR y SECRETARIA.
+- Historias clínicas: ADMINISTRADOR y MEDICO. Anotaciones: solo MEDICO.
+- Correo de prueba: ADMINISTRADOR.
+
+### Pendiente de las fases siguientes
+
+- Duración de la cita según `servicio` y bloqueo frente a citas simultáneas (fase 5).
+- `/medico/listar-disponibles` todavía recibe `fechaInicio` y `fechaFin`; pasará a `inicio` y `fin` (fase 5).
+- 200 de DESPACHO_MEDICO en `GET /inventario/productos`: se prueba en la fase 4, cuando exista.
 
 ## Desviaciones del contrato
 
-Sin desviaciones registradas: el contrato compartido aún no se ha recibido.
+- El JWT agrega el claim `jti`, que C3 no lista pero la sección 4 exige.
+- Los menús del JWT incluyen, además de `code`, `name` y `activo`, los campos que el frontend actual exige (`menuId`, `title`, `url`, `icon`, `fechaCreacion`, `fechaModificacion`). Al migrar el frontend a C3 se pueden quitar.
+- C1 dice que `/clinica/test` lleva token; la sección 4 lo declara público. Queda público.

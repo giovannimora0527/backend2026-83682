@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface MedicoRepository extends JpaRepository<Medico, Long> {
@@ -25,6 +26,8 @@ public interface MedicoRepository extends JpaRepository<Medico, Long> {
     List<Medico> findDisponiblesPorFecha(@Param("fechaInicio") LocalDateTime fechaInicio,
                                         @Param("fechaFin") LocalDateTime fechaFin,
                                         @Param("estado") String estado);
+
+    Optional<Medico> findByUsuarioId(Long usuarioId);
 
     boolean existsByNumeroDocumento(String numeroDocumento);
 

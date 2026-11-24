@@ -8,6 +8,7 @@ import com.uniminuto.clinica.models.MiRespuestaRS;
 import com.uniminuto.clinica.service.HistoriaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -19,17 +20,20 @@ public class HistoriaClinicaApiController implements HistoriaApi {
     private HistoriaService historiaService;
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'MEDICO')")
     public ResponseEntity<List<HistoriaMedicaRs>> listarAllHIstorias() throws BadRequestException {
         return ResponseEntity.ok(this.historiaService.getAllHistorias());
     }
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'MEDICO')")
     public ResponseEntity<MiRespuestaRS> guardarHistoria(HistoriaMedicaRq historiaMedicaRq)
             throws BadRequestException {
         return ResponseEntity.ok(this.historiaService.guardarHistoria(historiaMedicaRq));
     }
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'MEDICO')")
     public ResponseEntity<MiRespuestaRS> actualizarHistoria(HistoriaMedicaRq historiaMedicaRq)
             throws BadRequestException {
         return ResponseEntity.ok(this.historiaService.actualizarHistoria(historiaMedicaRq));

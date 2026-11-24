@@ -19,4 +19,6 @@ public interface CitaService {
     MiRespuestaRS crearCita(CitaRq citaRq) throws BadRequestException;
 
     MiRespuestaRS actualizarCita(CitaRq citaRq) throws BadRequestException;
+
+    Cita obtenerCita(Long id);
 }

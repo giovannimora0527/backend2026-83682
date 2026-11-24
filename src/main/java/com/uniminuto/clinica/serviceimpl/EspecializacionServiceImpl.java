@@ -2,6 +2,8 @@ package com.uniminuto.clinica.serviceimpl;
 
 import com.uniminuto.clinica.entity.Especializacion;
 import com.uniminuto.clinica.exception.BadRequestException;
+import com.uniminuto.clinica.exception.ConflictException;
+import com.uniminuto.clinica.exception.NotFoundException;
 import com.uniminuto.clinica.models.MiRespuestaRS;
 import com.uniminuto.clinica.repository.EspecializacionRepository;
 import com.uniminuto.clinica.service.EspecializacionService;
@@ -30,13 +32,13 @@ public class EspecializacionServiceImpl implements EspecializacionService {
         Optional<Especializacion> especializacionExistente = especializacionRepository
                 .findByCodigoEspecializacion(especializacion.getCodigoEspecializacion());
         if (especializacionExistente.isPresent()) {
-            throw new BadRequestException("La especialización con el código proporcionado ya existe.");
+            throw new ConflictException("La especialización con el código proporcionado ya existe.");
         }
 
         Optional<Especializacion> especializacionPorNombre = especializacionRepository
                 .findByNombre(especializacion.getNombre());
         if (especializacionPorNombre.isPresent()) {
-            throw new BadRequestException("La especialización con el nombre proporcionado ya existe.");
+            throw new ConflictException("La especialización con el nombre proporcionado ya existe.");
         }
 
         especializacionRepository.save(especializacion);
@@ -64,7 +66,7 @@ public class EspecializacionServiceImpl implements EspecializacionService {
         Optional<Especializacion> especializacionExistente = especializacionRepository
                 .findById(especializacion.getId());
         if (especializacionExistente.isEmpty()) {
-            throw new BadRequestException("La especialización que se intenta actualizar no existe.");
+            throw new NotFoundException("La especialización que se intenta actualizar no existe.");
         }
         Especializacion especializacionActual = especializacionExistente.get();
         if (!especializacionActual.getCodigoEspecializacion().equals(especializacion.getCodigoEspecializacion())) {
@@ -72,7 +74,7 @@ public class EspecializacionServiceImpl implements EspecializacionService {
                     .findByCodigoEspecializacion(especializacion.getCodigoEspecializacion());
             if (especializacionPorCodigo.isPresent() && !especializacionPorCodigo.get().getId()
                     .equals(especializacion.getId())) {
-                throw new BadRequestException("La especialización con el código proporcionado ya existe.");
+                throw new ConflictException("La especialización con el código proporcionado ya existe.");
             }
         }
 
@@ -81,7 +83,7 @@ public class EspecializacionServiceImpl implements EspecializacionService {
                     .findByNombre(especializacion.getNombre());
             if (especializacionPorNombre.isPresent() && !especializacionPorNombre.get().getId()
                     .equals(especializacion.getId())) {
-                throw new BadRequestException("La especialización con el nombre proporcionado ya existe.");
+                throw new ConflictException("La especialización con el nombre proporcionado ya existe.");
             }
         }
 

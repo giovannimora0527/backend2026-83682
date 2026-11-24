@@ -20,4 +20,7 @@ public class MedicoRq {
     private String registroProfesional;
 
     private Long especializacionId;
+
+    /** Opcional: usuario con rol MEDICO. Si no llega, se conserva el actual. */
+    private Long usuarioId;
 }

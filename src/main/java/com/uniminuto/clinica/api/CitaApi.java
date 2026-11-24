@@ -1,5 +1,7 @@
 package com.uniminuto.clinica.api;
 
+import org.springframework.web.bind.annotation.PathVariable;
+
 import com.uniminuto.clinica.entity.Cita;
 import com.uniminuto.clinica.exception.BadRequestException;
 import com.uniminuto.clinica.models.CitaRq;
@@ -83,4 +85,7 @@ public interface CitaApi {
             @RequestBody CitaRq cita
     )
             throws BadRequestException;
+
+    @GetMapping(value = "/{id}", produces = {"application/json"})
+    ResponseEntity<Cita> obtenerCita(@PathVariable("id") Long id);
 }

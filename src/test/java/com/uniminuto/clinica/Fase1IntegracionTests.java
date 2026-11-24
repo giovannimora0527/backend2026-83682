@@ -2,9 +2,11 @@ package com.uniminuto.clinica;
 
 import com.uniminuto.clinica.entity.*;
 import com.uniminuto.clinica.exception.BadRequestException;
+import com.uniminuto.clinica.exception.ConflictException;
 import com.uniminuto.clinica.exception.CorreoException;
 import com.uniminuto.clinica.models.*;
 import com.uniminuto.clinica.repository.*;
+import com.uniminuto.clinica.security.UsuarioAutenticado;
 import com.uniminuto.clinica.service.*;
 import com.uniminuto.clinica.util.PasswordUtil;
 import org.junit.jupiter.api.AfterEach;
@@ -13,6 +15,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.TestingAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -67,6 +71,7 @@ class Fase1IntegracionTests {
         mvc = MockMvcBuilders.webAppContextSetup(contexto).apply(springSecurity()).build();
         Perfil perfil = new Perfil();
         perfil.setNombre("Administrador");
+        perfil.setCodigo("ADMINISTRADOR");
         perfil.setActivo(true);
         perfil.setFechaCreacion(LocalDateTime.now());
         usuario = new Usuario();
@@ -80,6 +85,7 @@ class Fase1IntegracionTests {
 
     @AfterEach
     void limpiar() {
+        SecurityContextHolder.clearContext();
         citas.deleteAll();
         medicos.deleteAll();
         especializaciones.deleteAll();
@@ -197,6 +203,7 @@ class Fase1IntegracionTests {
 
     @Test
     void citasDetectanSolapamientoRealYNoChocanConsigoMismas() {
+        autenticar();
         Mascota luna = mascota("Luna");
         Mascota max = mascota("Max");
         Medico medico = medico();
@@ -206,12 +213,12 @@ class Fase1IntegracionTests {
         citaService.crearCita(cita(null, luna, medico, base.plusMinutes(30), null));
         // Antes fallaba con 500 al tener dos citas con el mismo medico.
         citaService.crearCita(cita(null, luna, medico, base.plusMinutes(60), null));
-        assertThrows(BadRequestException.class,
+        assertThrows(ConflictException.class,
                 () -> citaService.crearCita(cita(null, max, medico, base.plusMinutes(29), null)));
 
         Cita primera = citas.findAll().getFirst();
         citaService.actualizarCita(cita(primera.getId(), luna, medico, base, "PROGRAMADA"));
-        assertThrows(BadRequestException.class, () -> citaService.actualizarCita(
+        assertThrows(ConflictException.class, () -> citaService.actualizarCita(
                 cita(primera.getId(), luna, medico, base.plusMinutes(10), "PROGRAMADA")));
 
         citaService.actualizarCita(cita(primera.getId(), luna, medico, base, "CANCELADA"));
@@ -250,16 +257,17 @@ class Fase1IntegracionTests {
         cambio.setCodigoEspecializacion("A1");
         cambio.setNombre("Dermatologia");
         cambio.setDescripcion("x");
-        assertThrows(BadRequestException.class, () -> especializacionService.actualizarEspecializacion(cambio));
+        assertThrows(ConflictException.class, () -> especializacionService.actualizarEspecializacion(cambio));
         cambio.setCodigoEspecializacion("B2");
         cambio.setNombre("Cirugia");
-        assertThrows(BadRequestException.class, () -> especializacionService.actualizarEspecializacion(cambio));
+        assertThrows(ConflictException.class, () -> especializacionService.actualizarEspecializacion(cambio));
     }
 
     @Test
     void actualizarUsuarioTieneContrasenaOpcionalYCambiaPerfil() {
         Perfil nuevo = new Perfil();
         nuevo.setNombre("Medico");
+        nuevo.setCodigo("MEDICO");
         nuevo.setActivo(true);
         nuevo.setFechaCreacion(LocalDateTime.now());
         nuevo = perfiles.save(nuevo);
@@ -286,6 +294,11 @@ class Fase1IntegracionTests {
         rq.setCitaId(1L);
         BadRequestException ex = assertThrows(BadRequestException.class, () -> formulaService.guardarFormula(rq));
         assertTrue(ex.getMessage().contains("medicamento"));
+    }
+
+    private void autenticar() {
+        SecurityContextHolder.getContext().setAuthentication(new TestingAuthenticationToken(
+                new UsuarioAutenticado(usuario.getId(), "ana", "ADMINISTRADOR", null, "x"), null));
     }
 
     private String iniciarSesion() throws Exception {

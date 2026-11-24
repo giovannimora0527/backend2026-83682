@@ -20,6 +20,10 @@ public class Perfil {
     @Column(name = "perfil_id")
     private Integer perfilId;
 
+    /** Codigo de rol del contrato (C2). */
+    @Column(name = "codigo", unique = true, length = 30)
+    private String codigo;
+
     @Column(name = "nombre", nullable = false, length = 50)
     private String nombre;
 

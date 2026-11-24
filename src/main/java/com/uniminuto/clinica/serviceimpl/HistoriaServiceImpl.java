@@ -4,6 +4,8 @@ import com.uniminuto.clinica.entity.HistoriaMedica;
 import com.uniminuto.clinica.entity.FormulaMedica;
 import com.uniminuto.clinica.entity.Mascota;
 import com.uniminuto.clinica.exception.BadRequestException;
+import com.uniminuto.clinica.exception.ConflictException;
+import com.uniminuto.clinica.exception.NotFoundException;
 import com.uniminuto.clinica.models.AnotacionHistoriaRs;
 import com.uniminuto.clinica.models.HistoriaMedicaRq;
 import com.uniminuto.clinica.models.HistoriaMedicaRs;
@@ -76,7 +78,7 @@ public class HistoriaServiceImpl implements HistoriaService {
         this.validarHistoria(historiaMedicaRq);
         Mascota mascota = this.existeMascota(historiaMedicaRq);
         if (this.historiaMedicaRepository.existsByMascota(mascota)) {
-            throw new BadRequestException("La mascota ya tiene una historia clínica registrada.");
+            throw new ConflictException("La mascota ya tiene una historia clínica registrada.");
         }
 
         HistoriaMedica historiaNueva = new HistoriaMedica();
@@ -99,11 +101,11 @@ public class HistoriaServiceImpl implements HistoriaService {
         Optional<HistoriaMedica> optionalHistoria = this.historiaMedicaRepository
                 .findById(historiaMedicaRq.getId());
         if (optionalHistoria.isEmpty()) {
-            throw new BadRequestException("La historia clínica con el id proporcionado no existe.");
+            throw new NotFoundException("La historia clínica con el id proporcionado no existe.");
         }
         Mascota mascota = this.existeMascota(historiaMedicaRq);
         if (this.historiaMedicaRepository.existsByMascotaAndIdNot(mascota, historiaMedicaRq.getId())) {
-            throw new BadRequestException("La mascota ya tiene otra historia clínica registrada.");
+            throw new ConflictException("La mascota ya tiene otra historia clínica registrada.");
         }
 
         HistoriaMedica historiaExistente = optionalHistoria.get();
@@ -119,7 +121,7 @@ public class HistoriaServiceImpl implements HistoriaService {
     private Mascota existeMascota(HistoriaMedicaRq historiaMedicaRq) throws BadRequestException {
         Optional<Mascota> optionalMascota = this.mascotaRepository.findById(historiaMedicaRq.getMascotaId());
         if (optionalMascota.isEmpty()) {
-            throw new BadRequestException("La mascota con el id proporcionado no existe.");
+            throw new NotFoundException("La mascota con el id proporcionado no existe.");
         }
         return optionalMascota.get();
     }

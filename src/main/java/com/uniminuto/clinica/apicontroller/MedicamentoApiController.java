@@ -8,6 +8,7 @@ import com.uniminuto.clinica.service.MedicamentoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -19,6 +20,7 @@ public class MedicamentoApiController implements MedicamentoApi {
     private MedicamentoService medicamentoService;
 
     @Override
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<Medicamento>> listarMedicamentos() throws BadRequestException {
         return ResponseEntity.ok(medicamentoService.listarMedicamentos());
     }

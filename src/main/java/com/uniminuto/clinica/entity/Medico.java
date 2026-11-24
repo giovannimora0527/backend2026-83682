@@ -40,6 +40,10 @@ public class Medico {
     @JoinColumn(name = "especializacion_id", nullable = false)
     private Especializacion especializacion;
 
+    /** Usuario con rol MEDICO vinculado, si lo tiene. */
+    @Column(name = "usuario_id", unique = true)
+    private Long usuarioId;
+
     @Column(name = "estado", nullable = false)
     private Boolean estado;
 }

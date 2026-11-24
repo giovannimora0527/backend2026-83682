@@ -8,6 +8,7 @@ import com.uniminuto.clinica.models.MiRespuestaRS;
 import com.uniminuto.clinica.service.MascotaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
@@ -20,37 +21,44 @@ public class MascotaApiController implements MascotaApi {
     private MascotaService mascotaService;
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SECRETARIA', 'MEDICO')")
     public ResponseEntity<List<Mascota>> listarMascotas() throws BadRequestException {
        return ResponseEntity.ok(mascotaService.listarMascotas());
     }
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SECRETARIA', 'MEDICO')")
     public ResponseEntity<List<Mascota>> listarMascotasOrdenado(boolean ascendente) throws BadRequestException {
         return ResponseEntity.ok(mascotaService.listarMascotasOrdenado(ascendente));
     }
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SECRETARIA', 'MEDICO')")
     public ResponseEntity<List<Mascota>> buscarMascotaPorNombre(String nombre) throws BadRequestException {
         return ResponseEntity.ok(mascotaService.findByNombreMascota(nombre));
     }
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SECRETARIA', 'MEDICO')")
     public ResponseEntity<List<Mascota>> buscarMascotaPorCliente(Long clienteId) throws BadRequestException {
         return ResponseEntity.ok(mascotaService.buscarMascotasPorCliente(clienteId));
 
     }
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SECRETARIA', 'MEDICO')")
     public ResponseEntity<List<Mascota>> buscarMascotaPorRaza(Integer razaId) throws BadRequestException {
         return ResponseEntity.ok(mascotaService.buscarMascotasPorRaza(razaId));
     }
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SECRETARIA')")
     public ResponseEntity<MiRespuestaRS> guardarMascota(MascotaRq mascotaRq) throws BadRequestException {
         return ResponseEntity.ok(mascotaService.guardarMascota(mascotaRq));
     }
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SECRETARIA')")
     public ResponseEntity<MiRespuestaRS> actualizarMascota(MascotaRq mascotaRq) throws BadRequestException {
         return ResponseEntity.ok(mascotaService.actualizarMascota(mascotaRq));
     }

@@ -161,7 +161,7 @@ documentos duplicados, entrada invalida y respuestas HTTP. Las pruebas de integr
 
 - Todas las rutas exigen `Authorization: Bearer <JWT>`, salvo `/auth/login`, `/auth/validate-token`, `/clinica/test` y Swagger/health cuando existan.
 - El cierre de sesión invalida el token. Contraseñas en BCrypt, con migración automática desde MD5 al iniciar sesión. El OTP es de un solo uso.
-- CORS restringido a `CORS_ORIGINS`. La autorización por rol está pendiente.
+- CORS restringido a `CORS_ORIGINS`. Los permisos por rol se validan con `@PreAuthorize`.
 - Las credenciales que estuvieron versionadas deben rotarse.
 
 ## Despliegue

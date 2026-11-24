@@ -1,6 +1,7 @@
 package com.uniminuto.clinica.security;
 
 import com.uniminuto.clinica.exception.dto.ErrorResponse;
+import com.uniminuto.clinica.repository.MedicoRepository;
 import com.uniminuto.clinica.repository.SessionRepository;
 import com.uniminuto.clinica.repository.UsuarioRepository;
 import jakarta.servlet.http.HttpServletResponse;
@@ -40,6 +41,7 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(HttpSecurity http, JwtValidator jwtValidator,
                                             SessionRepository sessionRepository,
                                             UsuarioRepository usuarioRepository,
+                                            MedicoRepository medicoRepository,
                                             ObjectMapper objectMapper) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
@@ -48,15 +50,35 @@ public class SecurityConfig {
                 .authorizeHttpRequests(rutas -> rutas
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(RUTAS_PUBLICAS).permitAll()
+                        // Segunda barrera por modulo; el detalle por metodo esta en @PreAuthorize (C6).
+                        .requestMatchers("/usuario/**", "/perfil/**", "/reporte/**", "/email/**",
+                                "/inventario/carga/**").hasRole(Rol.ADMINISTRADOR)
+                        .requestMatchers("/factura/**").hasAnyRole(Rol.ADMINISTRADOR, Rol.SECRETARIA)
+                        .requestMatchers("/cita/**", "/medico/**", "/cliente/**", "/mascota/**", "/raza/**")
+                        .hasAnyRole(Rol.ADMINISTRADOR, Rol.SECRETARIA, Rol.MEDICO)
+                        .requestMatchers("/atencion/**", "/historia-clinica/**", "/anotacion-historia/**")
+                        .hasAnyRole(Rol.ADMINISTRADOR, Rol.MEDICO)
+                        .requestMatchers("/despacho/**").hasAnyRole(Rol.DESPACHO_MEDICO, Rol.ADMINISTRADOR)
+                        .requestMatchers(HttpMethod.GET, "/formula-medica/**")
+                        .hasAnyRole(Rol.ADMINISTRADOR, Rol.MEDICO, Rol.DESPACHO_MEDICO)
+                        .requestMatchers("/formula-medica/**").hasAnyRole(Rol.ADMINISTRADOR, Rol.MEDICO)
+                        .requestMatchers(HttpMethod.GET, "/inventario/**")
+                        .hasAnyRole(Rol.ADMINISTRADOR, Rol.DESPACHO_MEDICO, Rol.MEDICO)
+                        .requestMatchers("/inventario/**").hasRole(Rol.ADMINISTRADOR)
+                        .requestMatchers(HttpMethod.GET, "/servicio/**", "/impuesto/**", "/tarifa/**",
+                                "/configuracion-clinica", "/especializacion/**").authenticated()
+                        .requestMatchers("/servicio/**", "/impuesto/**", "/tarifa/**",
+                                "/configuracion-clinica", "/especializacion/**").hasRole(Rol.ADMINISTRADOR)
                         .anyRequest().authenticated())
                 .exceptionHandling(errores -> errores
                         .authenticationEntryPoint((request, response, ex) -> escribirError(response, objectMapper,
-                                HttpStatus.UNAUTHORIZED, "UNAUTHORIZED",
+                                HttpStatus.UNAUTHORIZED,
                                 "Debe iniciar sesión o su sesión ya no es válida."))
                         .accessDeniedHandler((request, response, ex) -> escribirError(response, objectMapper,
-                                HttpStatus.FORBIDDEN, "FORBIDDEN",
+                                HttpStatus.FORBIDDEN,
                                 "No tiene permisos para realizar esta operación.")))
-                .addFilterBefore(new JwtAuthenticationFilter(jwtValidator, sessionRepository, usuarioRepository),
+                .addFilterBefore(new JwtAuthenticationFilter(jwtValidator, sessionRepository, usuarioRepository,
+                                medicoRepository),
                         UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
@@ -79,11 +101,11 @@ public class SecurityConfig {
     }
 
     private static void escribirError(HttpServletResponse response, ObjectMapper objectMapper, HttpStatus status,
-                                      String error, String mensaje) throws IOException {
+                                      String mensaje) throws IOException {
         response.setStatus(status.value());
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.getWriter().write(objectMapper.writeValueAsString(
-                new ErrorResponse(status.value(), error, mensaje)));
+                new ErrorResponse(status, mensaje)));
     }
 }

@@ -4,6 +4,7 @@ import com.uniminuto.clinica.entity.Cliente;
 import com.uniminuto.clinica.entity.Mascota;
 import com.uniminuto.clinica.entity.Raza;
 import com.uniminuto.clinica.exception.BadRequestException;
+import com.uniminuto.clinica.exception.NotFoundException;
 import com.uniminuto.clinica.models.MascotaRq;
 import com.uniminuto.clinica.models.MiRespuestaRS;
 import com.uniminuto.clinica.repository.ClienteRepository;
@@ -69,7 +70,7 @@ public class MascotaServiceImpl implements MascotaService {
                 .findById(clienteId);
 
         if (optCliente.isEmpty()) {
-            throw new BadRequestException("El cliente con ID " + clienteId + " no existe");
+            throw new NotFoundException("El cliente con ID " + clienteId + " no existe");
         }
 
         return this.mascotaRepository
@@ -90,7 +91,7 @@ public class MascotaServiceImpl implements MascotaService {
 
         // Valido que la raza existe, si no existe lanzo una excepción
         if (optRaza.isEmpty()) {
-            throw new BadRequestException("La raza con ID " + razaId + " no existe");
+            throw new NotFoundException("La raza con ID " + razaId + " no existe");
         }
 
         // Paso 3. Buscar las mascotas por raza
@@ -111,7 +112,7 @@ public class MascotaServiceImpl implements MascotaService {
         Optional<Raza> optRaza = this.razaRepository
                 .findById(mascotaRq.getRazaId());
         if (optRaza.isEmpty()) {
-            throw new BadRequestException("La raza con ID " + mascotaRq.getRazaId() + " no existe");
+            throw new NotFoundException("La raza con ID " + mascotaRq.getRazaId() + " no existe");
 
         }
 
@@ -120,7 +121,7 @@ public class MascotaServiceImpl implements MascotaService {
                 .findById(mascotaRq.getClienteId());
 
         if (optCliente.isEmpty()) {
-            throw new BadRequestException("El cliente con ID " + mascotaRq.getClienteId() + " no existe");
+            throw new NotFoundException("El cliente con ID " + mascotaRq.getClienteId() + " no existe");
         }
 
         // Paso 4. Crear la nueva mascota y guardarla en la base de datos
@@ -170,7 +171,7 @@ public class MascotaServiceImpl implements MascotaService {
         Optional<Raza> optRaza = this.razaRepository
                 .findById(mascotaRq.getRazaId());
         if (optRaza.isEmpty()) {
-            throw new BadRequestException("La raza con ID " + mascotaRq.getRazaId() + " no existe");
+            throw new NotFoundException("La raza con ID " + mascotaRq.getRazaId() + " no existe");
 
         }
 
@@ -179,13 +180,13 @@ public class MascotaServiceImpl implements MascotaService {
                 .findById(mascotaRq.getClienteId());
 
         if (optCliente.isEmpty()) {
-            throw new BadRequestException("El cliente con ID " + mascotaRq.getClienteId() + " no existe");
+            throw new NotFoundException("El cliente con ID " + mascotaRq.getClienteId() + " no existe");
         }
 
         // Paso 4. Buscar la mascota existente
         Optional<Mascota> optMascota = this.mascotaRepository.findById(mascotaRq.getMascotaId());
         if (optMascota.isEmpty()) {
-            throw new BadRequestException("La mascota con ID " + mascotaRq.getMascotaId() + " no existe");
+            throw new NotFoundException("La mascota con ID " + mascotaRq.getMascotaId() + " no existe");
         }
 
         // Paso 5. Actualizar la mascota existente

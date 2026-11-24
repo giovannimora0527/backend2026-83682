@@ -3,6 +3,8 @@ package com.uniminuto.clinica.serviceimpl;
 import com.uniminuto.clinica.entity.Perfil;
 import com.uniminuto.clinica.entity.Usuario;
 import com.uniminuto.clinica.exception.BadRequestException;
+import com.uniminuto.clinica.exception.ConflictException;
+import com.uniminuto.clinica.exception.NotFoundException;
 import com.uniminuto.clinica.models.MiRespuestaRS;
 import com.uniminuto.clinica.models.UsuarioRq;
 import com.uniminuto.clinica.models.UsuarioRs;
@@ -58,16 +60,16 @@ public class UsuarioServiceImpl implements UsuarioService {
         }
 
         if (this.usuarioRepository.existsByUsername(usuarioRq.getUsername())) {
-            throw new BadRequestException("El nombre de usuario ya existe");
+            throw new ConflictException("El nombre de usuario ya existe");
         }
         if (this.usuarioRepository.existsByEmail(usuarioRq.getEmail())) {
-            throw new BadRequestException("El correo electrónico ya existe");
+            throw new ConflictException("El correo electrónico ya existe");
         }
 
         Optional<Perfil> optPerfil = this.perfilRepository
                 .findById(usuarioRq.getPerfilId());
         if (optPerfil.isEmpty()) {
-            throw new BadRequestException("El perfil no existe");
+            throw new NotFoundException("El perfil no existe");
         }
 
         Usuario usuarioNuevo = new Usuario();
@@ -96,25 +98,25 @@ public class UsuarioServiceImpl implements UsuarioService {
 
         Optional<Usuario> optUser = this.usuarioRepository.findById(usuarioRq.getId());
         if (optUser.isEmpty()) {
-            throw new BadRequestException("El usuario no existe");
+            throw new NotFoundException("El usuario no existe");
         }
 
         Usuario usuarioExistente = optUser.get();
         if (!usuarioExistente.getUsername().equals(usuarioRq.getUsername())) {
             if (this.usuarioRepository.existsByUsername(usuarioRq.getUsername())) {
-                throw new BadRequestException("El nombre de usuario ya existe");
+                throw new ConflictException("El nombre de usuario ya existe");
             }
         }
         usuarioExistente.setUsername(usuarioRq.getUsername());
         if (!usuarioExistente.getEmail().equals(usuarioRq.getEmail())) {
             if (this.usuarioRepository.existsByEmail(usuarioRq.getEmail())) {
-                throw new BadRequestException("El correo electrónico ya existe");
+                throw new ConflictException("El correo electrónico ya existe");
             }
         }
         Optional<Perfil> optPerfil = this.perfilRepository
                 .findById(usuarioRq.getPerfilId());
         if (optPerfil.isEmpty()) {
-            throw new BadRequestException("El perfil no existe");
+            throw new NotFoundException("El perfil no existe");
         }
 
         usuarioExistente.setEmail(usuarioRq.getEmail());

@@ -2,6 +2,7 @@ package com.uniminuto.clinica.serviceimpl;
 
 import com.uniminuto.clinica.entity.Raza;
 import com.uniminuto.clinica.exception.BadRequestException;
+import com.uniminuto.clinica.exception.ConflictException;
 import com.uniminuto.clinica.models.MiRespuestaRS;
 import com.uniminuto.clinica.models.RazaRq;
 import com.uniminuto.clinica.repository.RazaRepository;
@@ -26,7 +27,7 @@ public class RazaServiceImpl implements RazaService {
         Optional<Raza> optRaza = this.razaRepository.findByEspecieAndNombre(razaRq.getEspecie(), razaRq.getNombre());
 
         if (optRaza.isPresent()) {
-            throw new BadRequestException("La raza ya existe para la especie especificada.");
+            throw new ConflictException("La raza ya existe para la especie especificada.");
         }
 
         Raza nuevaRaza = new Raza();

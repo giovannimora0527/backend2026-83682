@@ -4,11 +4,14 @@ import com.uniminuto.clinica.entity.Cita;
 import com.uniminuto.clinica.entity.FormulaMedica;
 import com.uniminuto.clinica.entity.Medicamento;
 import com.uniminuto.clinica.exception.BadRequestException;
+import com.uniminuto.clinica.exception.NotFoundException;
 import com.uniminuto.clinica.models.FormulaRq;
 import com.uniminuto.clinica.models.MiRespuestaRS;
 import com.uniminuto.clinica.repository.CitaRepository;
 import com.uniminuto.clinica.repository.FormulaMedicaRepository;
 import com.uniminuto.clinica.repository.MedicamentoRepository;
+import com.uniminuto.clinica.security.UsuarioActual;
+import com.uniminuto.clinica.security.UsuarioAutenticado;
 import com.uniminuto.clinica.service.FormulaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -27,11 +30,17 @@ public class FormulaServiceImpl implements FormulaService {
     private CitaRepository citaRepository;
 
     @Autowired
+    private UsuarioActual usuarioActual;
+
+    @Autowired
     private MedicamentoRepository medicamentoRepository;
 
     @Override
     public List<FormulaMedica> findAllFormulas() {
-        return formulaMedicaRepository.findAllByOrderByFechaCreacionRegistroDesc();
+        UsuarioAutenticado usuario = usuarioActual.obtener();
+        return usuario.esMedico()
+                ? formulaMedicaRepository.findByCita_Medico_IdOrderByFechaCreacionRegistroDesc(usuario.medicoId())
+                : formulaMedicaRepository.findAllByOrderByFechaCreacionRegistroDesc();
     }
 
     @Override
@@ -58,15 +67,16 @@ public class FormulaServiceImpl implements FormulaService {
     private Cita existeCita(FormulaRq formulaRq) throws BadRequestException {
         Optional<Cita> citaOptional = citaRepository.findById(formulaRq.getCitaId());
         if (citaOptional.isEmpty()) {
-            throw new BadRequestException("La cita con el id proporcionado no existe.");
+            throw new NotFoundException("La cita con el id proporcionado no existe.");
         }
+        usuarioActual.verificarPropiedad(citaOptional.get().getMedico().getId());
         return citaOptional.get();
     }
 
     private Medicamento existeMedicamento(FormulaRq formulaRq) throws BadRequestException {
         Optional<Medicamento> medicamentoOptional = medicamentoRepository.findById(formulaRq.getMedicamentoId());
         if (medicamentoOptional.isEmpty()) {
-            throw new BadRequestException("El medicamento con el id proporcionado no existe.");
+            throw new NotFoundException("El medicamento con el id proporcionado no existe.");
         }
         return medicamentoOptional.get();
     }
@@ -78,9 +88,10 @@ public class FormulaServiceImpl implements FormulaService {
         Medicamento medicamento = this.existeMedicamento(formulaRq);
         Optional<FormulaMedica> optionalFormulaMedica = this.formulaMedicaRepository.findById(formulaRq.getId());
         if (optionalFormulaMedica.isEmpty()) {
-            throw new BadRequestException("La fórmula médica con el id proporcionado no existe.");
+            throw new NotFoundException("La fórmula médica con el id proporcionado no existe.");
         }
         FormulaMedica formulaExistente = optionalFormulaMedica.get();
+        usuarioActual.verificarPropiedad(formulaExistente.getCita().getMedico().getId());
         formulaExistente.setCita(cita);
         formulaExistente.setMedicamento(medicamento);
         formulaExistente.setDosis(formulaRq.getDosis());

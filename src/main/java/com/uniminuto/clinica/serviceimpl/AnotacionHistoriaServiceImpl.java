@@ -6,6 +6,7 @@ import com.uniminuto.clinica.entity.HistoriaMedica;
 import com.uniminuto.clinica.entity.Mascota;
 import com.uniminuto.clinica.entity.Medico;
 import com.uniminuto.clinica.exception.BadRequestException;
+import com.uniminuto.clinica.exception.NotFoundException;
 import com.uniminuto.clinica.models.AnotacionHistoriaRq;
 import com.uniminuto.clinica.models.MiRespuestaRS;
 import com.uniminuto.clinica.repository.AnotacionHistoriaRepository;
@@ -13,6 +14,7 @@ import com.uniminuto.clinica.repository.CitaRepository;
 import com.uniminuto.clinica.repository.HistoriaMedicaRepository;
 import com.uniminuto.clinica.repository.MascotaRepository;
 import com.uniminuto.clinica.repository.MedicoRepository;
+import com.uniminuto.clinica.security.UsuarioActual;
 import com.uniminuto.clinica.service.AnotacionHistoriaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -38,12 +40,15 @@ public class AnotacionHistoriaServiceImpl implements AnotacionHistoriaService {
     @Autowired
     private CitaRepository citaRepository;
 
+    @Autowired
+    private UsuarioActual usuarioActual;
+
     @Override
     public MiRespuestaRS crearAnotacionHistoria(AnotacionHistoriaRq anotacionHistoriaRq) {
         this.validarAnotacionHistoria(anotacionHistoriaRq);
         Optional<Cita> optCita = this.citaRepository.findById(anotacionHistoriaRq.getCitaId());
         if (optCita.isEmpty()) {
-            throw new BadRequestException("La cita con ID " + anotacionHistoriaRq.getCitaId()  +
+            throw new NotFoundException("La cita con ID " + anotacionHistoriaRq.getCitaId()  +
                     " no existe. Por favor consulte al administrador del sistema o registre la cita antes de " +
                     "crear la anotación de historia clínica.");
         }
@@ -52,6 +57,8 @@ public class AnotacionHistoriaServiceImpl implements AnotacionHistoriaService {
         AnotacionHistoria nuevaAnotacion = new AnotacionHistoria();
 
         Cita cita = optCita.get();
+        usuarioActual.verificarPropiedad(cita.getMedico().getId());
+        usuarioActual.verificarPropiedad(anotacionHistoriaRq.getMedicoId());
 
         Optional<HistoriaMedica> historiaOpt = this.historiaMedicaRepository
                 .findByMascota(cita.getMascota());
@@ -65,7 +72,7 @@ public class AnotacionHistoriaServiceImpl implements AnotacionHistoriaService {
 
         Optional<Medico> medicoOptional = this.medicoRepository.findById(anotacionHistoriaRq.getMedicoId());
         if (medicoOptional.isEmpty()) {
-            throw new BadRequestException("El médico con ID " + anotacionHistoriaRq.getMedicoId() + " no existe");
+            throw new NotFoundException("El médico con ID " + anotacionHistoriaRq.getMedicoId() + " no existe");
         }
         nuevaAnotacion.setDescripcion(anotacionHistoriaRq.getDescripcion());
         nuevaAnotacion.setHistoria(existeHistoria? historiaOpt.get() : historia);

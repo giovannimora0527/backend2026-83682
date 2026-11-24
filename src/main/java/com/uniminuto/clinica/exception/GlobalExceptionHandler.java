@@ -4,14 +4,19 @@ import com.uniminuto.clinica.exception.dto.ErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
+import java.util.Comparator;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @RestControllerAdvice
@@ -21,78 +26,79 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<ErrorResponse> handleNotFound(NotFoundException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(new ErrorResponse(404, "NOT FOUND", ex.getMessage()));
+        return responder(HttpStatus.NOT_FOUND, ex.getMessage());
     }
 
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex) {
-        return ResponseEntity.status(HttpStatus.CONFLICT)
-                .body(new ErrorResponse(409, "CONFLICT", ex.getMessage()));
+        return responder(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ErrorResponse> handleBadRequest(BadRequestException ex) {
+        return responder(ex.getStatus(), ex.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ErrorResponse> handleValidation(MethodArgumentNotValidException ex) {
-        String mensaje = ex.getBindingResult().getFieldErrors().stream()
-                .map(error -> error.getField() + ": " + error.getDefaultMessage())
-                .sorted()
+        List<ErrorResponse.Detalle> detalles = ex.getBindingResult().getFieldErrors().stream()
+                .map(error -> new ErrorResponse.Detalle(error.getField(), error.getDefaultMessage()))
+                .sorted(Comparator.comparing(ErrorResponse.Detalle::campo)
+                        .thenComparing(ErrorResponse.Detalle::mensaje))
+                .toList();
+        String mensaje = detalles.stream()
+                .map(detalle -> detalle.campo() + ": " + detalle.mensaje())
                 .collect(Collectors.joining("; "));
         return ResponseEntity.badRequest()
-                .body(new ErrorResponse(400, "BAD REQUEST", mensaje));
+                .body(new ErrorResponse(HttpStatus.BAD_REQUEST, mensaje, detalles));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleUnreadableBody(HttpMessageNotReadableException ex) {
-        return ResponseEntity.badRequest()
-                .body(new ErrorResponse(400, "BAD REQUEST",
-                        "El body debe ser un JSON valido con las propiedades y los formatos admitidos por el endpoint."));
+        return responder(HttpStatus.BAD_REQUEST,
+                "El body debe ser un JSON valido con las propiedades y los formatos admitidos por el endpoint.");
     }
 
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
-        return ResponseEntity.badRequest()
-                .body(new ErrorResponse(400, "BAD REQUEST", "El parametro " + ex.getName() + " no es valido."));
+        return responder(HttpStatus.BAD_REQUEST, "El parametro " + ex.getName() + " no es valido.");
     }
 
-    @ExceptionHandler(BadRequestException.class)
-    public ResponseEntity<ErrorResponse> handleBadRequest(
-            BadRequestException ex) {
-
-        ErrorResponse error = new ErrorResponse(
-                ex.getStatus().value(),
-                "BAD REQUEST",
-                ex.getMessage()
-        );
-
-        return ResponseEntity
-                .status(ex.getStatus())
-                .body(error);
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponse> handleMissingParameter(MissingServletRequestParameterException ex) {
+        return responder(HttpStatus.BAD_REQUEST, "El parametro " + ex.getParameterName() + " es obligatorio.");
     }
 
     @ExceptionHandler(CorreoException.class)
     public ResponseEntity<ErrorResponse> handleCorreo(CorreoException ex) {
         LOGGER.error("Fallo el envio de un correo", ex);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(new ErrorResponse(500, "INTERNAL SERVER_ERROR", ex.getMessage()));
+        return responder(HttpStatus.INTERNAL_SERVER_ERROR, ex.getMessage());
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthentication(AuthenticationException ex) {
+        return responder(HttpStatus.UNAUTHORIZED, "Debe iniciar sesión o su sesión ya no es válida.");
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
-        return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                .body(new ErrorResponse(403, "FORBIDDEN", "No tiene permisos para realizar esta operación."));
+        return responder(HttpStatus.FORBIDDEN, "No tiene permisos para realizar esta operación.");
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleException(Exception ex) {
+        // Errores propios de Spring MVC: ruta inexistente (404), metodo (405), tipo de contenido (415)...
+        if (ex instanceof org.springframework.web.ErrorResponse errorSpring
+                && errorSpring.getStatusCode().is4xxClientError()) {
+            return responder(errorSpring.getStatusCode(),
+                    errorSpring.getStatusCode().value() == 404
+                            ? "El recurso solicitado no existe." : "La solicitud no es válida para este recurso.");
+        }
         LOGGER.error("Error interno al procesar la solicitud", ex);
-        ErrorResponse error = new ErrorResponse(
-                HttpStatus.INTERNAL_SERVER_ERROR.value(),
-                "INTERNAL SERVER_ERROR",
-                "Ocurrio un error interno al procesar la solicitud."
-        );
+        return responder(HttpStatus.INTERNAL_SERVER_ERROR, "Ocurrio un error interno al procesar la solicitud.");
+    }
 
-        return ResponseEntity
-                .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(error);
+    private static ResponseEntity<ErrorResponse> responder(HttpStatusCode status, String mensaje) {
+        return ResponseEntity.status(status).body(new ErrorResponse(status, mensaje));
     }
 }

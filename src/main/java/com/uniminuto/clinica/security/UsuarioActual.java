@@ -1,5 +1,6 @@
 package com.uniminuto.clinica.security;
 
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -14,5 +15,13 @@ public class UsuarioActual {
             return usuario;
         }
         throw new AuthenticationCredentialsNotFoundException("No hay un usuario autenticado.");
+    }
+
+    /** Un MEDICO solo opera sobre lo suyo; los demas roles los limita @PreAuthorize. */
+    public void verificarPropiedad(Long medicoId) {
+        UsuarioAutenticado usuario = obtener();
+        if (usuario.esMedico() && (usuario.medicoId() == null || !usuario.medicoId().equals(medicoId))) {
+            throw new AccessDeniedException("El recurso pertenece a otro medico.");
+        }
     }
 }

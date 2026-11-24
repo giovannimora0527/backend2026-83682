@@ -8,6 +8,7 @@ import com.uniminuto.clinica.service.CitaService;
 import com.uniminuto.clinica.exception.BadRequestException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
@@ -21,28 +22,39 @@ public class CitaApiController implements CitaApi {
 
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SECRETARIA')")
     public ResponseEntity<List<Cita>> listarCitas() throws BadRequestException {
         return ResponseEntity.ok(this.citaService.listarCitas());
     }
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SECRETARIA')")
     public ResponseEntity<List<Cita>> listarCitasRango(LocalDateTime fechaInicio, LocalDateTime fechaFin)
             throws BadRequestException {
         return ResponseEntity.ok(this.citaService.listarCitasRango(fechaInicio, fechaFin));
     }
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SECRETARIA', 'MEDICO')")
     public ResponseEntity<List<Cita>> listarCitasPorMascota(Integer mascotaId) throws BadRequestException {
         return ResponseEntity.ok(this.citaService.listarCitasPorMascota(mascotaId));
     }
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SECRETARIA', 'MEDICO')")
     public ResponseEntity<MiRespuestaRS> crearCita(CitaRq cita) throws BadRequestException {
         return ResponseEntity.ok(this.citaService.crearCita(cita));
     }
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SECRETARIA', 'MEDICO')")
     public ResponseEntity<MiRespuestaRS> actualizarCita(CitaRq cita) throws BadRequestException {
         return ResponseEntity.ok(this.citaService.actualizarCita(cita));
+    }
+
+    @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SECRETARIA', 'MEDICO')")
+    public ResponseEntity<Cita> obtenerCita(Long id) {
+        return ResponseEntity.ok(this.citaService.obtenerCita(id));
     }
 }

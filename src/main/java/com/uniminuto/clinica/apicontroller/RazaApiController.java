@@ -8,6 +8,7 @@ import com.uniminuto.clinica.models.RazaRq;
 import com.uniminuto.clinica.service.RazaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -19,11 +20,13 @@ public class RazaApiController implements RazaApi {
     private RazaService razaService;
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SECRETARIA')")
     public ResponseEntity<MiRespuestaRS> guardarRaza(RazaRq razaRq) throws BadRequestException {
         return ResponseEntity.ok(this.razaService.crearRazaNueva(razaRq));
     }
 
     @Override
+    @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SECRETARIA', 'MEDICO')")
     public ResponseEntity<List<Raza>> listarRazas() throws BadRequestException {
         return ResponseEntity.ok(this.razaService.listarRazas());
     }

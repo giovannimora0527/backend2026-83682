@@ -2,11 +2,16 @@ package com.uniminuto.clinica.serviceimpl;
 
 import com.uniminuto.clinica.entity.Especializacion;
 import com.uniminuto.clinica.entity.Medico;
+import com.uniminuto.clinica.entity.Usuario;
 import com.uniminuto.clinica.exception.BadRequestException;
+import com.uniminuto.clinica.exception.ConflictException;
+import com.uniminuto.clinica.exception.NotFoundException;
 import com.uniminuto.clinica.models.MedicoRq;
 import com.uniminuto.clinica.models.MiRespuestaRS;
 import com.uniminuto.clinica.repository.EspecializacionRepository;
 import com.uniminuto.clinica.repository.MedicoRepository;
+import com.uniminuto.clinica.repository.UsuarioRepository;
+import com.uniminuto.clinica.security.Rol;
 import com.uniminuto.clinica.service.MedicoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -20,6 +25,9 @@ public class MedicoServiceImpl implements MedicoService {
 
     @Autowired
     private MedicoRepository medicoRepository;
+
+    @Autowired
+    private UsuarioRepository usuarioRepository;
 
     @Autowired
     private EspecializacionRepository especializacionRepository;
@@ -50,10 +58,10 @@ public class MedicoServiceImpl implements MedicoService {
     public MiRespuestaRS guardarMedico(MedicoRq medicoRq) throws BadRequestException {
         this.validarMedico(medicoRq);
         if (this.medicoRepository.existsByNumeroDocumento(medicoRq.getNumeroDocumento().trim())) {
-            throw new BadRequestException("Ya existe un médico con el número de documento proporcionado.");
+            throw new ConflictException("Ya existe un médico con el número de documento proporcionado.");
         }
         if (this.medicoRepository.existsByRegistroProfesional(medicoRq.getRegistroProfesional().trim())) {
-            throw new BadRequestException("Ya existe un médico con el registro profesional proporcionado.");
+            throw new ConflictException("Ya existe un médico con el registro profesional proporcionado.");
         }
         Especializacion especializacion = this.existeEspecializacion(medicoRq);
 
@@ -76,15 +84,15 @@ public class MedicoServiceImpl implements MedicoService {
         this.validarMedico(medicoRq);
         Optional<Medico> optionalMedico = this.medicoRepository.findById(medicoRq.getId());
         if (optionalMedico.isEmpty()) {
-            throw new BadRequestException("El médico con el id proporcionado no existe.");
+            throw new NotFoundException("El médico con el id proporcionado no existe.");
         }
         if (this.medicoRepository.existsByNumeroDocumentoAndIdNot(
                 medicoRq.getNumeroDocumento().trim(), medicoRq.getId())) {
-            throw new BadRequestException("Ya existe otro médico con el número de documento proporcionado.");
+            throw new ConflictException("Ya existe otro médico con el número de documento proporcionado.");
         }
         if (this.medicoRepository.existsByRegistroProfesionalAndIdNot(
                 medicoRq.getRegistroProfesional().trim(), medicoRq.getId())) {
-            throw new BadRequestException("Ya existe otro médico con el registro profesional proporcionado.");
+            throw new ConflictException("Ya existe otro médico con el registro profesional proporcionado.");
         }
         Especializacion especializacion = this.existeEspecializacion(medicoRq);
 
@@ -106,13 +114,30 @@ public class MedicoServiceImpl implements MedicoService {
         medico.setTelefono(medicoRq.getTelefono() == null ? null : medicoRq.getTelefono().trim());
         medico.setRegistroProfesional(medicoRq.getRegistroProfesional().trim());
         medico.setEspecializacion(especializacion);
+        if (medicoRq.getUsuarioId() != null) {
+            this.validarUsuario(medicoRq.getUsuarioId(), medico.getId());
+            medico.setUsuarioId(medicoRq.getUsuarioId());
+        }
+    }
+
+    private void validarUsuario(Long usuarioId, Long medicoId) {
+        Usuario usuario = this.usuarioRepository.findById(usuarioId)
+                .orElseThrow(() -> new NotFoundException("El usuario no existe."));
+        if (!Rol.MEDICO.equals(usuario.getPerfil().getCodigo())) {
+            throw new BadRequestException("El usuario vinculado debe tener el rol MEDICO.");
+        }
+        this.medicoRepository.findByUsuarioId(usuarioId)
+                .filter(otro -> !otro.getId().equals(medicoId))
+                .ifPresent(otro -> {
+                    throw new ConflictException("El usuario ya está vinculado a otro médico.");
+                });
     }
 
     private Especializacion existeEspecializacion(MedicoRq medicoRq) throws BadRequestException {
         Optional<Especializacion> optionalEspecializacion = this.especializacionRepository
                 .findById(medicoRq.getEspecializacionId());
         if (optionalEspecializacion.isEmpty()) {
-            throw new BadRequestException("La especialización con el id proporcionado no existe.");
+            throw new NotFoundException("La especialización con el id proporcionado no existe.");
         }
         return optionalEspecializacion.get();
     }

@@ -36,7 +36,7 @@ public class MenuServiceImpl implements MenuService {
                 List<PerfilMenu> perfilMenus = perfilMenuRepository.findByPerfil(perfil.get());
                 for (PerfilMenu perfilMenu : perfilMenus) {
                     Menu menu = perfilMenu.getMenu();
-                    if (!menus.contains(menu)) {
+                    if (Boolean.TRUE.equals(menu.getActivo()) && !menus.contains(menu)) {
                         menus.add(menu);
                     }
                 }
