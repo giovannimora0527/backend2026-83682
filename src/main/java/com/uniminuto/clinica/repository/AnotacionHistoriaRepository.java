@@ -11,4 +11,6 @@ import java.util.Optional;
 @Repository
 public interface AnotacionHistoriaRepository extends JpaRepository<AnotacionHistoria, Long> {
     List<AnotacionHistoria> findByHistoria(HistoriaMedica historia);
+
+    List<AnotacionHistoria> findByHistoria_Mascota_MascotaIdOrderByFechaDescIdDesc(Integer mascotaId);
 }

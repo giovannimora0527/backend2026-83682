@@ -79,6 +79,20 @@ El código del menú de citas es `cita`, no `citas`; la ruta sigue siendo `/inic
 - 409 por duplicado con `detalles`. Las restricciones de la base y los choques de versión también responden 409.
 - `FormulaRs` usa los nombres del frontend: `fecha`, `medicamentoCodigo`, `medicamentoNombre`.
 
+## Fase 6: tarifas, atención y fórmulas
+
+- **Cambio acordado de C5:** `EN_ATENCION` solo se asigna con `POST /atencion/iniciar/{citaId}` y `ATENDIDA` solo con `POST /atencion/{id}/finalizar`. `PATCH /cita/{id}/estado` y `/cita/actualizar` responden 409 para esos estados; siguen permitiendo `CONFIRMADA` y `CANCELADA`.
+- Tarifas: cambiar el valor o el impuesto cierra la vigente y crea otra, con motivo y usuario en `tarifa_historial`. Las vigencias futuras no se admiten.
+- El porcentaje de un impuesto en uso no se edita, para que ningún cambio de IVA quede fuera del historial.
+- Finalizar exige tarifa vigente en cada servicio, porque sin ella no se podría facturar.
+- Al finalizar se crea una anotación en `anotacion_historia`; en los antecedentes no se repite.
+- Fórmula olvidada: se admite con la cita ATENDIDA si se finalizó el mismo día.
+- Anular una fórmula cancela una preparación abierta; no se permite si ya se entregó algo.
+- El número se asigna al confirmar, con la configuración bloqueada.
+- Los permisos de fórmulas y atención se validan antes que el cuerpo de la petición.
+- `db/04_horarios_medicos_existentes.sql`: lunes a viernes 8–12 y 14–18 para médicos sin horario.
+- PDF con OpenPDF 2.0.4.
+
 ## Fase 5: citas, horarios y calendario
 
 - `AgendaService` reúne las reglas de 5.3 y bloquea médico y mascota, en ese orden: dos peticiones simultáneas no ocupan el mismo espacio. Probado en MySQL 8.4 con 8 peticiones a la vez.

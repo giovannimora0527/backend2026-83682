@@ -241,47 +241,6 @@ Rol: ADMINISTRADOR, SECRETARIA, MEDICO (solo las suyas). **JSON definitivo de la
 }
 ```
 
-## `GET /formula-medica/listar`
-
-Rol: ADMINISTRADOR, MEDICO (las suyas). **JSON definitivo de la fórmula**: encabezado con detalles; es el mismo objeto que devolverán `GET /formula-medica/{id}`, `/cita/{citaId}` y el `data` de crear, editar, confirmar y anular (estos agregarán `cantidadSugerida` en cada detalle). `numero` y `estadoDespacho` son `null` en BORRADOR. Los filtros llegan en la fase 6. `POST /guardar` y `POST /actualizar` responden 410.
-
-```json
-[
-  {
-    "id": 1,
-    "numero": "FM-000001",
-    "citaId": 5,
-    "medicoId": 1,
-    "medicoNombre": "Sofía Ramírez",
-    "mascotaId": 3,
-    "mascotaNombre": "Luna",
-    "clienteId": 1,
-    "clienteNombre": "Juan Pérez",
-    "fecha": "2026-11-16T09:25:00",
-    "indicacionesGenerales": "Reposo",
-    "estadoFormula": "CONFIRMADA",
-    "estadoDespacho": "PENDIENTE_DESPACHO",
-    "fechaConfirmacion": "2026-11-16T09:26:00",
-    "detalles": [
-      {
-        "id": 1,
-        "medicamentoId": 1,
-        "medicamentoCodigo": "AMX00500",
-        "medicamentoNombre": "Amoxicilina 500 mg",
-        "dosis": 1.0,
-        "unidadDosis": "tableta",
-        "frecuenciaHoras": 8,
-        "duracionDias": 7,
-        "viaAdministracion": "ORAL",
-        "cantidadPrescrita": 21,
-        "cantidadDespachada": 0,
-        "indicaciones": "con comida"
-      }
-    ]
-  }
-]
-```
-
 ## `GET /perfil/listar`
 
 Rol: ADMINISTRADOR. Perfiles activos con código.
@@ -336,6 +295,342 @@ Rol: ADMINISTRADOR, SECRETARIA. Lista vacía mientras no haya facturas; 404 si e
    "especialidadNombre": "Medicina general veterinaria", "subtotal": 50000.00, "descuentos": 0.00, "iva": 9500.00,
    "total": 59500.00, "pagado": 0.00, "saldo": 59500.00, "estado": "PENDIENTE", "observacion": null }]
 ```
+
+# Tarifas y configuración
+
+Lectura: cualquier usuario autenticado. Escritura: ADMINISTRADOR. Crear, editar y cambiar estado devuelven `{ status, message, data }` con el mismo objeto del listado.
+
+## Impuestos
+
+`GET /impuesto/listar`, `POST /impuesto/crear`, `PUT /impuesto/{id}`. Cuerpo: `{ "nombre", "porcentaje", "activo" }`. 409 al cambiar el porcentaje de un impuesto en uso (cree otro) o al inactivar uno de una tarifa vigente.
+
+```json
+[
+  {
+    "id": 1,
+    "nombre": "IVA 0 %",
+    "porcentaje": 0.0,
+    "activo": true
+  }
+]
+```
+
+## Servicios
+
+`GET /servicio/listar?soloActivos=&especializacionId=`, `POST /servicio/crear`, `PUT /servicio/{id}`, `PATCH /servicio/{id}/estado`. `soloActivos` excluye también los de especialidades inactivas. `tarifaVigente` puede ser `null`.
+
+```json
+[
+  {
+    "id": 6,
+    "codigo": "CIRU-MEN",
+    "nombre": "Cirugía menor",
+    "descripcion": "Cirugía menor",
+    "tipoServicio": "CIRUGIA",
+    "especializacionId": 2,
+    "especializacionNombre": "Cirugía veterinaria",
+    "duracionMinutos": 60,
+    "activo": true,
+    "tarifaVigente": {
+      "id": 7,
+      "valor": 250000.0,
+      "impuestoId": 3,
+      "porcentajeIva": 19.0
+    }
+  }
+]
+```
+
+## Tarifas
+
+`GET /tarifa/listar?servicioId=&soloVigentes=`:
+
+```json
+[
+  {
+    "id": 7,
+    "servicioId": 6,
+    "servicioCodigo": "CIRU-MEN",
+    "servicioNombre": "Cirugía menor",
+    "especializacionNombre": "Cirugía veterinaria",
+    "valor": 250000.0,
+    "impuestoId": 3,
+    "impuestoNombre": "IVA 19 %",
+    "porcentajeIva": 19.0,
+    "vigenteDesde": "2026-01-01",
+    "vigenteHasta": null,
+    "activa": true
+  }
+]
+```
+
+`POST /tarifa/crear`: `{ "servicioId", "valor", "impuestoId", "vigenteDesde" }` (hoy si falta; no futura). 409 si el servicio ya tiene una vigente.
+
+`PUT /tarifa/{id}`: `{ "valor", "impuestoId", "motivo" }`. Cierra la vigente y crea otra: **`data.id` es el id nuevo**. 409 si no hay cambios o si ya no está vigente.
+
+`GET /tarifa/{id}/historial` (todo el historial del servicio) y `GET /tarifa/historial?desde=&hasta=`:
+
+```json
+[
+  {
+    "id": 1,
+    "tarifaId": 8,
+    "servicioId": 5,
+    "servicioNombre": "Curación",
+    "valorAnterior": 40000.0,
+    "valorNuevo": 41004.0,
+    "ivaAnterior": 19.0,
+    "ivaNuevo": 19.0,
+    "motivo": "Ajuste",
+    "usuario": "admin",
+    "fecha": "2026-11-24T13:26:25"
+  }
+]
+```
+
+## `GET` y `PUT /configuracion-clinica`
+
+```json
+{
+  "nombre": "Clínica Veterinaria Uniminuto",
+  "nit": "900000000-0",
+  "direccion": "Calle 1 # 2-3, Bogotá",
+  "telefono": "6010000000",
+  "correo": "contacto@clinica.example",
+  "prefijoFactura": "FV",
+  "prefijoFormula": "FM",
+  "prefijoDespacho": "DP",
+  "topeDescuentoSecretaria": 10.0
+}
+```
+
+# Atención médica
+
+Escritura: el MEDICO dueño de la cita. Consulta: ese MEDICO y ADMINISTRADOR.
+
+## `POST /atencion/iniciar/{citaId}`
+
+Sin cuerpo. El mismo día de la cita y desde 30 minutos antes. Si ya existe, la devuelve. Respuesta como la de finalizar, con `estadoCita: "EN_ATENCION"`.
+
+## `PUT /atencion/{id}`
+
+Cuerpo: `{ "motivoConsulta", "sintomas", "diagnostico", "observaciones", "recomendaciones", "servicios": [{ "servicioId", "cantidad" }] }`. Guarda todos los textos enviados; si `servicios` no llega, se conservan. 409 si ya finalizó o hay servicios repetidos.
+
+## `POST /atencion/{id}/finalizar`
+
+Exige motivo, síntomas y diagnóstico (400 con `detalles`). 409 si hay fórmulas en borrador o un servicio sin tarifa. Sin servicios agrega el agendado o la consulta de la especialidad.
+
+```json
+{
+  "status": 200,
+  "message": "Atención finalizada correctamente.",
+  "data": {
+    "id": 2,
+    "citaId": 8,
+    "medicoId": 1,
+    "medicoNombre": "Sofía Ramírez",
+    "estadoCita": "ATENDIDA",
+    "motivoConsulta": "Vómito",
+    "sintomas": "Decaimiento",
+    "diagnostico": "Gastritis",
+    "observaciones": "Estable",
+    "recomendaciones": "Dieta blanda",
+    "servicios": [
+      {
+        "servicioId": 1,
+        "servicioCodigo": "CONS-GEN",
+        "servicioNombre": "Consulta general",
+        "cantidad": 1
+      },
+      {
+        "servicioId": 5,
+        "servicioCodigo": "CURACION",
+        "servicioNombre": "Curación",
+        "cantidad": 1
+      }
+    ],
+    "fechaInicio": "2026-11-24T13:26:26",
+    "fechaFin": "2026-11-24T13:26:26",
+    "finalizada": true
+  }
+}
+```
+
+## `GET /atencion/cita/{citaId}`
+
+```json
+{
+  "atencion": "<atención, como en finalizar, o null si no se ha iniciado>",
+  "cita": {
+    "id": 8,
+    "fechaInicio": "2026-11-24T13:26:25",
+    "fechaFin": "2026-11-24T13:56:25",
+    "estado": "ATENDIDA",
+    "motivo": "Vomito",
+    "servicioId": 1,
+    "servicioNombre": "Consulta general"
+  },
+  "mascota": {
+    "id": 1,
+    "nombre": "Firulais",
+    "especie": "Perro",
+    "raza": "Criollo",
+    "edad": 3,
+    "activo": true
+  },
+  "propietario": {
+    "id": 1,
+    "nombre": "Juan Pérez",
+    "documento": "9000000001",
+    "telefono": "3000000001",
+    "correo": "cliente1@clinica.example"
+  },
+  "antecedentes": {
+    "atenciones": [
+      {
+        "id": 1,
+        "citaId": 5,
+        "medicoId": 1,
+        "medicoNombre": "Sofía Ramírez",
+        "estadoCita": "ATENDIDA",
+        "motivoConsulta": "Vómito",
+        "sintomas": "Decaimiento",
+        "diagnostico": "Esguince leve",
+        "observaciones": "Estable",
+        "recomendaciones": "Dieta blanda",
+        "servicios": [
+          {
+            "servicioId": 1,
+            "servicioCodigo": "CONS-GEN",
+            "servicioNombre": "Consulta general",
+            "cantidad": 1
+          },
+          {
+            "servicioId": 5,
+            "servicioCodigo": "CURACION",
+            "servicioNombre": "Curación",
+            "cantidad": 1
+          }
+        ],
+        "fechaInicio": "2026-11-24T13:26:26",
+        "fechaFin": "2026-11-24T13:26:27",
+        "finalizada": true
+      }
+    ],
+    "anotaciones": [
+      {
+        "id": 3,
+        "fecha": "2025-11-24T10:00:00",
+        "medicoNombre": "Sofía Ramírez",
+        "descripcion": "Control",
+        "diagnostico": null,
+        "observaciones": null
+      }
+    ],
+    "formulas": [
+      "<fórmula completa>"
+    ]
+  }
+}
+```
+
+## `GET /atencion/{id}/prefactura/pdf`
+
+Servicios con su tarifa vigente y medicamentos de fórmulas confirmadas. Descarga `prefactura_<id>.pdf`.
+
+# Fórmulas médicas
+
+## `POST /formula-medica/crear` y `PUT /formula-medica/{id}`
+
+Rol: MEDICO dueño. Cuerpo del contrato; `cantidadPrescrita` es opcional (usa la sugerida). Solo durante la atención o el mismo día en que finalizó; editar, solo en BORRADOR. La disponibilidad informa y no bloquea.
+
+```json
+{
+  "status": 200,
+  "message": "Fórmula creada en borrador.",
+  "data": {
+    "id": 1,
+    "numero": null,
+    "citaId": 8,
+    "atencionId": 2,
+    "medicoId": 1,
+    "medicoNombre": "Sofía Ramírez",
+    "mascotaId": 1,
+    "mascotaNombre": "Firulais",
+    "clienteId": 1,
+    "clienteNombre": "Juan Pérez",
+    "fecha": "2026-11-24T13:26:26",
+    "indicacionesGenerales": "Control en 8 días",
+    "estadoFormula": "BORRADOR",
+    "estadoDespacho": null,
+    "fechaConfirmacion": null,
+    "motivoAnulacion": null,
+    "detalles": [
+      {
+        "id": 1,
+        "medicamentoId": 1,
+        "medicamentoCodigo": "AMX00500",
+        "medicamentoNombre": "Amoxicilina 500 mg",
+        "presentacion": "Caja x 10 tabletas",
+        "dosis": 1,
+        "unidadDosis": "tableta",
+        "frecuenciaHoras": 8,
+        "duracionDias": 7,
+        "viaAdministracion": "ORAL",
+        "cantidadSugerida": 21,
+        "cantidadPrescrita": 21,
+        "cantidadDespachada": 0,
+        "indicaciones": "Con comida",
+        "cantidadDisponibleVigente": 180,
+        "alcanza": true
+      },
+      {
+        "id": 2,
+        "medicamentoId": 3,
+        "medicamentoCodigo": "IVE00010",
+        "medicamentoNombre": "Ivermectina 1 %",
+        "presentacion": "Frasco 50 ml",
+        "dosis": 1,
+        "unidadDosis": "ml",
+        "frecuenciaHoras": 8,
+        "duracionDias": 7,
+        "viaAdministracion": "ORAL",
+        "cantidadSugerida": 21,
+        "cantidadPrescrita": 1,
+        "cantidadDespachada": 0,
+        "indicaciones": "Con comida",
+        "cantidadDisponibleVigente": 0,
+        "alcanza": false
+      }
+    ]
+  }
+}
+```
+
+## `POST /formula-medica/{id}/confirmar`
+
+Sin cuerpo. Asigna número. `data`:
+
+```json
+{
+  "id": 1,
+  "numero": "FM-000001",
+  "estadoFormula": "CONFIRMADA",
+  "estadoDespacho": "PENDIENTE_DESPACHO",
+  "fechaConfirmacion": "2026-11-24T13:26:26"
+}
+```
+(más los demás campos de la fórmula).
+
+## `POST /formula-medica/{id}/anular`
+
+Rol: MEDICO dueño, ADMINISTRADOR. Cuerpo `{ "motivo" }`. 409 si ya se entregó algo. Queda `ANULADA` y, si estaba confirmada, `estadoDespacho: "CANCELADO"`.
+
+## Consultas
+
+- `GET /formula-medica/listar?texto=&desde=&hasta=&estado=`: ADMINISTRADOR, MEDICO (las suyas). `estado` es el de la fórmula.
+- `GET /formula-medica/cita/{citaId}`: ADMINISTRADOR, MEDICO.
+- `GET /formula-medica/{id}` y `/pdf`: además DESPACHO_MEDICO, que no ve borradores (403).
 
 # Citas, horarios y calendario
 

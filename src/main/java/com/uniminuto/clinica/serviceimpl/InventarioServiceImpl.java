@@ -1,5 +1,6 @@
 package com.uniminuto.clinica.serviceimpl;
 
+import com.uniminuto.clinica.util.Texto;
 import com.uniminuto.clinica.entity.Impuesto;
 import com.uniminuto.clinica.entity.LoteMedicamento;
 import com.uniminuto.clinica.entity.Medicamento;
@@ -68,12 +69,12 @@ public class InventarioServiceImpl implements InventarioService {
     @Override
     @Transactional(readOnly = true)
     public List<ProductoRs> listar(String texto, TipoProducto tipo, EstadoStock estadoStock, boolean soloActivos) {
-        String filtro = texto == null ? "" : normalizar(texto);
+        String filtro = texto == null ? "" : Texto.normalizar(texto);
         return todos().stream()
                 .filter(p -> !soloActivos || Boolean.TRUE.equals(p.activo()))
                 .filter(p -> tipo == null || p.tipoProducto() == tipo)
                 .filter(p -> estadoStock == null || p.estadosStock().contains(estadoStock))
-                .filter(p -> normalizar(p.codigo() + " " + p.nombre()).contains(filtro))
+                .filter(p -> Texto.normalizar(p.codigo() + " " + p.nombre()).contains(filtro))
                 .toList();
     }
 
@@ -312,10 +313,5 @@ public class InventarioServiceImpl implements InventarioService {
 
     private static String vacioANulo(String valor) {
         return valor == null || valor.isBlank() ? null : valor.trim();
-    }
-
-    private static String normalizar(String valor) {
-        return java.text.Normalizer.normalize(valor.trim(), java.text.Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT);
     }
 }

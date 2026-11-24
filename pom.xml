@@ -28,6 +28,7 @@
 	</scm>
 	<properties>
 		<java.version>21</java.version>
+		<openpdf.version>2.0.4</openpdf.version>
 		<poi.version>5.5.1</poi.version>
 		<commons-csv.version>1.14.1</commons-csv.version>
 		<jjwt.version>0.12.6</jjwt.version>
@@ -109,6 +110,11 @@
 			<groupId>org.apache.commons</groupId>
 			<artifactId>commons-csv</artifactId>
 			<version>${commons-csv.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>com.github.librepdf</groupId>
+			<artifactId>openpdf</artifactId>
+			<version>${openpdf.version}</version>
 		</dependency>
 	</dependencies>
 

@@ -1,5 +1,8 @@
 package com.uniminuto.clinica.repository;
 
+import java.util.Optional;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.Lock;
 import com.uniminuto.clinica.entity.Cita;
 import com.uniminuto.clinica.entity.Mascota;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -47,4 +50,8 @@ public interface CitaRepository extends JpaRepository<Cita, Long> {
     @Query("SELECT COUNT(c) > 0 FROM Cita c WHERE c.mascota.mascotaId = :mascotaId" + NO_CANCELADA)
     boolean mascotaOcupada(@Param("mascotaId") Integer mascotaId, @Param("inicio") LocalDateTime inicio,
                            @Param("fin") LocalDateTime fin, @Param("idExcluido") Long idExcluido);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT c FROM Cita c WHERE c.id = :id")
+    Optional<Cita> bloquear(@Param("id") Long id);
 }

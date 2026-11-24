@@ -181,15 +181,17 @@ class CitasTests extends PruebaIntegracion {
     @Test
     void transicionesDeEstado() throws Exception {
         long id = id(crear(luna, medico, a(9, 0), null));
-        conflicto(estado(id, "ATENDIDA", null), "no puede pasar de PROGRAMADA a ATENDIDA");
+        conflicto(estado(id, "EN_ATENCION", null), "solo se asigna al iniciar la atención");
+        conflicto(estado(id, "ATENDIDA", null), "solo se asigna al finalizar la atención");
         estado(id, "CONFIRMADA", null).andExpect(status().isOk());
         conflicto(estado(id, "PROGRAMADA", null), "no puede pasar");
-        estado(id, "EN_ATENCION", null).andExpect(status().isOk());
-        conflicto(estado(id, "CANCELADA", "x"), "no puede pasar");
-        estado(id, "ATENDIDA", null).andExpect(status().isOk());
-        conflicto(estado(id, "CONFIRMADA", null), "no puede pasar");
         estado(id, "OTRO", null).andExpect(status().isBadRequest());
-        assertEquals(4, historial.count());
+        Cita cita = citas.findById(id).orElseThrow();
+        cita.setEstado(EstadoCita.EN_ATENCION);
+        citas.save(cita);
+        conflicto(estado(id, "CANCELADA", "x"), "no puede pasar");
+        conflicto(estado(id, "ATENDIDA", null), "solo se asigna");
+        assertEquals(2, historial.count());
     }
 
     @Test

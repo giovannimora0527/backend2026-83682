@@ -1,7 +1,6 @@
 package com.uniminuto.clinica.serviceimpl;
 
 import com.uniminuto.clinica.entity.Cita;
-import com.uniminuto.clinica.entity.CitaHistorialEstado;
 import com.uniminuto.clinica.entity.Especializacion;
 import com.uniminuto.clinica.entity.Medico;
 import com.uniminuto.clinica.entity.Servicio;
@@ -20,7 +19,6 @@ import com.uniminuto.clinica.repository.CitaRepository;
 import com.uniminuto.clinica.repository.MascotaRepository;
 import com.uniminuto.clinica.repository.MedicoRepository;
 import com.uniminuto.clinica.repository.ServicioRepository;
-import com.uniminuto.clinica.repository.UsuarioRepository;
 import com.uniminuto.clinica.security.UsuarioActual;
 import com.uniminuto.clinica.security.UsuarioAutenticado;
 import com.uniminuto.clinica.service.CitaService;
@@ -44,21 +42,21 @@ public class CitaServiceImpl implements CitaService {
     private final MascotaRepository mascotaRepository;
     private final MedicoRepository medicoRepository;
     private final ServicioRepository servicioRepository;
-    private final UsuarioRepository usuarioRepository;
+    private final HistorialCitaService historialCita;
     private final AgendaService agenda;
     private final ReporteCitasExcel reporteExcel;
     private final UsuarioActual usuarioActual;
 
     public CitaServiceImpl(CitaRepository citaRepository, CitaHistorialEstadoRepository historialRepository,
                            MascotaRepository mascotaRepository, MedicoRepository medicoRepository,
-                           ServicioRepository servicioRepository, UsuarioRepository usuarioRepository,
+                           ServicioRepository servicioRepository, HistorialCitaService historialCita,
                            AgendaService agenda, ReporteCitasExcel reporteExcel, UsuarioActual usuarioActual) {
         this.citaRepository = citaRepository;
         this.historialRepository = historialRepository;
         this.mascotaRepository = mascotaRepository;
         this.medicoRepository = medicoRepository;
         this.servicioRepository = servicioRepository;
-        this.usuarioRepository = usuarioRepository;
+        this.historialCita = historialCita;
         this.agenda = agenda;
         this.reporteExcel = reporteExcel;
         this.usuarioActual = usuarioActual;
@@ -235,6 +233,10 @@ public class CitaServiceImpl implements CitaService {
     }
 
     private static void exigirTransicion(EstadoCita anterior, EstadoCita nuevo) {
+        if (nuevo == EstadoCita.EN_ATENCION || nuevo == EstadoCita.ATENDIDA) {
+            throw new ConflictException("estado", "El estado " + nuevo + " solo se asigna al "
+                    + (nuevo == EstadoCita.ATENDIDA ? "finalizar" : "iniciar") + " la atención médica.");
+        }
         if (!anterior.puedePasarA(nuevo)) {
             throw new ConflictException("estado", "La cita no puede pasar de " + anterior + " a " + nuevo + ".");
         }
@@ -267,16 +269,7 @@ public class CitaServiceImpl implements CitaService {
     }
 
     private void registrar(Cita cita, EstadoCita anterior, LocalDateTime fechaAnterior, String motivo) {
-        CitaHistorialEstado registro = new CitaHistorialEstado();
-        registro.setCita(cita);
-        registro.setEstadoAnterior(anterior);
-        registro.setEstadoNuevo(cita.getEstado());
-        registro.setFechaInicioAnterior(fechaAnterior);
-        registro.setFechaInicioNueva(anterior == null || fechaAnterior != null ? cita.getFechaInicio() : null);
-        registro.setMotivo(motivo == null || motivo.isBlank() ? null : motivo.trim());
-        registro.setUsuario(usuarioRepository.getReferenceById(usuarioActual.obtener().id()));
-        registro.setFecha(LocalDateTime.now());
-        historialRepository.save(registro);
+        historialCita.registrar(cita, anterior, fechaAnterior, motivo);
     }
 
     private static EstadoCita leerEstado(String valor, EstadoCita actual) {

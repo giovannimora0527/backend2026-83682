@@ -1,5 +1,6 @@
 package com.uniminuto.clinica.repository;
 
+import java.time.LocalDate;
 import com.uniminuto.clinica.entity.LoteMedicamento;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -26,4 +27,10 @@ public interface LoteMedicamentoRepository extends JpaRepository<LoteMedicamento
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT l FROM LoteMedicamento l WHERE l.id = :id")
     Optional<LoteMedicamento> bloquear(@Param("id") Long id);
+
+    /** Pares [medicamentoId, existencia vigente]. */
+    @Query("SELECT l.medicamento.id, SUM(l.cantidadDisponible) FROM LoteMedicamento l "
+            + "WHERE l.medicamento.id IN :ids AND l.activo = true "
+            + "AND (l.fechaVencimiento IS NULL OR l.fechaVencimiento >= :hoy) GROUP BY l.medicamento.id")
+    List<Object[]> existenciasVigentes(@Param("ids") Collection<Long> ids, @Param("hoy") LocalDate hoy);
 }
