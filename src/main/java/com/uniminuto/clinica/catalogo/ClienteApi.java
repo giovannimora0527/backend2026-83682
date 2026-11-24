@@ -39,6 +39,10 @@ public interface ClienteApi {
     @GetMapping("/{id}")
     ResponseEntity<Map<String, Object>> consultar(@PathVariable long id);
 
+    @Operation(summary = "Listar las mascotas activas de un cliente (para combos dependientes cliente → mascota)")
+    @GetMapping("/{id}/mascotas")
+    ResponseEntity<List<Map<String, Object>>> mascotas(@PathVariable long id);
+
     @Operation(summary = "Registrar cliente")
     @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
     @PostMapping

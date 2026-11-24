@@ -48,6 +48,23 @@ public class ClienteApiController implements ClienteApi {
                 "El cliente no existe."));
     }
 
+    /**
+     * Mascotas activas de un cliente. Responde 404 si el cliente no existe.
+     *
+     * @param id identificador del cliente.
+     * @return mascotas con su raza y especie.
+     */
+    @Override
+    public ResponseEntity<List<Map<String, Object>>> mascotas(long id) {
+        consultar(id);
+        return ResponseEntity.ok(db.lista("""
+                SELECT m.mascota_id AS mascotaId, m.nombre_mascota AS nombreMascota, m.edad, r.nombre AS raza,
+                       r.especie, m.cliente_id AS clienteId
+                FROM mascota m JOIN raza r ON r.raza_id = m.raza_id
+                WHERE m.cliente_id = :id AND m.activo = 1 ORDER BY m.nombre_mascota
+                """, Db.p("id", id)));
+    }
+
     @Override
     @Transactional
     public ResponseEntity<Map<String, Object>> crear(ClienteRq datos) {

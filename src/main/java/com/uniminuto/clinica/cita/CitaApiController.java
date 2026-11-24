@@ -23,6 +23,26 @@ public class CitaApiController implements CitaApi {
     }
 
     @Override
+    public ResponseEntity<List<Map<String, Object>>> listarRango(String fechaInicio, String fechaFin) {
+        return ResponseEntity.ok(servicio.listarRango(fechaInicio, fechaFin));
+    }
+
+    @Override
+    public ResponseEntity<List<Map<String, Object>>> porMascota(int mascotaId) {
+        return ResponseEntity.ok(servicio.porMascota(mascotaId));
+    }
+
+    @Override
+    public ResponseEntity<Map<String, Object>> consultar(long id) {
+        return ResponseEntity.ok(servicio.detalle(id));
+    }
+
+    @Override
+    public ResponseEntity<Map<String, Object>> reactivar(long id, CambioRq horario) {
+        return ResponseEntity.ok(servicio.reactivar(id, horario));
+    }
+
+    @Override
     public ResponseEntity<Map<String, Object>> crear(CitaRq datos) {
         return ResponseEntity.ok(servicio.crear(datos));
     }

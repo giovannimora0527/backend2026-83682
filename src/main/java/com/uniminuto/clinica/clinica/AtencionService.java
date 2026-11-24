@@ -136,11 +136,15 @@ public class AtencionService {
             throw new ConflictException("La atención solo puede abrirse a partir del día de la cita (" + inicio.toLocalDate() + ").");
         }
         if (atencionDeCita(citaId) == null) {
-            Long historia = db.valor("SELECT id FROM historia_medica WHERE paciente_id = :m",
-                    Db.p("m", cita.get("mascota_id")), Long.class);
+            // La historia clínica corresponde a la consulta (cita): se reutiliza si ya existe.
+            Long historia = db.valor("SELECT id FROM historia_medica WHERE cita_id = :c",
+                    Db.p("c", citaId), Long.class);
             if (historia == null) {
-                historia = db.insertar("INSERT INTO historia_medica (paciente_id, fecha_creacion) VALUES (:m, :f)",
-                        Db.p("m", cita.get("mascota_id"), "f", Tiempo.ahora()));
+                historia = db.insertar("""
+                        INSERT INTO historia_medica (paciente_id, cita_id, medico_id, fecha, motivo, activo, fecha_creacion)
+                        VALUES (:m, :c, :medico, :fecha, :motivo, 1, :ahora)
+                        """, Db.p("m", cita.get("mascota_id"), "c", citaId, "medico", cita.get("medico_id"),
+                        "fecha", cita.get("fecha_hora"), "motivo", cita.get("motivo"), "ahora", Tiempo.ahora()));
             }
             db.insertar("""
                     INSERT INTO atencion_medica (cita_id, historia_id, medico_id, especializacion_id, motivo, version,
@@ -243,11 +247,16 @@ public class AtencionService {
                 + ". Síntomas: " + valor(atencion.get("sintomas")) + ". Diagnóstico: " + atencion.get("diagnostico")
                 + ". Observaciones: " + valor(atencion.get("observaciones"))
                 + ". Recomendaciones: " + valor(atencion.get("recomendaciones")) + ".";
+        db.ejecutar("""
+                UPDATE historia_medica SET motivo = :motivo, diagnostico = :diagnostico, observaciones = :obs,
+                       fecha_modificacion = :f WHERE id = :h
+                """, Db.p("motivo", atencion.get("motivo"), "diagnostico", atencion.get("diagnostico"),
+                "obs", atencion.get("observaciones"), "f", ahora, "h", atencion.get("historia_id")));
         db.insertar("""
-                INSERT INTO anotacion_historia (historia_id, medico_id, cita_id, fecha, descripcion)
-                VALUES (:h, :m, :c, :f, :d)
+                INSERT INTO anotacion_historia (historia_id, medico_id, cita_id, fecha, descripcion, observacion, diagnostico)
+                VALUES (:h, :m, :c, :f, :d, :o, :dx)
                 """, Db.p("h", atencion.get("historia_id"), "m", atencion.get("medico_id"), "c", citaId, "f", ahora,
-                "d", resumen));
+                "d", resumen, "o", atencion.get("observaciones"), "dx", atencion.get("diagnostico")));
         return consultar(citaId);
     }
 

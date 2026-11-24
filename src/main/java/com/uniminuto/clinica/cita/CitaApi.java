@@ -47,6 +47,27 @@ public interface CitaApi {
     @GetMapping("/listar")
     ResponseEntity<List<Map<String, Object>>> listar();
 
+    @Operation(summary = "Filtrar citas entre una fecha inicial y una final (de la más reciente a la más antigua)")
+    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
+    @GetMapping("/listar-rango")
+    ResponseEntity<List<Map<String, Object>>> listarRango(@RequestParam(required = false) String fechaInicio,
+                                                          @RequestParam(required = false) String fechaFin);
+
+    @Operation(summary = "Citas de una mascota (para combos dependientes mascota → cita)")
+    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
+    @GetMapping("/por-mascota/{mascotaId}")
+    ResponseEntity<List<Map<String, Object>>> porMascota(@PathVariable int mascotaId);
+
+    @Operation(summary = "Consultar una cita")
+    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
+    @GetMapping("/{id:\\d+}")
+    ResponseEntity<Map<String, Object>> consultar(@PathVariable long id);
+
+    @Operation(summary = "Reactivar una cita cancelada (operación explícita; vuelve a pendiente)")
+    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PostMapping("/{id}/reactivar")
+    ResponseEntity<Map<String, Object>> reactivar(@PathVariable long id, @RequestBody(required = false) CambioRq horario);
+
     @Operation(summary = "Registrar cita", description = "Valida horario, ausencias, médico activo y superposiciones.")
     @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
     @PostMapping("/crear")

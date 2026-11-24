@@ -39,9 +39,13 @@ import java.util.Set;
 @Service
 public class CitaService {
 
-    public static final Set<String> ESTADOS = Set.of("pendiente", "confirmada", "cancelada", "atendida", "finalizada");
+    public static final Set<String> ESTADOS = Set.of("pendiente", "programada", "confirmada", "cancelada", "atendida", "finalizada");
+    /** Estados de una cita reservada que aún no se ha atendido (se puede reprogramar). */
+    static final Set<String> RESERVADAS = Set.of("pendiente", "programada", "confirmada");
+    /** Margen mínimo entre citas del mismo veterinario (regla: 15 minutos antes y 15 después). */
+    static final int MARGEN_MINUTOS = 15;
     /** Estados que ocupan la agenda (bloquean el horario). */
-    static final String OCUPAN = "'pendiente', 'confirmada', 'atendida'";
+    static final String OCUPAN = "'pendiente', 'programada', 'confirmada', 'atendida'";
     private static final int MINUTOS_MAXIMOS = 240;
 
     private static final String EVENTO = """
@@ -64,18 +68,107 @@ public class CitaService {
 
     // ------------------------------------------------------------------ CRUD
 
+    /** Columnas de una cita con los nombres de cliente, mascota y veterinario para el DataTable. */
+    private static final String CITA_DETALLE = """
+            SELECT c.id, c.cliente_id AS clienteId, c.mascota_id AS mascotaId, c.medico_id AS medicoId,
+                   c.fecha_hora AS fechaHora, c.fecha_fin AS fechaFin, c.estado, c.motivo,
+                   CONCAT(cl.nombres, ' ', cl.apellidos) AS cliente, m.nombre_mascota AS mascota,
+                   CONCAT(md.nombres, ' ', md.apellidos) AS veterinario, h.id AS historiaId
+            FROM cita c
+            JOIN cliente cl ON cl.cliente_id = c.cliente_id
+            JOIN mascota m ON m.mascota_id = c.mascota_id
+            JOIN medico md ON md.id = c.medico_id
+            LEFT JOIN historia_medica h ON h.cita_id = c.id
+            """;
+
+    /**
+     * Lista las citas de la más reciente a la más antigua. El médico solo recibe las suyas.
+     *
+     * @return citas con identificadores y nombres de cliente, mascota y veterinario.
+     */
     public List<Map<String, Object>> listar() {
-        SesionUsuario s = SesionActual.obtener();
-        String sql = """
-                SELECT c.id, c.cliente_id AS clienteId, c.mascota_id AS mascotaId, c.medico_id AS medicoId,
-                       c.fecha_hora AS fechaHora, c.fecha_fin AS fechaFin, c.estado, c.motivo
-                FROM cita c
-                """;
-        if (s.es(Perfiles.MEDICO)) {
-            return db.lista(sql + " WHERE c.medico_id = :m ORDER BY c.fecha_hora DESC",
-                    Db.p("m", SesionActual.medicoId()));
+        return listarRango(null, null);
+    }
+
+    /**
+     * Filtra las citas entre una fecha inicial y una final (ambas opcionales e inclusivas),
+     * ordenadas desde la más reciente hasta la más antigua.
+     *
+     * @param fechaInicio fecha inicial AAAA-MM-DD (o fecha y hora).
+     * @param fechaFin    fecha final AAAA-MM-DD (o fecha y hora).
+     * @return citas del rango.
+     */
+    public List<Map<String, Object>> listarRango(String fechaInicio, String fechaFin) {
+        LocalDate desde = Validar.fecha(fechaInicio, "fecha inicial", false);
+        LocalDate hasta = Validar.fecha(fechaFin, "fecha final", false);
+        if (desde != null && hasta != null && hasta.isBefore(desde)) {
+            throw new BadRequestException("La fecha final no puede ser anterior a la fecha inicial.");
         }
-        return db.lista(sql + " ORDER BY c.fecha_hora DESC");
+        SesionUsuario s = SesionActual.obtener();
+        Long medico = s.es(Perfiles.MEDICO) ? SesionActual.medicoId() : null;
+        return db.lista(CITA_DETALLE + """
+                WHERE (:medico IS NULL OR c.medico_id = :medico)
+                  AND (:desde IS NULL OR c.fecha_hora >= :desde)
+                  AND (:hasta IS NULL OR c.fecha_hora < :hasta)
+                ORDER BY c.fecha_hora DESC, c.id DESC
+                """, Db.p("medico", medico, "desde", desde == null ? null : desde.atStartOfDay(),
+                "hasta", hasta == null ? null : hasta.plusDays(1).atStartOfDay()));
+    }
+
+    /**
+     * Citas de una mascota, de la más reciente a la más antigua (el médico solo ve las suyas).
+     *
+     * @param mascotaId identificador de la mascota; 404 si no existe.
+     * @return citas con nombres y la historia clínica asociada.
+     */
+    public List<Map<String, Object>> porMascota(int mascotaId) {
+        db.requerido("SELECT mascota_id FROM mascota WHERE mascota_id = :m", Db.p("m", mascotaId), "La mascota no existe.");
+        SesionUsuario s = SesionActual.obtener();
+        Long medico = s.es(Perfiles.MEDICO) ? SesionActual.medicoId() : null;
+        return db.lista(CITA_DETALLE + """
+                WHERE c.mascota_id = :m AND (:medico IS NULL OR c.medico_id = :medico)
+                ORDER BY c.fecha_hora DESC
+                """, Db.p("m", mascotaId, "medico", medico));
+    }
+
+    /**
+     * Consulta el detalle de una cita (con nombres y la historia clínica asociada, si existe).
+     *
+     * @param id identificador de la cita.
+     * @return cita encontrada; 404 si no existe; 403 si es de otro médico.
+     */
+    public Map<String, Object> detalle(long id) {
+        Map<String, Object> cita = db.requerido(CITA_DETALLE + " WHERE c.id = :id", Db.p("id", id), "La cita no existe.");
+        SesionUsuario s = SesionActual.obtener();
+        if (s.es(Perfiles.MEDICO) && Validar.largo(cita, "medicoId") != SesionActual.medicoId()) {
+            throw new ForbiddenException("Solo puedes consultar tus propias citas.");
+        }
+        return cita;
+    }
+
+    /**
+     * Reactiva una cita cancelada (operación explícita): vuelve a quedar pendiente en el horario indicado,
+     * validando de nuevo todas las reglas de programación. Queda registrada en el historial de la cita.
+     *
+     * @param id     cita cancelada.
+     * @param cambio nuevo inicio y fin (opcionales: si no se envían se usa el horario original).
+     * @return cita reactivada.
+     */
+    @Transactional
+    public Map<String, Object> reactivar(long id, CitaApi.CambioRq cambio) {
+        Map<String, Object> actual = bloquear(id);
+        if (!"cancelada".equals(actual.get("estado"))) {
+            throw new ConflictException("Solo se pueden reactivar citas canceladas.");
+        }
+        LocalDateTime inicio = cambio == null || cambio.inicio() == null
+                ? (LocalDateTime) actual.get("fecha_hora") : Validar.fechaHora(cambio.inicio(), "inicio");
+        LocalDateTime fin = cambio == null || cambio.fin() == null
+                ? (LocalDateTime) actual.get("fecha_fin") : Validar.fechaHora(cambio.fin(), "fin");
+        validarProgramacion(Validar.largo(actual, "medico_id"), Validar.largo(actual, "mascota_id"), inicio, fin, id);
+        db.ejecutar("UPDATE cita SET estado = 'pendiente', fecha_hora = :i, fecha_fin = :f, fecha_modificacion = :ahora WHERE id = :id",
+                Db.p("i", inicio, "f", fin, "ahora", Tiempo.ahora(), "id", id));
+        registrarRevision(id, actual, "pendiente", inicio, fin);
+        return detalle(id);
     }
 
     public Map<String, Object> consultar(long id) {
@@ -89,8 +182,8 @@ public class CitaService {
     @Transactional
     public Map<String, Object> crear(CitaApi.CitaRq d) {
         Datos datos = validarDatos(d);
-        if (!Set.of("pendiente", "confirmada").contains(datos.estado)) {
-            throw new BadRequestException("Una cita nueva solo puede quedar pendiente o confirmada.");
+        if (!RESERVADAS.contains(datos.estado)) {
+            throw new BadRequestException("Una cita nueva solo puede quedar pendiente, programada o confirmada.");
         }
         validarProgramacion(datos.medico, datos.mascota, datos.inicio, datos.fin, null);
         long id = db.insertar("""
@@ -117,12 +210,13 @@ public class CitaService {
             throw new ForbiddenException("Solo el médico (al finalizar la atención) o el administrador marcan una cita como atendida.");
         }
         validarTransicion(estadoActual, datos.estado, s);
+        validarAtendida(estadoActual, datos.estado, datos.inicio);
         LocalDateTime inicioActual = (LocalDateTime) actual.get("fecha_hora");
         LocalDateTime finActual = (LocalDateTime) actual.get("fecha_fin");
         boolean reprograma = !datos.inicio.equals(inicioActual) || !datos.fin.equals(finActual)
                 || datos.medico != Validar.largo(actual, "medico_id") || datos.mascota != Validar.largo(actual, "mascota_id");
         if (reprograma) {
-            if (!Set.of("pendiente", "confirmada").contains(estadoActual)) {
+            if (!RESERVADAS.contains(estadoActual)) {
                 throw new ConflictException("Solo se reprograman citas pendientes o confirmadas.");
             }
             validarProgramacion(datos.medico, datos.mascota, datos.inicio, datos.fin, id);
@@ -169,7 +263,7 @@ public class CitaService {
         filtros.put("Médico", Validar.cadena(m, "nombre"));
         filtros.put("Rango", desde + " a " + hasta);
         filtros.put("Estado", estado == null || estado.isBlank() ? "Todos" : estado);
-        for (String e : List.of("pendiente", "confirmada", "cancelada", "atendida", "finalizada")) {
+        for (String e : List.of("pendiente", "programada", "confirmada", "cancelada", "atendida", "finalizada")) {
             long n = citas.stream().filter(c -> e.equals(c.get("estado"))).count();
             filtros.put("Citas " + e, String.valueOf(n));
         }
@@ -194,7 +288,8 @@ public class CitaService {
         List<LocalDateTime[]> libres = new ArrayList<>();
         if (Validar.bool(m, "activo")) {
             List<LocalDateTime[]> ocupados = new ArrayList<>();
-            for (Map<String, Object> o : db.lista("SELECT fecha_hora AS i, fecha_fin AS f FROM cita "
+            // Las citas ocupan su horario más el margen de 15 minutos antes y después; las ausencias, solo su rango.
+            for (Map<String, Object> o : db.lista("SELECT fecha_hora - INTERVAL 15 MINUTE AS i, fecha_fin + INTERVAL 15 MINUTE AS f FROM cita "
                     + "WHERE medico_id = :m AND estado IN (" + OCUPAN + ") AND fecha_fin > :d AND fecha_hora < :h "
                     + "UNION ALL SELECT inicio, fin FROM medico_ausencia WHERE medico_id = :m AND fin > :d AND inicio < :h",
                     Db.p("m", medico, "d", fecha.atStartOfDay(), "h", fecha.plusDays(1).atStartOfDay()))) {
@@ -339,8 +434,9 @@ public class CitaService {
         validarTransicion(estadoActual, estado, s);
         LocalDateTime inicio = (LocalDateTime) actual.get("fecha_hora");
         LocalDateTime fin = (LocalDateTime) actual.get("fecha_fin");
+        validarAtendida(estadoActual, estado, inicio);
         if (cambio.inicio() != null || cambio.fin() != null) {
-            if (!Set.of("pendiente", "confirmada").contains(estadoActual) || "cancelada".equals(estado)) {
+            if (!RESERVADAS.contains(estadoActual) || "cancelada".equals(estado)) {
                 throw new ConflictException("Solo se reprograman citas pendientes o confirmadas.");
             }
             LocalDateTime nuevoInicio = cambio.inicio() == null ? inicio : Validar.fechaHora(cambio.inicio(), "inicio");
@@ -445,10 +541,13 @@ public class CitaService {
                 Db.p("m", medico, "i", inicio, "f", fin))) {
             throw new ConflictException("El veterinario tiene una ausencia registrada en ese horario.");
         }
+        // Regla: el veterinario no puede tener otra cita a menos de 15 minutos antes o después.
         if (db.existe("SELECT 1 FROM cita WHERE medico_id = :m AND estado IN (" + OCUPAN + ") "
                 + "AND fecha_hora < :f AND fecha_fin > :i AND (:excluir IS NULL OR id <> :excluir)",
-                Db.p("m", medico, "i", inicio, "f", fin, "excluir", excluir))) {
-            throw new ConflictException("El veterinario ya tiene una cita que se superpone con ese horario.");
+                Db.p("m", medico, "i", inicio.minusMinutes(MARGEN_MINUTOS), "f", fin.plusMinutes(MARGEN_MINUTOS),
+                        "excluir", excluir))) {
+            throw new ConflictException("El veterinario ya tiene una cita en ese horario o a menos de "
+                    + MARGEN_MINUTOS + " minutos. Elige otra hora.");
         }
         if (db.existe("SELECT 1 FROM cita WHERE mascota_id = :m AND estado IN (" + OCUPAN + ") "
                 + "AND fecha_hora < :f AND fecha_fin > :i AND (:excluir IS NULL OR id <> :excluir)",
@@ -463,13 +562,29 @@ public class CitaService {
             return;
         }
         boolean valida = switch (actual) {
-            case "pendiente" -> Set.of("confirmada", "cancelada").contains(nuevo) || ("atendida".equals(nuevo) && s.esAdmin());
-            case "confirmada" -> Set.of("pendiente", "cancelada").contains(nuevo) || ("atendida".equals(nuevo) && s.esAdmin());
+            case "pendiente", "programada" -> Set.of("pendiente", "programada", "confirmada", "cancelada").contains(nuevo)
+                    || ("atendida".equals(nuevo) && s.esAdmin());
+            case "confirmada" -> Set.of("pendiente", "programada", "cancelada").contains(nuevo)
+                    || ("atendida".equals(nuevo) && s.esAdmin());
+            // Una cita cancelada solo vuelve a estar activa con la operación explícita "reactivar".
             case "atendida" -> "finalizada".equals(nuevo) && s.es(Perfiles.ADMINISTRADOR, Perfiles.MEDICO, Perfiles.RECEPCION);
             default -> false;
         };
         if (!valida) {
             throw new ConflictException("No se permite cambiar una cita de " + actual + " a " + nuevo + ".");
+        }
+    }
+
+    /**
+     * Una cita solo puede marcarse como atendida cuando ya ocurrió (su hora de inicio no es futura).
+     *
+     * @param actual estado actual.
+     * @param nuevo  estado solicitado.
+     * @param inicio hora de inicio de la cita.
+     */
+    private static void validarAtendida(String actual, String nuevo, LocalDateTime inicio) {
+        if ("atendida".equals(nuevo) && !"atendida".equals(actual) && inicio.isAfter(Tiempo.ahora())) {
+            throw new ConflictException("No se puede marcar como atendida una cita que aún no ha ocurrido.");
         }
     }
 
@@ -517,19 +632,21 @@ public class CitaService {
         Validar.requerido(d.clienteId(), "propietario");
         Validar.requerido(d.mascotaId(), "mascota");
         Validar.requerido(d.medicoId(), "médico");
+        // Orden de validación: cliente, mascota, pertenencia y veterinario (mensajes claros para cada caso).
+        Map<String, Object> cliente = db.requerido("SELECT activo FROM cliente WHERE cliente_id = :c",
+                Db.p("c", d.clienteId()), "El cliente no existe.");
+        if (!Validar.bool(cliente, "activo")) {
+            throw new BadRequestException("El propietario está archivado.");
+        }
         Map<String, Object> mascota = db.requerido("SELECT cliente_id, activo FROM mascota WHERE mascota_id = :m",
                 Db.p("m", d.mascotaId()), "La mascota no existe.");
         if (Validar.largo(mascota, "cliente_id") != d.clienteId()) {
-            throw new BadRequestException("La mascota seleccionada no pertenece al propietario indicado.");
+            throw new BadRequestException("La mascota seleccionada no pertenece al cliente indicado.");
         }
         if (!Validar.bool(mascota, "activo")) {
             throw new BadRequestException("La mascota está inactiva.");
         }
-        Map<String, Object> cliente = db.requerido("SELECT activo FROM cliente WHERE cliente_id = :c",
-                Db.p("c", d.clienteId()), "El propietario no existe.");
-        if (!Validar.bool(cliente, "activo")) {
-            throw new BadRequestException("El propietario está archivado.");
-        }
+        db.requerido("SELECT id FROM medico WHERE id = :m", Db.p("m", d.medicoId()), "El veterinario no existe.");
         String estado = d.estado() == null || d.estado().isBlank() ? "pendiente" : d.estado().trim().toLowerCase();
         if (!ESTADOS.contains(estado)) {
             throw new BadRequestException("Estado de cita no válido.");
