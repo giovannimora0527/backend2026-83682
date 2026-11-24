@@ -25,8 +25,10 @@ public interface MedicoApi {
     @GetMapping(value = "/listar-disponibles",
             produces = {"application/json"})
     ResponseEntity<List<Medico>> listarMedicosDisponibles(
-            @RequestParam LocalDateTime fechaInicio,
-            @RequestParam LocalDateTime fechaFin)
+            @RequestParam(required = false) LocalDateTime inicio,
+            @RequestParam(required = false) LocalDateTime fin,
+            @RequestParam(required = false) LocalDateTime fechaInicio,
+            @RequestParam(required = false) LocalDateTime fechaFin)
             throws BadRequestException;
 
 

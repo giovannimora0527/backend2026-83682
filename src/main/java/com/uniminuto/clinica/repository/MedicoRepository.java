@@ -1,5 +1,7 @@
 package com.uniminuto.clinica.repository;
 
+import org.springframework.data.jpa.repository.Lock;
+import jakarta.persistence.LockModeType;
 import com.uniminuto.clinica.entity.Medico;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -35,4 +37,9 @@ public interface MedicoRepository extends JpaRepository<Medico, Long> {
     boolean existsByNumeroDocumentoAndIdNot(String numeroDocumento, Long id);
 
     boolean existsByRegistroProfesionalAndIdNot(String registroProfesional, Long id);
+
+    /** Serializa el agendamiento. */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT x FROM Medico x WHERE x.id = :id")
+    Optional<Medico> bloquear(@Param("id") Long id);
 }

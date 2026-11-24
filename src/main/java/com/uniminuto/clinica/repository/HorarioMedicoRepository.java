@@ -15,4 +15,8 @@ public interface HorarioMedicoRepository extends JpaRepository<HorarioMedico, Lo
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query("DELETE FROM HorarioMedico h WHERE h.medico.id = :medicoId")
     void eliminarPorMedico(@Param("medicoId") Long medicoId);
+
+    List<HorarioMedico> findByMedico_IdAndActivoTrue(Long medicoId);
+
+    List<HorarioMedico> findByActivoTrue();
 }

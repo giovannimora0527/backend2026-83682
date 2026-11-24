@@ -29,9 +29,11 @@ public class MedicoApiController implements MedicoApi {
 
     @Override
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SECRETARIA', 'MEDICO')")
-    public ResponseEntity<List<Medico>> listarMedicosDisponibles(LocalDateTime fechaInicio, LocalDateTime fechaFin)
+    public ResponseEntity<List<Medico>> listarMedicosDisponibles(LocalDateTime inicio, LocalDateTime fin,
+                                                                 LocalDateTime fechaInicio, LocalDateTime fechaFin)
             throws BadRequestException {
-        return ResponseEntity.ok(this.medicoService.listarMedicosDisponiblesPorFecha(fechaInicio, fechaFin));
+        return ResponseEntity.ok(this.medicoService.listarMedicosDisponiblesPorFecha(
+                inicio == null ? fechaInicio : inicio, fin == null ? fechaFin : fin));
     }
 
     @Override

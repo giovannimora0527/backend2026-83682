@@ -1,5 +1,10 @@
 package com.uniminuto.clinica.serviceimpl;
 
+import com.uniminuto.clinica.entity.HorarioMedico;
+import com.uniminuto.clinica.repository.HorarioMedicoRepository;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.time.LocalDate;
 import com.uniminuto.clinica.entity.Especializacion;
 import com.uniminuto.clinica.entity.Medico;
 import com.uniminuto.clinica.entity.Usuario;
@@ -30,6 +35,9 @@ public class MedicoServiceImpl implements MedicoService {
     private UsuarioRepository usuarioRepository;
 
     @Autowired
+    private HorarioMedicoRepository horarioRepository;
+
+    @Autowired
     private EspecializacionRepository especializacionRepository;
 
     @Override
@@ -49,7 +57,28 @@ public class MedicoServiceImpl implements MedicoService {
             throw new BadRequestException("La fecha de inicio no puede ser mayor a la fecha de fin");
         }
 
-        return this.medicoRepository.findDisponiblesPorFecha(fechaInicio, fechaFin);
+        Map<Long, List<HorarioMedico>> horarios = this.horarioRepository.findByActivoTrue().stream()
+                .collect(Collectors.groupingBy(h -> h.getMedico().getId()));
+        return this.medicoRepository.findDisponiblesPorFecha(fechaInicio, fechaFin).stream()
+                .filter(m -> horarios.getOrDefault(m.getId(), List.of()).stream()
+                        .anyMatch(h -> this.atiende(h, fechaInicio, fechaFin)))
+                .toList();
+    }
+
+    /** En un mismo dia el bloque debe cubrir el rango; en varios dias basta con atender alguno de ellos. */
+    private boolean atiende(HorarioMedico horario, LocalDateTime inicio, LocalDateTime fin) {
+        if (inicio.toLocalDate().equals(fin.toLocalDate())) {
+            return AgendaService.cabe(horario, inicio, fin);
+        }
+        for (LocalDate dia = inicio.toLocalDate(); dia.isBefore(inicio.toLocalDate().plusDays(8))
+                && !dia.isAfter(fin.toLocalDate()); dia = dia.plusDays(1)) {
+            if (horario.getDiaSemana() == dia.getDayOfWeek().getValue()
+                    && dia.atTime(horario.getHoraInicio()).isBefore(fin)
+                    && dia.atTime(horario.getHoraFin()).isAfter(inicio)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

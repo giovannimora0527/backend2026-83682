@@ -4,7 +4,7 @@ import com.uniminuto.clinica.exception.dto.ErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
-import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.dao.ConcurrencyFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -70,9 +70,9 @@ public class GlobalExceptionHandler {
         return responder(HttpStatus.CONFLICT, "La operación entra en conflicto con datos existentes.");
     }
 
-    @ExceptionHandler(OptimisticLockingFailureException.class)
-    public ResponseEntity<ErrorResponse> handleConcurrency(OptimisticLockingFailureException ex) {
-        return responder(HttpStatus.CONFLICT, "Otro usuario modificó el registro. Vuelva a consultarlo.");
+    @ExceptionHandler(ConcurrencyFailureException.class)
+    public ResponseEntity<ErrorResponse> handleConcurrency(ConcurrencyFailureException ex) {
+        return responder(HttpStatus.CONFLICT, "Otro usuario modificó el registro al mismo tiempo. Intente de nuevo.");
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

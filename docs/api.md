@@ -337,6 +337,159 @@ Rol: ADMINISTRADOR, SECRETARIA. Lista vacía mientras no haya facturas; 404 si e
    "total": 59500.00, "pagado": 0.00, "saldo": 59500.00, "estado": "PENDIENTE", "observacion": null }]
 ```
 
+# Citas, horarios y calendario
+
+`desde` y `hasta` aceptan `yyyy-MM-dd` (el día final se incluye), `yyyy-MM-ddTHH:mm:ss` o con zona, como los envía FullCalendar. Un `+` en la URL debe codificarse como `%2B`. Rango máximo: un año.
+
+## `GET /cita/calendario?desde=&hasta=&medicoId=`
+
+Rol: MEDICO (siempre lo suyo; ignora `medicoId`), ADMINISTRADOR, SECRETARIA. Incluye canceladas. `servicioId`, `servicioNombre` y `motivoCancelacion` pueden ser `null`.
+
+```json
+[
+  {
+    "id": 4,
+    "title": "Max - Miguel Castro",
+    "start": "2026-12-01T15:00:00",
+    "end": "2026-12-01T15:30:00",
+    "estado": "CONFIRMADA",
+    "color": "#0d6efd",
+    "extendedProps": {
+      "motivo": "[Prueba] Vacunación",
+      "mascotaId": 2,
+      "mascotaNombre": "Max",
+      "especie": "Perro",
+      "raza": "Criollo",
+      "edad": 8,
+      "clienteId": 5,
+      "clienteNombre": "Miguel Castro",
+      "clienteTelefono": "3000000005",
+      "clienteDocumento": "9000000005",
+      "medicoId": 1,
+      "medicoNombre": "Sofía Ramírez",
+      "servicioId": 4,
+      "servicioNombre": "Vacunación",
+      "motivoCancelacion": null
+    }
+  }
+]
+```
+
+## `POST /cita/crear` y `POST /cita/actualizar`
+
+Rol: ADMINISTRADOR, SECRETARIA, MEDICO (para sí mismo o las suyas). Cuerpo: `{ "id" (solo actualizar), "mascotaId", "medicoId", "fechaInicio", "motivo", "servicioId", "clienteId", "estado", "motivoCancelacion" }`. `servicioId` y `clienteId` son opcionales; sin servicio dura 30 minutos. Al actualizar, `estado` es opcional y debe ser una transición válida; si es CANCELADA exige `motivoCancelacion`.
+
+Antes devolvían `{status, message}`; ahora agregan `data` con la cita completa (objetos anidados como en `GET /cita/{id}`):
+
+```json
+{
+  "status": 200,
+  "message": "Cita creada correctamente.",
+  "data": {
+    "estado": "PROGRAMADA",
+    "fechaCreacionRegistro": "2026-11-24T13:10:44",
+    "fechaFin": "2026-11-30T14:30:00",
+    "fechaHora": "2026-11-30T14:00:00",
+    "fechaInicio": "2026-11-30T14:00:00",
+    "fechaModificacionRegistro": null,
+    "id": 8,
+    "motivo": "Vacuna anual",
+    "motivoCancelacion": null,
+    "usuarioCreacionId": 5,
+    "version": 0,
+    "cliente": "{...}",
+    "mascota": "{...}",
+    "medico": "{...}",
+    "servicio": "{...}"
+  }
+}
+```
+
+409 según la regla: fecha pasada, médico o mascota inactivos, cliente que no es propietario, servicio inactivo, cruza la medianoche, fuera del horario, médico ocupado, mascota ocupada, cita no editable o transición inválida.
+
+```json
+{
+  "detalles": [
+    {
+      "campo": "fechaInicio",
+      "mensaje": "La cita está fuera del horario de disponibilidad del médico."
+    }
+  ],
+  "error": "Conflict",
+  "message": "La cita está fuera del horario de disponibilidad del médico.",
+  "status": 409
+}
+```
+
+## `PATCH /cita/{id}/reprogramar` y `PATCH /cita/{id}/estado`
+
+Mismos roles. Cuerpos: `{ "fechaInicio", "motivo" (opcional) }` y `{ "estado", "motivo" }` (obligatorio si es CANCELADA). Respuesta igual a la de crear.
+
+## `GET /cita/{id}/historial-estados`
+
+Del más antiguo al más reciente. La creación lleva `estadoAnterior` nulo; una reprogramación lleva las dos fechas.
+
+```json
+[
+  {
+    "id": 1,
+    "estadoAnterior": null,
+    "estadoNuevo": "PROGRAMADA",
+    "fechaInicioAnterior": null,
+    "fechaInicioNueva": "2026-11-30T14:00:00",
+    "motivo": null,
+    "usuario": "secretaria",
+    "fecha": "2026-11-24T13:10:45"
+  },
+  {
+    "id": 2,
+    "estadoAnterior": "PROGRAMADA",
+    "estadoNuevo": "PROGRAMADA",
+    "fechaInicioAnterior": "2026-11-30T14:00:00",
+    "fechaInicioNueva": "2026-11-30T15:00:00",
+    "motivo": "Pedido del propietario",
+    "usuario": "medico1",
+    "fecha": "2026-11-24T13:10:45"
+  },
+  {
+    "id": 3,
+    "estadoAnterior": "PROGRAMADA",
+    "estadoNuevo": "CONFIRMADA",
+    "fechaInicioAnterior": null,
+    "fechaInicioNueva": null,
+    "motivo": null,
+    "usuario": "medico1",
+    "fecha": "2026-11-24T13:10:45"
+  }
+]
+```
+
+## `GET /cita/historial-mascota/{mascotaId}`
+
+Rol: ADMINISTRADOR, SECRETARIA, MEDICO (de cualquier médico: son antecedentes del paciente). Arreglo de citas completas, la más reciente primero, con canceladas.
+
+## `GET /cita/resumen-estados?desde=&hasta=&medicoId=`
+
+Rol: MEDICO (las suyas), ADMINISTRADOR. Cuenta por fecha de inicio; siempre vienen los cinco estados.
+
+```json
+{
+  "PROGRAMADA": 1,
+  "CONFIRMADA": 3,
+  "EN_ATENCION": 0,
+  "ATENDIDA": 1,
+  "CANCELADA": 1
+}
+```
+
+## `GET /cita/reporte/excel?desde=&hasta=&medicoId=`
+
+Rol: MEDICO (las suyas), ADMINISTRADOR (`medicoId` opcional; sin él agrega la columna Médico). Descarga `citas_<desde>_<hasta>.xlsx`.
+
+## `GET /medico/listar-disponibles?inicio=&fin=`
+
+Arreglo de médicos activos cuyo horario cubre el rango y sin citas que se crucen. También acepta `fechaInicio` y `fechaFin`, los nombres anteriores.
+
 # Inventario
 
 ADMINISTRADOR escribe; DESPACHO_MEDICO consulta todo; MEDICO solo productos y disponibilidad.

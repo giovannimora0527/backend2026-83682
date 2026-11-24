@@ -57,6 +57,8 @@ class Fase1IntegracionTests {
     @Autowired MedicoRepository medicos;
     @Autowired EspecializacionRepository especializaciones;
     @Autowired CitaRepository citas;
+    @Autowired CitaHistorialEstadoRepository historialCitas;
+    @Autowired HorarioMedicoRepository horarios;
     @Autowired CitaService citaService;
     @Autowired UsuarioService usuarioService;
     @Autowired EspecializacionService especializacionService;
@@ -85,6 +87,8 @@ class Fase1IntegracionTests {
     @AfterEach
     void limpiar() {
         SecurityContextHolder.clearContext();
+        historialCitas.deleteAll();
+        horarios.deleteAll();
         citas.deleteAll();
         medicos.deleteAll();
         especializaciones.deleteAll();
@@ -207,6 +211,12 @@ class Fase1IntegracionTests {
         Mascota max = mascota("Max");
         Medico medico = medico();
         LocalDateTime base = LocalDate.now().plusDays(2).atTime(10, 0);
+        HorarioMedico horario = new HorarioMedico();
+        horario.setMedico(medico);
+        horario.setDiaSemana(base.getDayOfWeek().getValue());
+        horario.setHoraInicio(java.time.LocalTime.of(8, 0));
+        horario.setHoraFin(java.time.LocalTime.of(18, 0));
+        horarios.save(horario);
 
         citaService.crearCita(cita(null, luna, medico, base, null));
         citaService.crearCita(cita(null, luna, medico, base.plusMinutes(30), null));
@@ -371,6 +381,7 @@ class Fase1IntegracionTests {
         rq.setFechaHora(fecha);
         rq.setMotivo("Control");
         rq.setEstado(estado);
+        rq.setMotivoCancelacion("Prueba");
         return rq;
     }
 }

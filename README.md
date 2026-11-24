@@ -135,6 +135,8 @@ Requisitos: JDK 21, MySQL disponible y una base de datos `clinica` inicializada 
 .\mvnw.cmd spring-boot:run
 ```
 
+Para desarrollo con correo en Mailpit: `powershell -ExecutionPolicy Bypass -File scripts\iniciar-dev.ps1` (`-Parar` para detenerlo).
+
 La aplicación inicia en `http://localhost:8080/clinica/v1`. Para crear el artefacto ejecutable:
 
 ```powershell

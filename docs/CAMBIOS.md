@@ -49,11 +49,6 @@
 - Historias clínicas: ADMINISTRADOR y MEDICO. Anotaciones: solo MEDICO.
 - Correo de prueba: ADMINISTRADOR.
 
-### Pendiente de las fases siguientes
-
-- Duración de la cita según `servicio` y bloqueo frente a citas simultáneas (fase 5).
-- `/medico/listar-disponibles` todavía recibe `fechaInicio` y `fechaFin`; pasará a `inicio` y `fin` (fase 5).
-
 ## Fase 3: modelo de datos
 
 - Scripts `db/01` a `db/03`, repetibles. Probados en MySQL 8.4 sobre una base nueva y sobre una copia de la base existente. `ddl-auto=validate` en `dev` y `prod`.
@@ -83,6 +78,18 @@ El código del menú de citas es `cita`, no `citas`; la ruta sigue siendo `/inic
 - `GET /perfil/listar`, `PATCH /usuario/{id}/estado`, horarios del médico, `PATCH /especializacion/{id}/estado` y facturas por cliente y mascota.
 - 409 por duplicado con `detalles`. Las restricciones de la base y los choques de versión también responden 409.
 - `FormulaRs` usa los nombres del frontend: `fecha`, `medicamentoCodigo`, `medicamentoNombre`.
+
+## Fase 5: citas, horarios y calendario
+
+- `AgendaService` reúne las reglas de 5.3 y bloquea médico y mascota, en ese orden: dos peticiones simultáneas no ocupan el mismo espacio. Probado en MySQL 8.4 con 8 peticiones a la vez.
+- Duración según el servicio (30 minutos por defecto). Segundos de la fecha truncados al minuto.
+- Al editar se validan todas las reglas; la de fecha futura, solo si cambia la fecha.
+- Cada creación, cambio de estado y reprogramación queda en `cita_historial_estado`. Nada se borra.
+- Crear y actualizar cita devuelven además `data`. Cancelar por `/cita/actualizar` exige `motivoCancelacion`.
+- Un médico sin horario registrado no puede recibir citas: los médicos que existían antes de la migración necesitan que se les cargue.
+- `/cita/historial-mascota` no se limita a las citas del médico autenticado, porque C6 no lo restringe.
+- Choques de bloqueo de la base responden 409.
+- `scripts/iniciar-dev.ps1` arranca el backend en segundo plano con Mailpit; `-Parar` lo detiene.
 
 ## Fase 4: inventario y carga masiva
 

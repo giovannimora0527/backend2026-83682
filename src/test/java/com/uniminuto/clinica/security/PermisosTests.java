@@ -45,6 +45,7 @@ class PermisosTests {
     @Autowired MedicoRepository medicos;
     @Autowired EspecializacionRepository especializaciones;
     @Autowired CitaRepository citas;
+    @Autowired CitaHistorialEstadoRepository historialCitas;
     @MockitoBean EmailService emailService;
     @Value("${JWT_SECRET}") String secreto;
 
@@ -57,6 +58,7 @@ class PermisosTests {
 
     @AfterEach
     void limpiar() {
+        historialCitas.deleteAll();
         citas.deleteAll();
         medicos.deleteAll();
         especializaciones.deleteAll();
@@ -143,7 +145,7 @@ class PermisosTests {
                 .andExpect(status().isOk());
 
         String body = """
-                {"id":%d,"mascotaId":%d,"medicoId":%d,"fechaHora":"%s","motivo":"x","estado":"CANCELADA"}"""
+                {"id":%d,"mascotaId":%d,"medicoId":%d,"fechaHora":"%s","motivo":"x","estado":"CANCELADA","motivoCancelacion":"y"}"""
                 .formatted(cita.getId(), cita.getMascota().getMascotaId(), medico.getId(),
                         LocalDate.now().plusDays(3).atTime(9, 0, 0).toString() + ":00");
         mvc.perform(post("/cita/actualizar").header("Authorization", otro)
