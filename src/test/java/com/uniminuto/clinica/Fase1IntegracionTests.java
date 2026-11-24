@@ -193,8 +193,8 @@ class Fase1IntegracionTests {
                  "fechaNacimiento":"1990-01-01"}""";
         mvc.perform(post("/cliente/guardar").header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.activo").value(true))
-                .andExpect(jsonPath("$.numeroDocumento").value("77"));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.data.activo").value(true))
+                .andExpect(jsonPath("$.data.numeroDocumento").value("77"));
         mvc.perform(post("/cliente/guardar").header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON).content(body))
                 .andExpect(status().isConflict());

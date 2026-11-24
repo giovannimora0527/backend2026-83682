@@ -1,6 +1,8 @@
 -- Migracion del examen final. MySQL 8. Conserva los datos existentes y se puede ejecutar mas de una vez.
 -- Hacer un respaldo antes de ejecutarla sobre una base con datos.
--- Sirve tanto para la base real (sin tablas perfil/menu) como para la creada con 01_esquema_base.sql.
+-- Sirve para una base creada con 01_esquema_base.sql, para una base antigua sin perfil/menu/perfil_menu y para una
+-- base que ya tenga esas tablas con los datos del profesor (se completan; no se borran sus filas).
+-- Compatible desde MySQL 8.0.12 (los CHECK solo se aplican desde 8.0.16).
 SET NAMES utf8mb4;
 SET SESSION sql_safe_updates = 0;
 
@@ -53,7 +55,7 @@ CREATE PROCEDURE mig_tipo(IN p_tabla VARCHAR(64), IN p_columna VARCHAR(64), IN p
 BEGIN
     IF EXISTS (SELECT 1 FROM information_schema.columns
                WHERE table_schema = DATABASE() AND table_name = p_tabla AND column_name = p_columna
-                 AND column_type <> p_tipo) THEN
+                 AND REGEXP_REPLACE(column_type, '^(tinyint|int|bigint)[(][0-9]+[)]', '$1') <> p_tipo) THEN
         CALL mig_ejecutar(CONCAT('ALTER TABLE `', p_tabla, '` MODIFY COLUMN `', p_columna, '` ', p_tipo, ' ', p_resto));
     END IF;
 END$$
@@ -100,28 +102,104 @@ CALL mig_restriccion('perfil', 'uk_perfil_codigo', 'UNIQUE (`codigo`)');
 
 -- Asigna codigo (C2) a los perfiles existentes por su nombre y crea los que falten.
 UPDATE `perfil` p
-JOIN (SELECT MIN(`perfil_id`) AS id, cod
+JOIN (SELECT MIN(n.`perfil_id`) AS id, n.cod
       FROM (SELECT `perfil_id`,
-                   CASE WHEN UPPER(`nombre`) LIKE 'DESPACHO%' THEN 'DESPACHO_MEDICO'
-                        WHEN UPPER(`nombre`) LIKE 'ADMIN%' THEN 'ADMINISTRADOR'
-                        WHEN UPPER(`nombre`) LIKE 'SECRETARI%' THEN 'SECRETARIA'
-                        WHEN UPPER(`nombre`) LIKE 'MEDIC%' OR UPPER(`nombre`) LIKE 'VETERINARI%' THEN 'MEDICO'
-                   END AS cod FROM `perfil`) n
-      WHERE cod IS NOT NULL AND cod NOT IN (SELECT `codigo` FROM (SELECT `codigo` FROM `perfil` WHERE `codigo` IS NOT NULL) y)
-      GROUP BY cod) x ON x.id = p.`perfil_id`
+       CASE WHEN UPPER(`nombre`) LIKE 'DESPACHO%' THEN 'DESPACHO_MEDICO'
+            WHEN UPPER(`nombre`) LIKE 'ADMIN%' THEN 'ADMINISTRADOR'
+            WHEN UPPER(`nombre`) LIKE 'SECRETARI%' OR UPPER(`nombre`) LIKE 'RECEPCI%' THEN 'SECRETARIA'
+            WHEN UPPER(`nombre`) LIKE 'MEDIC%' OR UPPER(`nombre`) LIKE 'VETERINARI%' THEN 'MEDICO' END AS cod FROM `perfil` WHERE `codigo` IS NULL) n
+      LEFT JOIN (SELECT `codigo` FROM `perfil` WHERE `codigo` IS NOT NULL) y ON y.`codigo` = n.cod
+      WHERE n.cod IS NOT NULL AND y.`codigo` IS NULL
+      GROUP BY n.cod) x ON x.id = p.`perfil_id`
 SET p.`codigo` = x.cod
 WHERE p.`codigo` IS NULL;
 
+-- Mismos ids que el profesor si estan libres; si no, el siguiente disponible.
+INSERT INTO `perfil` (`perfil_id`, `codigo`, `nombre`, `activo`, `fecha_creacion`)
+SELECT c.id, c.cod, c.nom, TRUE, '2026-01-01 00:00:00' FROM (SELECT 1 id, 'ADMINISTRADOR' cod, 'Administrador' nom UNION ALL SELECT 2, 'SECRETARIA', 'Recepcion'
+      UNION ALL SELECT 3, 'MEDICO', 'Medico' UNION ALL SELECT 4, 'DESPACHO_MEDICO', 'Despacho Medico') c
+WHERE NOT EXISTS (SELECT 1 FROM `perfil` p WHERE p.`codigo` = c.cod OR p.`perfil_id` = c.id);
 INSERT INTO `perfil` (`codigo`, `nombre`, `activo`, `fecha_creacion`)
-SELECT c.cod, c.nom, TRUE, NOW()
-FROM (SELECT 'ADMINISTRADOR' cod, 'Administrador' nom UNION ALL SELECT 'SECRETARIA', 'Secretaria'
-      UNION ALL SELECT 'MEDICO', 'Médico' UNION ALL SELECT 'DESPACHO_MEDICO', 'Despacho médico') c
+SELECT c.cod, c.nom, TRUE, '2026-01-01 00:00:00' FROM (SELECT 1 id, 'ADMINISTRADOR' cod, 'Administrador' nom UNION ALL SELECT 2, 'SECRETARIA', 'Recepcion'
+      UNION ALL SELECT 3, 'MEDICO', 'Medico' UNION ALL SELECT 4, 'DESPACHO_MEDICO', 'Despacho Medico') c
 WHERE NOT EXISTS (SELECT 1 FROM `perfil` p WHERE p.`codigo` = c.cod);
 
+-- La fila `medicamentos` del profesor se convierte en `inventario` conservando su id y sus permisos.
+UPDATE `menu` m LEFT JOIN (SELECT `menu_id` FROM `menu` WHERE `code` = 'inventario') x ON TRUE
+SET m.`code` = 'inventario', m.`title` = 'Gestión de Inventario', m.`url` = '/inicio/inventario', m.`fecha_modificacion` = NOW()
+WHERE m.`code` = 'medicamentos' AND x.`menu_id` IS NULL;
+
+-- Menus del profesor (1 a 9) y los nuevos (10 a 16). Los que ya existen no se tocan.
+DROP TEMPORARY TABLE IF EXISTS `mig_menu`;
+CREATE TEMPORARY TABLE `mig_menu` (`id` INT, `c` VARCHAR(100), `t` VARCHAR(255), `u` VARCHAR(255), `i` VARCHAR(255))
+    DEFAULT CHARSET=utf8mb4;
+INSERT INTO `mig_menu`
+    SELECT 1 id, 'cita' c, 'Gestión de citas' t, '/inicio/citas' u, 'bi bi-calendar' i UNION ALL
+    SELECT 2 id, 'clientes' c, 'Gestión de clientes' t, '/inicio/clientes' u, 'bi bi-person-check' i UNION ALL
+    SELECT 3 id, 'especializaciones' c, 'Gestión de Especializaciones' t, '/inicio/especializaciones' u, 'fa-solid fa-user-graduate' i UNION ALL
+    SELECT 4 id, 'formulas' c, 'Gestión de Formulas' t, '/inicio/formulas' u, 'fa-solid fa-clipboard-list' i UNION ALL
+    SELECT 5 id, 'historias' c, 'Gestión de Historias' t, '/inicio/historias' u, 'fa-solid fa-book-medical' i UNION ALL
+    SELECT 6 id, 'mascotas' c, 'Gestión de Mascotas' t, '/inicio/mascotas' u, 'fa-solid fa-paw' i UNION ALL
+    SELECT 7 id, 'inventario' c, 'Gestión de Inventario' t, '/inicio/inventario' u, 'fa-solid fa-capsules' i UNION ALL
+    SELECT 8 id, 'medicos' c, 'Gestión de Medicos' t, '/inicio/medicos' u, 'fa-solid fa-user-doctor' i UNION ALL
+    SELECT 9 id, 'usuarios' c, 'Gestión de Usuarios' t, '/inicio/usuarios' u, 'feather icon-users' i UNION ALL
+    SELECT 10 id, 'calendario' c, 'Calendario de citas' t, '/inicio/calendario' u, 'bi bi-calendar-week' i UNION ALL
+    SELECT 11 id, 'atencion' c, 'Atención Médica' t, '/inicio/atencion' u, 'fa-solid fa-stethoscope' i UNION ALL
+    SELECT 12 id, 'carga-inventario' c, 'Carga de Inventario' t, '/inicio/carga-inventario' u, 'fa-solid fa-file-arrow-up' i UNION ALL
+    SELECT 13 id, 'despacho' c, 'Gestión de Despachos' t, '/inicio/despacho' u, 'fa-solid fa-prescription-bottle-medical' i UNION ALL
+    SELECT 14 id, 'tarifas' c, 'Gestión de Tarifas' t, '/inicio/tarifas' u, 'fa-solid fa-tags' i UNION ALL
+    SELECT 15 id, 'facturacion' c, 'Gestión de Facturación' t, '/inicio/facturacion' u, 'fa-solid fa-file-invoice-dollar' i UNION ALL
+    SELECT 16 id, 'reportes' c, 'Gestión de Reportes' t, '/inicio/reportes' u, 'fa-solid fa-chart-column' i;
+INSERT INTO `menu` (`menu_id`, `code`, `title`, `url`, `icon`, `activo`, `fecha_creacion`)
+SELECT n.id, n.c, n.t, n.u, n.i, TRUE, '2026-01-01 00:00:00' FROM `mig_menu` n
+LEFT JOIN `menu` m ON m.`code` COLLATE utf8mb4_0900_ai_ci = n.c COLLATE utf8mb4_0900_ai_ci OR m.`menu_id` = n.id
+WHERE m.`menu_id` IS NULL;
+INSERT INTO `menu` (`code`, `title`, `url`, `icon`, `activo`, `fecha_creacion`)
+SELECT n.c, n.t, n.u, n.i, TRUE, '2026-01-01 00:00:00' FROM `mig_menu` n
+LEFT JOIN `menu` m ON m.`code` COLLATE utf8mb4_0900_ai_ci = n.c COLLATE utf8mb4_0900_ai_ci
+WHERE m.`menu_id` IS NULL ORDER BY n.id;
+DROP TEMPORARY TABLE `mig_menu`;
+
+-- Solo se eliminan copias exactas del mismo par, necesario para el UNIQUE.
+DELETE a FROM `perfil_menu` a JOIN `perfil_menu` b
+    ON b.`perfil_id` = a.`perfil_id` AND b.`menu_id` = a.`menu_id` AND b.`perfil_menu_id` < a.`perfil_menu_id`;
 CALL mig_restriccion('perfil_menu', 'uk_perfil_menu', 'UNIQUE (`perfil_id`, `menu_id`)');
 CALL mig_restriccion('menu', 'uk_menu_code', 'UNIQUE (`code`)');
 CALL mig_restriccion('perfil_menu', 'fk_perfil_menu_perfil', 'FOREIGN KEY (`perfil_id`) REFERENCES `perfil` (`perfil_id`) ON DELETE RESTRICT');
 CALL mig_restriccion('perfil_menu', 'fk_perfil_menu_menu', 'FOREIGN KEY (`menu_id`) REFERENCES `menu` (`menu_id`) ON DELETE RESTRICT');
+
+-- Matriz C4: agrega los permisos que falten.
+INSERT INTO `perfil_menu` (`perfil_id`, `menu_id`)
+SELECT p.`perfil_id`, m.`menu_id` FROM (
+    SELECT 'cita' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'cita' c, 'SECRETARIA' r UNION ALL
+    SELECT 'clientes' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'clientes' c, 'SECRETARIA' r UNION ALL
+    SELECT 'especializaciones' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'formulas' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'formulas' c, 'MEDICO' r UNION ALL
+    SELECT 'historias' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'historias' c, 'MEDICO' r UNION ALL
+    SELECT 'mascotas' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'mascotas' c, 'SECRETARIA' r UNION ALL
+    SELECT 'mascotas' c, 'MEDICO' r UNION ALL
+    SELECT 'inventario' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'inventario' c, 'DESPACHO_MEDICO' r UNION ALL
+    SELECT 'medicos' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'medicos' c, 'SECRETARIA' r UNION ALL
+    SELECT 'usuarios' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'calendario' c, 'MEDICO' r UNION ALL
+    SELECT 'atencion' c, 'MEDICO' r UNION ALL
+    SELECT 'carga-inventario' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'despacho' c, 'DESPACHO_MEDICO' r UNION ALL
+    SELECT 'tarifas' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'facturacion' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'facturacion' c, 'SECRETARIA' r UNION ALL
+    SELECT 'reportes' c, 'ADMINISTRADOR' r
+) x JOIN `perfil` p ON p.`codigo` COLLATE utf8mb4_0900_ai_ci = x.r JOIN `menu` m ON m.`code` COLLATE utf8mb4_0900_ai_ci = x.c
+LEFT JOIN `perfil_menu` pm ON pm.`perfil_id` = p.`perfil_id` AND pm.`menu_id` = m.`menu_id`
+WHERE pm.`perfil_menu_id` IS NULL
+ORDER BY p.`perfil_id`, m.`menu_id`;
 
 -- usuario.rol (texto libre o id) pasa a usuario.perfil_id. La columna `rol` se conserva como historico.
 CALL mig_columna('usuario', 'perfil_id', 'INT NULL');
@@ -131,7 +209,7 @@ SET u.`perfil_id` = p.`perfil_id` WHERE u.`perfil_id` IS NULL;
 UPDATE `usuario` u JOIN `perfil` p ON p.`codigo` =
        CASE WHEN UPPER(u.`rol`) LIKE 'DESPACHO%' THEN 'DESPACHO_MEDICO'
             WHEN UPPER(u.`rol`) LIKE 'ADMIN%' THEN 'ADMINISTRADOR'
-            WHEN UPPER(u.`rol`) LIKE 'SECRETARI%' THEN 'SECRETARIA'
+            WHEN UPPER(u.`rol`) LIKE 'SECRETARI%' OR UPPER(u.`rol`) LIKE 'RECEPCI%' THEN 'SECRETARIA'
             WHEN UPPER(u.`rol`) LIKE 'MEDIC%' OR UPPER(u.`rol`) LIKE 'VETERINARI%' THEN 'MEDICO' END
 SET u.`perfil_id` = p.`perfil_id` WHERE u.`perfil_id` IS NULL;
 
@@ -756,3 +834,35 @@ DROP PROCEDURE mig_tipo;
 -- Revisar: todo usuario debe tener perfil y todo perfil, codigo.
 SELECT `username`, `rol`, `perfil_id` FROM `usuario` WHERE `perfil_id` IS NULL;
 SELECT `perfil_id`, `nombre` FROM `perfil` WHERE `codigo` IS NULL;
+
+-- Permisos presentes que no estan en C4 (no se borran; revisar).
+SELECT p.`codigo`, m.`code` FROM `perfil_menu` pm
+JOIN `perfil` p ON p.`perfil_id` = pm.`perfil_id` JOIN `menu` m ON m.`menu_id` = pm.`menu_id`
+LEFT JOIN (
+    SELECT 'cita' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'cita' c, 'SECRETARIA' r UNION ALL
+    SELECT 'clientes' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'clientes' c, 'SECRETARIA' r UNION ALL
+    SELECT 'especializaciones' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'formulas' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'formulas' c, 'MEDICO' r UNION ALL
+    SELECT 'historias' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'historias' c, 'MEDICO' r UNION ALL
+    SELECT 'mascotas' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'mascotas' c, 'SECRETARIA' r UNION ALL
+    SELECT 'mascotas' c, 'MEDICO' r UNION ALL
+    SELECT 'inventario' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'inventario' c, 'DESPACHO_MEDICO' r UNION ALL
+    SELECT 'medicos' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'medicos' c, 'SECRETARIA' r UNION ALL
+    SELECT 'usuarios' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'calendario' c, 'MEDICO' r UNION ALL
+    SELECT 'atencion' c, 'MEDICO' r UNION ALL
+    SELECT 'carga-inventario' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'despacho' c, 'DESPACHO_MEDICO' r UNION ALL
+    SELECT 'tarifas' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'facturacion' c, 'ADMINISTRADOR' r UNION ALL
+    SELECT 'facturacion' c, 'SECRETARIA' r UNION ALL
+    SELECT 'reportes' c, 'ADMINISTRADOR' r
+) x ON x.c = m.`code` COLLATE utf8mb4_0900_ai_ci AND x.r = p.`codigo` COLLATE utf8mb4_0900_ai_ci
+WHERE x.c IS NULL;

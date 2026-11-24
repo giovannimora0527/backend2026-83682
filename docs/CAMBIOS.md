@@ -65,6 +65,20 @@
 - `cliente.correo` nuevo, opcional.
 - Médicos disponibles: se descartan por cualquier cita no cancelada que se cruce, no solo las `PROGRAMADA`.
 
+## Compatibilidad con las tablas del profesor
+
+- Referencia: `db/referencia_profesor_perfiles_menus.sql` (no ejecutar: hace `DROP TABLE`).
+- `02` crea o completa `perfil`, `menu` y `perfil_menu`. Conserva los 9 menús con sus ids; la fila 7 pasa de `medicamentos` a `inventario`; agrega los menús 10 a 16 y el perfil 4.
+- Perfiles: 1 Administrador, 2 Recepcion (`SECRETARIA`), 3 Medico, 4 Despacho Medico.
+- `perfil_menu`: FK, `UNIQUE(perfil_id, menu_id)` y matriz C4. No se borran permisos existentes; al final `02` lista los que no estén en C4.
+- `03` ya no toca menús ni permisos, y no escribe `usuario.rol`, que puede ser texto o número.
+- Probado dos veces por caso en MySQL 8.4.13 y 8.0.12: base vacía, base antigua, base con las tablas del profesor, ambas combinadas y `usuario.rol` numérico. En versiones anteriores a 8.0.16 MySQL no aplica los `CHECK`: esas reglas dependen del backend.
+- `POST /cliente/guardar` responde `{status, message, data}` (C1) y `POST /auth/cerrar-sesion` incluye `status`.
+
+### Cambio acordado del contrato (C4)
+
+El código del menú de citas es `cita`, no `citas`; la ruta sigue siendo `/inicio/citas`. Los `@PreAuthorize` usan roles, no códigos de menú, así que no cambian.
+
 ## Desviaciones del contrato
 
 - `factura_detalle.despacho_detalle_id` no es `UNIQUE` simple: impediría volver a facturar tras anular. Se permite un solo renglón vigente por entrega.

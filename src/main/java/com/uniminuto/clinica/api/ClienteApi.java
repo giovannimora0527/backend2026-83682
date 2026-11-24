@@ -3,6 +3,7 @@ package com.uniminuto.clinica.api;
 import com.uniminuto.clinica.entity.Cliente;
 import com.uniminuto.clinica.exception.BadRequestException;
 import com.uniminuto.clinica.models.ClienteActualizarRq;
+import com.uniminuto.clinica.models.RespuestaRs;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,7 +21,7 @@ public interface ClienteApi {
     @PostMapping(value = "/guardar",
             produces = {"application/json"},
             consumes = {"application/json"})
-    ResponseEntity<Cliente> crearCliente(@Valid @RequestBody ClienteActualizarRq clienteRq);
+    ResponseEntity<RespuestaRs<Cliente>> crearCliente(@Valid @RequestBody ClienteActualizarRq clienteRq);
 
     @PostMapping(value = "/{id}",
             produces = {"application/json"},

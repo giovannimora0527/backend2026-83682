@@ -4,6 +4,7 @@ import lombok.Data;
 
 @Data
 public class CloseSessionRs {
+    private int status = 200;
     private String message;
     private boolean success;
 }

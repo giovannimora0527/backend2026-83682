@@ -3,67 +3,12 @@
 SET NAMES utf8mb4;
 SET SESSION sql_safe_updates = 0;
 
--- ============================ Menus (C4) ============================
-INSERT INTO `menu` (`code`, `title`, `url`, `icon`, `activo`, `fecha_creacion`)
-SELECT * FROM (
-    SELECT 'clientes' c, 'Clientes' t, '/inicio/clientes' u, 'icon-users' i, TRUE a, NOW() f UNION ALL
-    SELECT 'mascotas' c, 'Mascotas' t, '/inicio/mascotas' u, 'icon-heart' i, TRUE a, NOW() f UNION ALL
-    SELECT 'medicos' c, 'Médicos' t, '/inicio/medicos' u, 'icon-user-check' i, TRUE a, NOW() f UNION ALL
-    SELECT 'especializaciones' c, 'Especializaciones' t, '/inicio/especializaciones' u, 'icon-award' i, TRUE a, NOW() f UNION ALL
-    SELECT 'citas' c, 'Citas' t, '/inicio/citas' u, 'icon-calendar' i, TRUE a, NOW() f UNION ALL
-    SELECT 'calendario' c, 'Mi calendario' t, '/inicio/calendario' u, 'icon-calendar' i, TRUE a, NOW() f UNION ALL
-    SELECT 'atencion' c, 'Atención médica' t, '/inicio/atencion' u, 'icon-activity' i, TRUE a, NOW() f UNION ALL
-    SELECT 'historias' c, 'Historias clínicas' t, '/inicio/historias' u, 'icon-file-text' i, TRUE a, NOW() f UNION ALL
-    SELECT 'formulas' c, 'Fórmulas médicas' t, '/inicio/formulas' u, 'icon-clipboard' i, TRUE a, NOW() f UNION ALL
-    SELECT 'inventario' c, 'Inventario' t, '/inicio/inventario' u, 'icon-package' i, TRUE a, NOW() f UNION ALL
-    SELECT 'carga-inventario' c, 'Carga de inventario' t, '/inicio/carga-inventario' u, 'icon-upload' i, TRUE a, NOW() f UNION ALL
-    SELECT 'despacho' c, 'Despacho' t, '/inicio/despacho' u, 'icon-truck' i, TRUE a, NOW() f UNION ALL
-    SELECT 'tarifas' c, 'Tarifas' t, '/inicio/tarifas' u, 'icon-tag' i, TRUE a, NOW() f UNION ALL
-    SELECT 'facturacion' c, 'Facturación' t, '/inicio/facturacion' u, 'icon-dollar-sign' i, TRUE a, NOW() f UNION ALL
-    SELECT 'reportes' c, 'Reportes' t, '/inicio/reportes' u, 'icon-bar-chart-2' i, TRUE a, NOW() f UNION ALL
-    SELECT 'usuarios' c, 'Usuarios' t, '/inicio/usuarios' u, 'icon-user' i, TRUE a, NOW() f
-) n WHERE NOT EXISTS (SELECT 1 FROM `menu` m WHERE m.`code` = n.c);
-
--- `medicamentos` lo reemplaza `inventario`.
-UPDATE `menu` SET `activo` = FALSE, `fecha_modificacion` = NOW() WHERE `code` = 'medicamentos';
-
--- Los codigos del contrato quedan visibles exactamente para sus roles.
-DELETE pm FROM `perfil_menu` pm JOIN `menu` m ON m.`menu_id` = pm.`menu_id`
-WHERE m.`code` IN ('clientes', 'mascotas', 'medicos', 'especializaciones', 'citas', 'calendario', 'atencion', 'historias', 'formulas', 'inventario', 'carga-inventario', 'despacho', 'tarifas', 'facturacion', 'reportes', 'usuarios');
-
-INSERT INTO `perfil_menu` (`perfil_id`, `menu_id`)
-SELECT p.`perfil_id`, m.`menu_id` FROM (
-    SELECT 'clientes' c, 'ADMINISTRADOR' r UNION ALL
-    SELECT 'clientes' c, 'SECRETARIA' r UNION ALL
-    SELECT 'mascotas' c, 'ADMINISTRADOR' r UNION ALL
-    SELECT 'mascotas' c, 'SECRETARIA' r UNION ALL
-    SELECT 'mascotas' c, 'MEDICO' r UNION ALL
-    SELECT 'medicos' c, 'ADMINISTRADOR' r UNION ALL
-    SELECT 'medicos' c, 'SECRETARIA' r UNION ALL
-    SELECT 'especializaciones' c, 'ADMINISTRADOR' r UNION ALL
-    SELECT 'citas' c, 'ADMINISTRADOR' r UNION ALL
-    SELECT 'citas' c, 'SECRETARIA' r UNION ALL
-    SELECT 'calendario' c, 'MEDICO' r UNION ALL
-    SELECT 'atencion' c, 'MEDICO' r UNION ALL
-    SELECT 'historias' c, 'ADMINISTRADOR' r UNION ALL
-    SELECT 'historias' c, 'MEDICO' r UNION ALL
-    SELECT 'formulas' c, 'ADMINISTRADOR' r UNION ALL
-    SELECT 'formulas' c, 'MEDICO' r UNION ALL
-    SELECT 'inventario' c, 'ADMINISTRADOR' r UNION ALL
-    SELECT 'inventario' c, 'DESPACHO_MEDICO' r UNION ALL
-    SELECT 'carga-inventario' c, 'ADMINISTRADOR' r UNION ALL
-    SELECT 'despacho' c, 'DESPACHO_MEDICO' r UNION ALL
-    SELECT 'tarifas' c, 'ADMINISTRADOR' r UNION ALL
-    SELECT 'facturacion' c, 'ADMINISTRADOR' r UNION ALL
-    SELECT 'facturacion' c, 'SECRETARIA' r UNION ALL
-    SELECT 'reportes' c, 'ADMINISTRADOR' r UNION ALL
-    SELECT 'usuarios' c, 'ADMINISTRADOR' r
-) x JOIN `perfil` p ON p.`codigo` = x.r JOIN `menu` m ON m.`code` = x.c;
+-- Los perfiles, menus y permisos los crea 02.
 
 -- ============================ Usuarios (C7) ============================
 -- Si el username ya existe, se respeta el usuario existente.
-INSERT INTO `usuario` (`username`, `password_hash`, `rol`, `perfil_id`, `activo`, `email`)
-SELECT n.u, n.h, n.r, p.`perfil_id`, TRUE, CONCAT(n.u, '@clinica.example') FROM (
+INSERT INTO `usuario` (`username`, `password_hash`, `perfil_id`, `activo`, `email`)
+SELECT n.u, n.h, p.`perfil_id`, TRUE, CONCAT(n.u, '@clinica.example') FROM (
     SELECT 'admin' u, '$2a$10$/VSj63imO7vKNdi5kLkUF.06XfGN0XiSi8icDlvF77ExWPE1eaiZO' h, 'ADMINISTRADOR' r UNION ALL
     SELECT 'secretaria' u, '$2a$10$aphbwR9OoC4gYXU8IAq3vOJ542pJa/TRyx2xM/Q7MFlTm2xj/vOUC' h, 'SECRETARIA' r UNION ALL
     SELECT 'medico1' u, '$2a$10$xFRWgIZH4.F0iyUJ2Anet.ZmZtfQqOPKd0YWHlaUMySaY39npMSIe' h, 'MEDICO' r UNION ALL

@@ -4,6 +4,7 @@ import com.uniminuto.clinica.api.ClienteApi;
 import com.uniminuto.clinica.entity.Cliente;
 import com.uniminuto.clinica.exception.BadRequestException;
 import com.uniminuto.clinica.models.ClienteActualizarRq;
+import com.uniminuto.clinica.models.RespuestaRs;
 import com.uniminuto.clinica.service.ClienteService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,8 +23,9 @@ public class ClienteApiController implements ClienteApi {
 
     @Override
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'SECRETARIA')")
-    public ResponseEntity<Cliente> crearCliente(ClienteActualizarRq clienteRq) {
-        return ResponseEntity.ok(clienteService.crearCliente(clienteRq));
+    public ResponseEntity<RespuestaRs<Cliente>> crearCliente(ClienteActualizarRq clienteRq) {
+        return ResponseEntity.ok(RespuestaRs.ok("Cliente creado correctamente.",
+                clienteService.crearCliente(clienteRq)));
     }
 
     @Override
