@@ -23,7 +23,8 @@ public class CitaServiceImpl implements CitaService {
 
     private static final String ESTADO_PROGRAMADA = "PROGRAMADA";
     private static final String ESTADO_CANCELADA = "CANCELADA";
-    private static final String ESTADO_CONFIRMADA = "CONFIRMADA";
+    /** Duracion por defecto; pasa a salir del servicio cuando exista ese modelo. */
+    private static final int DURACION_MINUTOS = 30;
 
     @Autowired
     private CitaRepository citaRepository;
@@ -84,32 +85,26 @@ public class CitaServiceImpl implements CitaService {
             throw new BadRequestException("El médico no existe");
         }
 
+        if (citaRq.getId() == null) {
+            throw new BadRequestException("El id de la cita no puede ser nulo");
+        }
         Optional<Cita> optCita = this.citaRepository.findById(citaRq.getId());
         if (optCita.isEmpty()) {
             throw new BadRequestException("La cita no existe");
         }
 
         Cita citaActualizar = optCita.get();
-        if (!ESTADO_CANCELADA.equalsIgnoreCase(citaRq.getEstado()) && !ESTADO_CONFIRMADA.equalsIgnoreCase(citaRq.getEstado())) {
-            if (citaActualizar.getFechaHora().equals(citaRq.getFechaHora())) {
-                if (!sePuedeAgendarCitaXFecha(citaActualizar)) {
-                    throw new BadRequestException("No se puede actualizar la cita  ya que hay una cita agendada en ese rango de fechas.");
-                }
-            }
-
-            List<Cita> citas = citaRepository.findByMedicoAndFechaHoraBetween(medicoOptional.get(),
-                    citaRq.getFechaHora().minusMinutes(30), citaRq.getFechaHora().plusMinutes(30));
-            if (!citas.isEmpty()) {
-                throw new BadRequestException("No se puede actualizar la cita " +
-                        "ya que hay el médico tiene una cita agendada en ese rango de fechas.");
-            }
+        String estado = citaRq.getEstado() == null || citaRq.getEstado().isBlank()
+                ? citaActualizar.getEstado() : citaRq.getEstado();
+        if (!ESTADO_CANCELADA.equalsIgnoreCase(estado)) {
+            this.validarSolapamiento(citaRq, medicoOptional.get(), mascotaOptional.get());
         }
-
         citaActualizar.setMedico(medicoOptional.get());
         citaActualizar.setMascota(mascotaOptional.get());
+        citaActualizar.setCliente(mascotaOptional.get().getCliente());
         citaActualizar.setFechaHora(citaRq.getFechaHora());
         citaActualizar.setMotivo(citaRq.getMotivo());
-        citaActualizar.setEstado(citaRq.getEstado());
+        citaActualizar.setEstado(estado);
         citaRepository.save(citaActualizar);
 
         MiRespuestaRS rta = new MiRespuestaRS();
@@ -133,28 +128,8 @@ public class CitaServiceImpl implements CitaService {
             throw new BadRequestException("El médico no existe");
         }
 
-        Optional<Cita> citaOptional = citaRepository.findByMascotaAndMedico(mascotaOptional.get(), medicoOptional.get());
-
-        if (citaOptional.isPresent()) {
-            // Valido las fechas de la cita para darle un tiempo de 30 minutos para que no se solapen las citas
-            Cita cita = citaOptional.get();
-            LocalDateTime fechaHoraCita = cita.getFechaHora();
-            LocalDateTime fechaHoraCitaMas30Min = fechaHoraCita.plusMinutes(15);
-            LocalDateTime fechaHoraCitaMenos30Min = fechaHoraCita.minusMinutes(15);
-            if (citaRq.getFechaHora().isAfter(fechaHoraCitaMenos30Min)
-                    && citaRq.getFechaHora().isBefore(fechaHoraCitaMas30Min)
-                    && cita.getEstado().equals(ESTADO_PROGRAMADA)) {
-                throw new BadRequestException("No se puede asignar la cita ya que tiene una cita programada en ese rango de fechas.");
-            }
-        }
-
-        List<Cita> citas = citaRepository
-                .findByMedicoAndFechaHoraBetween(medicoOptional.get(),
-                        citaRq.getFechaHora().minusMinutes(15),
-                        citaRq.getFechaHora().plusMinutes(15));
-        if (!citas.isEmpty()) {
-            throw new BadRequestException("El médico ya tiene una cita programada en ese rango de hora.");
-        }
+        citaRq.setId(null);
+        this.validarSolapamiento(citaRq, medicoOptional.get(), mascotaOptional.get());
 
         Mascota mascota = mascotaOptional.get();
         Medico medico = medicoOptional.get();
@@ -175,13 +150,12 @@ public class CitaServiceImpl implements CitaService {
         return rta;
     }
 
-    private boolean sePuedeAgendarCitaXFecha(Cita cita) {
-        LocalDateTime fechaHoraCita = cita.getFechaHora();
-        LocalDateTime fechaHoraCitaMas30Min = fechaHoraCita.plusMinutes(15);
-        LocalDateTime fechaHoraCitaMenos30Min = fechaHoraCita.minusMinutes(15);
-        return !cita.getFechaHora().isAfter(fechaHoraCitaMenos30Min)
-                || !cita.getFechaHora().isBefore(fechaHoraCitaMas30Min)
-                || !cita.getEstado().equals(ESTADO_PROGRAMADA);
+    private void validarSolapamiento(CitaRq citaRq, Medico medico, Mascota mascota) throws BadRequestException {
+        LocalDateTime inicio = citaRq.getFechaHora();
+        if (citaRepository.existeSolapamiento(medico, mascota, inicio.minusMinutes(DURACION_MINUTOS),
+                inicio.plusMinutes(DURACION_MINUTOS), citaRq.getId())) {
+            throw new BadRequestException("El médico o la mascota ya tienen una cita en ese rango de hora.");
+        }
     }
 
     private void validarCita(CitaRq citaRq) throws BadRequestException {

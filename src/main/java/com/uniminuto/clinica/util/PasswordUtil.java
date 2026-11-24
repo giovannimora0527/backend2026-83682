@@ -6,6 +6,17 @@ import java.security.NoSuchAlgorithmException;
 
 public class PasswordUtil {
 
+    /** Maximo de bytes que procesa BCrypt. */
+    private static final int BCRYPT_BYTES_MAXIMOS = 72;
+
+    public static boolean esMD5(String hash) {
+        return hash != null && hash.matches("[0-9a-fA-F]{32}");
+    }
+
+    public static boolean cabeEnBCrypt(String password) {
+        return password.getBytes(StandardCharsets.UTF_8).length <= BCRYPT_BYTES_MAXIMOS;
+    }
+
     public static String generarMD5(String cadena) {
         return generateMD5(cadena);
     }

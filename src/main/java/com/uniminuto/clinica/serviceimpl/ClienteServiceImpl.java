@@ -38,6 +38,43 @@ public class ClienteServiceImpl implements ClienteService {
         if (id == null || id <= 0) {
             throw new BadRequestException("El id del cliente debe ser mayor a cero.");
         }
+        this.validar(clienteRq);
+        String documento = clienteRq.getNumeroDocumento().trim();
+        try {
+            return transactionTemplate.execute(status -> {
+                Cliente cliente = clienteRepository.findById(id)
+                        .orElseThrow(() -> new NotFoundException("El cliente con ID " + id + " no existe."));
+                comprobarDocumentoDisponible(documento, id);
+
+                this.copiarDatos(clienteRq, documento, cliente);
+                return clienteRepository.save(cliente);
+            });
+        } catch (DataIntegrityViolationException ex) {
+            // Consultar despues del rollback tambien cubre duplicados concurrentes al confirmar.
+            comprobarDocumentoDisponible(documento, id);
+            throw ex;
+        }
+    }
+
+    @Override
+    public Cliente crearCliente(ClienteActualizarRq clienteRq) {
+        this.validar(clienteRq);
+        String documento = clienteRq.getNumeroDocumento().trim();
+        try {
+            return transactionTemplate.execute(status -> {
+                comprobarDocumentoDisponible(documento, null);
+                Cliente cliente = new Cliente();
+                this.copiarDatos(clienteRq, documento, cliente);
+                cliente.setActivo(true);
+                return clienteRepository.save(cliente);
+            });
+        } catch (DataIntegrityViolationException ex) {
+            comprobarDocumentoDisponible(documento, null);
+            throw ex;
+        }
+    }
+
+    private void validar(ClienteActualizarRq clienteRq) {
         if (clienteRq == null) {
             throw new BadRequestException("La informacion del cliente es obligatoria.");
         }
@@ -49,34 +86,22 @@ public class ClienteServiceImpl implements ClienteService {
                     .collect(Collectors.joining("; "));
             throw new BadRequestException(mensaje);
         }
+    }
 
-        String documento = clienteRq.getNumeroDocumento().trim();
-        try {
-            return transactionTemplate.execute(status -> {
-                Cliente cliente = clienteRepository.findById(id)
-                        .orElseThrow(() -> new NotFoundException("El cliente con ID " + id + " no existe."));
-                comprobarDocumentoDisponible(documento, id);
-
-                cliente.setTipoDocumento(clienteRq.getTipoDocumento().trim());
-                cliente.setNumeroDocumento(documento);
-                cliente.setNombres(clienteRq.getNombres().trim());
-                cliente.setApellidos(clienteRq.getApellidos().trim());
-                cliente.setFechaNacimiento(clienteRq.getFechaNacimiento());
-                cliente.setGenero(clienteRq.getGenero());
-                cliente.setTelefono(clienteRq.getTelefono());
-                cliente.setDireccion(clienteRq.getDireccion());
-                return clienteRepository.save(cliente);
-            });
-        } catch (DataIntegrityViolationException ex) {
-            // Consultar despues del rollback tambien cubre duplicados concurrentes al confirmar.
-            comprobarDocumentoDisponible(documento, id);
-            throw ex;
-        }
+    private void copiarDatos(ClienteActualizarRq clienteRq, String documento, Cliente cliente) {
+        cliente.setTipoDocumento(clienteRq.getTipoDocumento().trim());
+        cliente.setNumeroDocumento(documento);
+        cliente.setNombres(clienteRq.getNombres().trim());
+        cliente.setApellidos(clienteRq.getApellidos().trim());
+        cliente.setFechaNacimiento(clienteRq.getFechaNacimiento());
+        cliente.setGenero(clienteRq.getGenero());
+        cliente.setTelefono(clienteRq.getTelefono());
+        cliente.setDireccion(clienteRq.getDireccion());
     }
 
     private void comprobarDocumentoDisponible(String documento, Long id) {
         clienteRepository.findByNumeroDocumento(documento)
-                .filter(cliente -> !id.equals(cliente.getId()))
+                .filter(cliente -> !cliente.getId().equals(id))
                 .ifPresent(cliente -> {
                     throw new ConflictException("El numero de documento ya pertenece a otro cliente.");
                 });

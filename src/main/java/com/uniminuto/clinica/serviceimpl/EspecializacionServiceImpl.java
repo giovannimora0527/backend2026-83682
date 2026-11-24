@@ -67,7 +67,7 @@ public class EspecializacionServiceImpl implements EspecializacionService {
             throw new BadRequestException("La especialización que se intenta actualizar no existe.");
         }
         Especializacion especializacionActual = especializacionExistente.get();
-        if (especializacionActual.getCodigoEspecializacion().equals(especializacion.getCodigoEspecializacion())) {
+        if (!especializacionActual.getCodigoEspecializacion().equals(especializacion.getCodigoEspecializacion())) {
             Optional<Especializacion> especializacionPorCodigo = especializacionRepository
                     .findByCodigoEspecializacion(especializacion.getCodigoEspecializacion());
             if (especializacionPorCodigo.isPresent() && !especializacionPorCodigo.get().getId()
@@ -76,7 +76,7 @@ public class EspecializacionServiceImpl implements EspecializacionService {
             }
         }
 
-        if (especializacionActual.getNombre().equals(especializacion.getNombre())) {
+        if (!especializacionActual.getNombre().equals(especializacion.getNombre())) {
             Optional<Especializacion> especializacionPorNombre = especializacionRepository
                     .findByNombre(especializacion.getNombre());
             if (especializacionPorNombre.isPresent() && !especializacionPorNombre.get().getId()

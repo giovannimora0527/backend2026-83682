@@ -57,6 +57,7 @@ La aplicación usa el prefijo `/clinica/v1`. URL local base: `http://localhost:8
 | | `POST /usuario/guardar`, `/usuario/actualizar` | Crea o actualiza usuario |
 | Clientes | `GET /cliente/listar` | Lista clientes |
 | | `GET /cliente/buscar-por-documento?documento=...` | Busca por documento |
+| | `POST /cliente/guardar` | Crea un cliente con documento único |
 | | `POST /cliente/{id}` | Actualiza completamente los campos editables de un cliente existente |
 | Mascotas | `GET /mascota/listar`, `/mascota/listar-ordenado?ascendente=...` | Lista mascotas |
 | | `GET /mascota/buscar-nombre?nombre=...` | Busca por nombre |
@@ -81,7 +82,7 @@ La aplicación usa el prefijo `/clinica/v1`. URL local base: `http://localhost:8
 | Fórmulas | `GET /formula-medica/listar` | Lista fórmulas |
 | | `POST /formula-medica/guardar`, `/formula-medica/actualizar` | Crea o actualiza fórmula |
 
-Los endpoints usan `@CrossOrigin("*")`; restringe orígenes antes de exponer el servicio en producción. Varias operaciones GET declaran `consumes: application/json`; según el cliente HTTP, puede requerirse enviar `Content-Type: application/json` incluso sin cuerpo. No hay especificación OpenAPI/Swagger configurada en las dependencias actuales.
+No hay especificación OpenAPI/Swagger configurada en las dependencias actuales.
 
 ### Actualizacion de clientes
 
@@ -121,21 +122,9 @@ las anotaciones JPA la declaran, pero no se incluyen migraciones que acrediten e
 
 ## Configuración
 
-`application.properties` activa el perfil `dev`, establece puerto `8080`, contexto `/clinica/v1` y conexión MySQL local. También importa opcionalmente `./application-secrets.properties`. `application-dev.properties` y `application-prod.properties` existen, pero actualmente contienen una configuración de base de datos local equivalente; no constituyen una configuración de producción aislada.
+Las credenciales se toman de variables de entorno. En `dev`, copia `.env.example` como `.env` y complétalo; en `prod`, define las variables en el entorno. `JWT_SECRET` debe ser Base64 de al menos 64 bytes aleatorios.
 
-Configura las credenciales y claves fuera del repositorio usando variables de entorno de Spring, por ejemplo:
-
-```powershell
-$env:SPRING_DATASOURCE_URL = 'jdbc:mysql://localhost:3306/clinica?serverTimezone=America/Bogota'
-$env:SPRING_DATASOURCE_USERNAME = 'usuario_app'
-$env:SPRING_DATASOURCE_PASSWORD = 'contraseña'
-$env:SPRING_MAIL_USERNAME = 'cuenta-smtp'
-$env:SPRING_MAIL_PASSWORD = 'secreto-smtp'
-$env:SPRING_MAIL_TO = 'destino@example.com'
-$env:JWT_SECRET = '<secreto aleatorio Base64 de al menos 64 bytes>'
-```
-
-La clave JWT se usa para firmar HS512 y debe ser aleatoria, fuerte y distinta por entorno. No uses las credenciales de ejemplo/locales para despliegue.
+Antes del primer arranque, respalda la base y ejecuta una vez `db/02_migracion_examen_final.sql`. Los detalles están en `docs/CAMBIOS.md`.
 
 ## Ejecución local
 
@@ -166,19 +155,14 @@ Ejecuta la suite con:
 La suite incluye una prueba de carga del contexto de Spring, pruebas unitarias de utilidades para JWT y OTP,
 y pruebas de servicio y HTTP de clientes con Mockito, Bean Validation y MockMvc sin una base de datos real.
 Las pruebas de clientes cubren actualizacion completa, preservacion de atributos no editables,
-documentos duplicados, entrada invalida y respuestas HTTP. La carga de contexto puede necesitar
-conectividad/configuracion de MySQL; no se incluye una base de datos de prueba dedicada.
+documentos duplicados, entrada invalida y respuestas HTTP. Las pruebas de integracion usan el perfil `test` con H2, sin necesidad de MySQL.
 
 ## Seguridad y operación
 
-- Las rutas habilitan CORS para cualquier origen y no se observa una cadena de filtros Spring Security que proteja globalmente los recursos. No asumas que el JWT se valida automáticamente en cada endpoint.
-- El flujo de autenticación usa OTP con expiración de 15 minutos y límite de intentos, y crea JWT con expiración de una hora. Revisa el estado de cierre de sesión: `cerrarSesion` devuelve actualmente `null` en el servicio.
-- `PasswordUtil` usa MD5 para las contraseñas, algoritmo inadecuado para almacenamiento de credenciales. Migra a BCrypt, Argon2 o scrypt antes de un despliegue real.
-- El manejador global devuelve un mensaje generico para errores internos y registra la excepcion en servidor; protege el acceso a esos registros.
-- SQL detallado está habilitado en configuración. Desactívalo en producción y evita registrar credenciales/datos personales.
-- Usa TLS, cuenta de base de datos con privilegios mínimos, secretos gestionados por el entorno, copias de seguridad y restricciones de red. No versionar secretos ni guardar archivos locales de secretos en Git.
-- Hay credenciales y secretos sensibles en la configuración actualmente versionada. Deben considerarse expuestos: rótalos y elimina su uso; moverlos a variables de entorno no invalida los valores ya expuestos.
-- El `CommandLineRunner` `DatabaseConnectionTest` imprime metadatos de conexión al iniciar; revisa si esa salida es apropiada para el entorno productivo.
+- Todas las rutas exigen `Authorization: Bearer <JWT>`, salvo `/auth/login`, `/auth/validate-token`, `/clinica/test` y Swagger/health cuando existan.
+- El cierre de sesión invalida el token. Contraseñas en BCrypt, con migración automática desde MD5 al iniciar sesión. El OTP es de un solo uso.
+- CORS restringido a `CORS_ORIGINS`. La autorización por rol está pendiente.
+- Las credenciales que estuvieron versionadas deben rotarse.
 
 ## Despliegue
 

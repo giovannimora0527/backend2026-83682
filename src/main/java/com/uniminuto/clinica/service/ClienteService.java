@@ -8,6 +8,8 @@ import java.util.List;
 
 public interface ClienteService {
 
+    Cliente crearCliente(ClienteActualizarRq clienteRq);
+
     Cliente actualizarCliente(Long id, ClienteActualizarRq clienteRq);
 
     List<Cliente> listarClientes() throws BadRequestException;

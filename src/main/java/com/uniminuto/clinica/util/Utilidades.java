@@ -19,6 +19,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.List;
+import java.util.UUID;
 
 @Component
 public class Utilidades {
@@ -57,6 +58,10 @@ public class Utilidades {
     }
 
     public String crearJwtToken(OtpToken otpToken, String secret) {
+        return crearJwtToken(otpToken, secret, UUID.randomUUID().toString());
+    }
+
+    public String crearJwtToken(OtpToken otpToken, String secret, String jti) {
         validarOtpToken(otpToken);
         if (secret == null || secret.isBlank()) {
             throw new IllegalStateException(
@@ -67,7 +72,7 @@ public class Utilidades {
                 .orElseThrow(() -> new IllegalArgumentException("El usuario del token no existe."));
         List<Menu> menus = menuService.obtenerListaMenus(otpToken.getUsuarioId());
         String menusJson = serializarMenus(menus);
-        return firmarJwtToken(otpToken, usuario, key, menusJson);
+        return firmarJwtToken(otpToken, usuario, key, menusJson, jti);
     }
 
     private String serializarMenus(List<Menu> menus) {
@@ -79,9 +84,10 @@ public class Utilidades {
     }
 
     private static String firmarJwtToken(OtpToken otpToken, Usuario usuario,
-                                         SecretKey key, String menusJson) {
+                                         SecretKey key, String menusJson, String jti) {
         Instant now = Instant.now();
         return Jwts.builder()
+                .id(jti)
                 .subject(otpToken.getUsuarioId().toString())
                 .claim("username", usuario.getUsername())
                 .claim("email", usuario.getEmail())

@@ -101,8 +101,8 @@ public class FormulaServiceImpl implements FormulaService {
         if (formulaRq.getCitaId() == null || formulaRq.getCitaId() <= 0) {
             throw new BadRequestException("El id de la cita es obligatorio y debe ser mayor a cero.");
         }
-        if (formulaRq.getCitaId() == null || formulaRq.getCitaId() <= 0) {
-            throw new BadRequestException("El id de la cita es obligatorio y debe ser mayor a cero.");
+        if (formulaRq.getMedicamentoId() == null || formulaRq.getMedicamentoId() <= 0) {
+            throw new BadRequestException("El id del medicamento es obligatorio y debe ser mayor a cero.");
         }
         if (formulaRq.getDosis() == null || formulaRq.getDosis().isEmpty()) {
             throw new BadRequestException("La dosis de la fórmula es obligatoria.");

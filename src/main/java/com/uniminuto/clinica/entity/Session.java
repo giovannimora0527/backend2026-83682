@@ -23,12 +23,19 @@ public class Session {
     @Column(name = "user_id", nullable = false)
     private Long userId;
 
-    @Column(name = "token", nullable = false, length = 500)
-    private String token;
+    /** Identificador del JWT; el token completo no se guarda. */
+    @Column(name = "jti", unique = true, length = 36)
+    private String jti;
+
+    @Column(name = "activa", nullable = false)
+    private Boolean activa;
 
     @Column(name = "fecha_ini_sesion")
     private LocalDateTime fechaIniSesion;
 
     @Column(name = "fecha_expiracion")
     private LocalDateTime fechaExpiracion;
+
+    @Column(name = "fecha_cierre")
+    private LocalDateTime fechaCierre;
 }

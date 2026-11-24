@@ -10,6 +10,7 @@ import com.uniminuto.clinica.repository.PerfilRepository;
 import com.uniminuto.clinica.repository.UsuarioRepository;
 import com.uniminuto.clinica.service.UsuarioService;
 import com.uniminuto.clinica.util.PasswordUtil;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -21,8 +22,11 @@ public class UsuarioServiceImpl implements UsuarioService {
 
     private final UsuarioRepository usuarioRepository;
     private final PerfilRepository perfilRepository;
+    private final PasswordEncoder passwordEncoder;
 
-    public UsuarioServiceImpl(UsuarioRepository usuarioRepository, PerfilRepository perfilRepository) {
+    public UsuarioServiceImpl(UsuarioRepository usuarioRepository, PerfilRepository perfilRepository,
+                              PasswordEncoder passwordEncoder) {
+        this.passwordEncoder = passwordEncoder;
         this.usuarioRepository = usuarioRepository;
         this.perfilRepository = perfilRepository;
     }
@@ -49,6 +53,9 @@ public class UsuarioServiceImpl implements UsuarioService {
     @Override
     public MiRespuestaRS crearUsuario(UsuarioRq usuarioRq) {
         this.validarUsuario(usuarioRq);
+        if (!tienePassword(usuarioRq)) {
+            throw new BadRequestException("La contraseña no puede estar vacía");
+        }
 
         if (this.usuarioRepository.existsByUsername(usuarioRq.getUsername())) {
             throw new BadRequestException("El nombre de usuario ya existe");
@@ -63,10 +70,9 @@ public class UsuarioServiceImpl implements UsuarioService {
             throw new BadRequestException("El perfil no existe");
         }
 
-        String claveMD5 = PasswordUtil.generarMD5(usuarioRq.getPassword());
         Usuario usuarioNuevo = new Usuario();
         usuarioNuevo.setUsername(usuarioRq.getUsername());
-        usuarioNuevo.setPasswordHash(claveMD5);
+        usuarioNuevo.setPasswordHash(passwordEncoder.encode(usuarioRq.getPassword()));
         usuarioNuevo.setPerfil(optPerfil.get());
         usuarioNuevo.setEmail(usuarioRq.getEmail());
         usuarioNuevo.setActivo(true);
@@ -84,6 +90,9 @@ public class UsuarioServiceImpl implements UsuarioService {
     @Override
     public MiRespuestaRS actualizarUsuario(UsuarioRq usuarioRq) {
         this.validarUsuario(usuarioRq);
+        if (usuarioRq.getId() == null) {
+            throw new BadRequestException("El id del usuario es obligatorio");
+        }
 
         Optional<Usuario> optUser = this.usuarioRepository.findById(usuarioRq.getId());
         if (optUser.isEmpty()) {
@@ -109,7 +118,12 @@ public class UsuarioServiceImpl implements UsuarioService {
         }
 
         usuarioExistente.setEmail(usuarioRq.getEmail());
-        usuarioExistente.setActivo(usuarioRq.getActivo());
+        if (usuarioRq.getActivo() != null) {
+            usuarioExistente.setActivo(usuarioRq.getActivo());
+        }
+        if (tienePassword(usuarioRq)) {
+            usuarioExistente.setPasswordHash(passwordEncoder.encode(usuarioRq.getPassword()));
+        }
         usuarioExistente.setPerfil(optPerfil.get());
         usuarioRepository.save(usuarioExistente);
 
@@ -120,6 +134,10 @@ public class UsuarioServiceImpl implements UsuarioService {
         return rta;
     }
 
+    private boolean tienePassword(UsuarioRq usuarioRq) {
+        return usuarioRq.getPassword() != null && !usuarioRq.getPassword().isEmpty();
+    }
+
     private void validarUsuario(UsuarioRq usuarioRq) throws BadRequestException {
         if (usuarioRq == null) {
             throw new BadRequestException("El usuario no puede estar vacío");
@@ -127,11 +145,11 @@ public class UsuarioServiceImpl implements UsuarioService {
         if (usuarioRq.getUsername() == null || usuarioRq.getUsername().isEmpty()) {
             throw new BadRequestException("El nombre de usuario no puede estar vacío");
         }
-        if (usuarioRq.getPassword() == null || usuarioRq.getPassword().isEmpty()) {
-            throw new BadRequestException("La contraseña no puede estar vacía");
+        if (tienePassword(usuarioRq) && !PasswordUtil.cabeEnBCrypt(usuarioRq.getPassword())) {
+            throw new BadRequestException("La contraseña admite hasta 72 bytes");
         }
-        if (usuarioRq.getRol() == null || usuarioRq.getRol().isEmpty()) {
-            throw new BadRequestException("El rol no puede estar vacío");
+        if (usuarioRq.getPerfilId() == null) {
+            throw new BadRequestException("El perfil no puede estar vacío");
         }
         if (usuarioRq.getEmail() == null || usuarioRq.getEmail().isEmpty()) {
             throw new BadRequestException("El correo electrónico no puede estar vacío");

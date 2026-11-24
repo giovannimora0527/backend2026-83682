@@ -20,6 +20,11 @@ public class ClienteApiController implements ClienteApi {
     }
 
     @Override
+    public ResponseEntity<Cliente> crearCliente(ClienteActualizarRq clienteRq) {
+        return ResponseEntity.ok(clienteService.crearCliente(clienteRq));
+    }
+
+    @Override
     public ResponseEntity<Cliente> actualizarCliente(Long id, ClienteActualizarRq clienteRq) {
         return ResponseEntity.ok(clienteService.actualizarCliente(id, clienteRq));
     }

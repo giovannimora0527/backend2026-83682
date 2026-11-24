@@ -10,7 +10,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 @RequestMapping("/usuario")
 public interface UsuarioApi {
 
@@ -21,8 +20,7 @@ public interface UsuarioApi {
      * @throws BadRequestException excepcion.
      */
     @GetMapping(value = "/listar-ordenado",
-            produces = {"application/json"},
-            consumes = {"application/json"})
+            produces = {"application/json"})
     ResponseEntity<List<UsuarioRs>> getUsuarios()
             throws BadRequestException;
 

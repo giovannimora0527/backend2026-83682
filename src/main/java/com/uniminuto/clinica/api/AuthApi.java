@@ -8,12 +8,10 @@ import com.uniminuto.clinica.models.CloseSessionRs;
 import com.uniminuto.clinica.models.LoginRs;
 import com.uniminuto.clinica.models.TokenRq;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
-@CrossOrigin(origins = "*", allowedHeaders = "*")
 @RequestMapping("/auth")
 public interface AuthApi {
 
@@ -33,9 +31,8 @@ public interface AuthApi {
 
 
     @PostMapping(value = "/cerrar-sesion",
-            produces = {"application/json"},
-            consumes = {"application/json"})
+            produces = {"application/json"})
     ResponseEntity<CloseSessionRs> cerrarSesion(
-            @RequestBody CloseSession closeSession)
+            @RequestBody(required = false) CloseSession closeSession)
             throws BadRequestException;
 }

@@ -14,7 +14,7 @@ public interface MascotaRepository extends JpaRepository<Mascota, Integer> {
 
     List<Mascota> findAllByOrderByNombreMascotaDesc();
 
-    Mascota findByNombreMascota(String nombreMascota);
+    List<Mascota> findByNombreMascota(String nombreMascota);
 
     List<Mascota> findByClienteOrderByNombreMascotaAsc(Cliente c);
 

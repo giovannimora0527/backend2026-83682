@@ -31,7 +31,7 @@ public class MascotaApiController implements MascotaApi {
 
     @Override
     public ResponseEntity<List<Mascota>> buscarMascotaPorNombre(String nombre) throws BadRequestException {
-        return ResponseEntity.ok(mascotaService.findByNombreMascota(nombre).map(List::of).orElseGet(List::of));
+        return ResponseEntity.ok(mascotaService.findByNombreMascota(nombre));
     }
 
     @Override

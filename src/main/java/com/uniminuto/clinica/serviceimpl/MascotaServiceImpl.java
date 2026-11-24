@@ -53,8 +53,8 @@ public class MascotaServiceImpl implements MascotaService {
     }
 
     @Override
-    public Optional<Mascota> findByNombreMascota(String nombreMascota) {
-        return Optional.ofNullable(mascotaRepository.findByNombreMascota(nombreMascota));
+    public List<Mascota> findByNombreMascota(String nombreMascota) {
+        return mascotaRepository.findByNombreMascota(nombreMascota);
     }
 
     @Override
@@ -129,6 +129,7 @@ public class MascotaServiceImpl implements MascotaService {
         nueva.setEdad(mascotaRq.getEdad());
         nueva.setCliente(optCliente.get());
         nueva.setRaza(optRaza.get());
+        nueva.setActivo(true);
         nueva.setFechaRegistro(LocalDateTime.now());
 
         // Paso 5. Guardar la nueva mascota en la base de datos
