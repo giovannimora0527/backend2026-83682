@@ -108,6 +108,18 @@ public class CitaApiController implements CitaApi {
 
     /** {@inheritDoc} */
     @Override
+    public ResponseEntity<Map<String, Object>> eliminarAusenciaPropia(long id) {
+        return ResponseEntity.ok(servicio.eliminarAusencia(SesionActual.medicoId(), id));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public ResponseEntity<List<Map<String, Object>>> ausenciasPropias(String desde, String hasta) {
+        return ResponseEntity.ok(servicio.ausenciasEnRango(SesionActual.medicoId(), desde, hasta));
+    }
+
+    /** {@inheritDoc} */
+    @Override
     public ResponseEntity<Map<String, Object>> disponibilidad(long medico, String fecha) {
         return ResponseEntity.ok(servicio.disponibilidad(medico, fecha));
     }
@@ -128,6 +140,12 @@ public class CitaApiController implements CitaApi {
     @Override
     public ResponseEntity<Map<String, Object>> ausencia(long medico, AusenciaRq ausencia) {
         return ResponseEntity.ok(servicio.registrarAusencia(medico, ausencia));
+    }
+
+    /** {@inheritDoc} */
+    @Override
+    public ResponseEntity<Map<String, Object>> eliminarAusencia(long medico, long id) {
+        return ResponseEntity.ok(servicio.eliminarAusencia(medico, id));
     }
 
     /** {@inheritDoc} */

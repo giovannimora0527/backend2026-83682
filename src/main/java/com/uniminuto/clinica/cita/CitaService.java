@@ -468,11 +468,16 @@ public class CitaService {
         if (fin.isBefore(Tiempo.ahora())) {
             throw new BadRequestException("No se registran ausencias en el pasado.");
         }
-        long conflictos = db.contar("SELECT COUNT(*) FROM cita WHERE medico_id = :m AND estado IN ('pendiente', 'confirmada') "
+        long conflictos = db.contar("SELECT COUNT(*) FROM cita WHERE medico_id = :m "
+                + "AND estado IN ('pendiente', 'programada', 'confirmada') "
                 + "AND fecha_hora < :f AND fecha_fin > :i", Db.p("m", medico, "i", inicio, "f", fin));
         if (conflictos > 0) {
             throw new ConflictException("Hay " + conflictos + " cita(s) reservada(s) en ese periodo. "
                     + "Reprográmalas o cancélalas antes de registrar la ausencia.");
+        }
+        if (db.existe("SELECT 1 FROM medico_ausencia WHERE medico_id = :m AND inicio < :f AND fin > :i",
+                Db.p("m", medico, "i", inicio, "f", fin))) {
+            throw new ConflictException("Ya existe una ausencia registrada que se cruza con ese periodo.");
         }
         db.insertar("""
                 INSERT INTO medico_ausencia (medico_id, inicio, fin, motivo, usuario_id, fecha_registro)
@@ -480,6 +485,44 @@ public class CitaService {
                 """, Db.p("m", medico, "i", inicio, "f", fin, "motivo", motivo, "u", SesionActual.usuarioId(),
                 "ahora", Tiempo.ahora()));
         return configuracion(medico);
+    }
+
+    /**
+     * Elimina una ausencia que aún no ha terminado (por ejemplo, vacaciones canceladas).
+     * Las ausencias ya cumplidas no se eliminan: forman parte del historial de la agenda.
+     *
+     * @param medico identificador del médico dueño de la ausencia.
+     * @param ausencia identificador de la ausencia.
+     * @return configuración actualizada.
+     */
+    @Transactional
+    public Map<String, Object> eliminarAusencia(long medico, long ausencia) {
+        Map<String, Object> a = db.requerido("""
+                SELECT fin FROM medico_ausencia WHERE id = :id AND medico_id = :m FOR UPDATE
+                """, Db.p("id", ausencia, "m", medico), "La ausencia no existe para este médico.");
+        LocalDateTime fin = (LocalDateTime) a.get("fin");
+        if (fin != null && !fin.isAfter(Tiempo.ahora())) {
+            throw new ConflictException("La ausencia ya terminó; se conserva en el historial.");
+        }
+        db.ejecutar("DELETE FROM medico_ausencia WHERE id = :id", Db.p("id", ausencia));
+        return configuracion(medico);
+    }
+
+    /**
+     * Ausencias de un médico que se cruzan con un rango (para pintarlas en el calendario).
+     *
+     * @param medico identificador del médico.
+     * @param desde fecha inicial AAAA-MM-DD.
+     * @param hasta fecha final AAAA-MM-DD.
+     * @return ausencias con inicio, fin y motivo.
+     */
+    public List<Map<String, Object>> ausenciasEnRango(long medico, String desde, String hasta) {
+        LocalDate d = Validar.fecha(desde, "desde", true);
+        LocalDate h = Validar.fecha(hasta, "hasta", true);
+        return db.lista("""
+                SELECT id, inicio, fin, motivo FROM medico_ausencia
+                WHERE medico_id = :m AND inicio < :h AND fin > :d ORDER BY inicio
+                """, Db.p("m", medico, "d", d.atStartOfDay(), "h", h.plusDays(1).atStartOfDay()));
     }
 
     /**

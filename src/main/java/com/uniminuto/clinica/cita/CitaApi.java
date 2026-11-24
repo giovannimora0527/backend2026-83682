@@ -5,6 +5,7 @@ import com.uniminuto.clinica.seguridad.Permitido;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -205,6 +206,29 @@ public interface CitaApi {
     @PostMapping("/agenda/mia/ausencias")
     ResponseEntity<Map<String, Object>> ausenciaPropia(@RequestBody AusenciaRq ausencia);
 
+    /**
+     * Eliminar una ausencia propia que aún no ha terminado.
+     *
+     * @param id identificador de la ausencia.
+     * @return respuesta HTTP con la configuración actualizada.
+     */
+    @Operation(summary = "Eliminar ausencia propia vigente o futura")
+    @Permitido(Perfiles.MEDICO)
+    @DeleteMapping("/agenda/mia/ausencias/{id}")
+    ResponseEntity<Map<String, Object>> eliminarAusenciaPropia(@PathVariable long id);
+
+    /**
+     * Ausencias del médico autenticado en un rango de fechas (se muestran como bloqueos en el calendario).
+     *
+     * @param desde fecha inicial (AAAA-MM-DD).
+     * @param hasta fecha final (AAAA-MM-DD).
+     * @return respuesta HTTP con las ausencias.
+     */
+    @Operation(summary = "Ausencias del médico autenticado en un rango de fechas")
+    @Permitido(Perfiles.MEDICO)
+    @GetMapping("/agenda/mia/ausencias")
+    ResponseEntity<List<Map<String, Object>>> ausenciasPropias(@RequestParam String desde, @RequestParam String hasta);
+
     // ---------------------------------------------------------------- Agenda de cualquier médico
 
     /**
@@ -253,6 +277,18 @@ public interface CitaApi {
     @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
     @PostMapping("/agenda/medicos/{medico}/ausencias")
     ResponseEntity<Map<String, Object>> ausencia(@PathVariable long medico, @RequestBody AusenciaRq ausencia);
+
+    /**
+     * Eliminar una ausencia de un médico que aún no ha terminado.
+     *
+     * @param medico identificador del médico veterinario.
+     * @param id identificador de la ausencia.
+     * @return respuesta HTTP con la configuración actualizada.
+     */
+    @Operation(summary = "Eliminar ausencia vigente o futura de un médico")
+    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @DeleteMapping("/agenda/medicos/{medico}/ausencias/{id}")
+    ResponseEntity<Map<String, Object>> eliminarAusencia(@PathVariable long medico, @PathVariable long id);
 
     /**
      * Activar o inactivar un médico.
