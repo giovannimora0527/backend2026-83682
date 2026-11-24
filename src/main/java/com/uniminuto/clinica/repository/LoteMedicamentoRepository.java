@@ -33,4 +33,8 @@ public interface LoteMedicamentoRepository extends JpaRepository<LoteMedicamento
             + "WHERE l.medicamento.id IN :ids AND l.activo = true "
             + "AND (l.fechaVencimiento IS NULL OR l.fechaVencimiento >= :hoy) GROUP BY l.medicamento.id")
     List<Object[]> existenciasVigentes(@Param("ids") Collection<Long> ids, @Param("hoy") LocalDate hoy);
+
+    @Query("SELECT l FROM LoteMedicamento l WHERE l.medicamento.id IN :ids AND l.activo = true "
+            + "AND l.cantidadDisponible > 0")
+    List<LoteMedicamento> conExistencias(@Param("ids") Collection<Long> ids);
 }

@@ -1,5 +1,7 @@
 package com.uniminuto.clinica.repository;
 
+import java.util.Collection;
+import com.uniminuto.clinica.entity.enums.EstadoDespacho;
 import com.uniminuto.clinica.entity.FormulaMedica;
 import com.uniminuto.clinica.entity.enums.EstadoFormula;
 import jakarta.persistence.LockModeType;
@@ -37,4 +39,15 @@ public interface FormulaMedicaRepository extends JpaRepository<FormulaMedica, Lo
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT f FROM FormulaMedica f WHERE f.id = :id")
     Optional<FormulaMedica> bloquear(@Param("id") Long id);
+
+    @EntityGraph(attributePaths = {"medico", "mascota", "cliente"})
+    @Query("""
+            SELECT f FROM FormulaMedica f
+            WHERE f.estadoFormula = com.uniminuto.clinica.entity.enums.EstadoFormula.CONFIRMADA
+              AND f.estadoDespacho IN :estados
+              AND f.fechaGeneracion >= :desde AND f.fechaGeneracion < :hasta
+            ORDER BY f.fechaGeneracion, f.id
+            """)
+    List<FormulaMedica> bandeja(@Param("estados") Collection<EstadoDespacho> estados,
+                                @Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
 }

@@ -1,5 +1,6 @@
 package com.uniminuto.clinica.serviceimpl;
 
+import com.uniminuto.clinica.entity.DespachoDetalle;
 import com.uniminuto.clinica.entity.CargaInventario;
 import com.uniminuto.clinica.entity.LoteMedicamento;
 import com.uniminuto.clinica.entity.Medicamento;
@@ -87,6 +88,39 @@ public class ExistenciasService {
         MovimientoInventario movimiento = nuevo(tipo, lote, cantidad, usuarioId);
         movimiento.setObservacion(motivo.trim());
         return movimientoRepository.save(movimiento);
+    }
+
+    /** Descuenta del lote lo entregado en un despacho. El llamador ya valido vencimiento y cantidad. */
+    public void despachar(DespachoDetalle detalle, Long usuarioId) {
+        LoteMedicamento lote = detalle.getLote();
+        int cantidad = detalle.getCantidadEntregada();
+        if (cantidad > lote.getCantidadDisponible()) {
+            throw new ConflictException("El lote " + lote.getNumeroLote() + " no tiene existencias suficientes.");
+        }
+        lote.setCantidadDisponible(lote.getCantidadDisponible() - cantidad);
+        loteRepository.saveAndFlush(lote);
+        movimientoRepository.save(conDespacho(nuevo(TipoMovimiento.SALIDA_DESPACHO, lote, cantidad, usuarioId), detalle));
+    }
+
+    /** Devuelve al mismo lote lo que salio en el movimiento, con un movimiento que lo referencia. */
+    public void revertir(MovimientoInventario salida, LoteMedicamento lote, String motivo, Long usuarioId) {
+        lote.setCantidadDisponible(Math.addExact(lote.getCantidadDisponible(), salida.getCantidad()));
+        lote.setCantidadInicial(Math.max(lote.getCantidadInicial(), lote.getCantidadDisponible()));
+        loteRepository.saveAndFlush(lote);
+        MovimientoInventario entrada = conDespacho(
+                nuevo(TipoMovimiento.ENTRADA_REVERSION, lote, salida.getCantidad(), usuarioId),
+                salida.getDespachoDetalle());
+        entrada.setCostoUnitario(salida.getCostoUnitario());
+        entrada.setMovimientoRevertido(salida);
+        entrada.setObservacion(motivo);
+        movimientoRepository.saveAndFlush(entrada);
+    }
+
+    private static MovimientoInventario conDespacho(MovimientoInventario movimiento, DespachoDetalle detalle) {
+        movimiento.setDespachoDetalle(detalle);
+        movimiento.setDespacho(detalle.getDespacho());
+        movimiento.setFormula(detalle.getDespacho().getFormula());
+        return movimiento;
     }
 
     private void validarLote(Medicamento producto, LoteRq rq) {

@@ -11,4 +11,7 @@ public interface ConfiguracionService {
 
     /** Siguiente numero de formula, por ejemplo FM-000001. Exige una transaccion. */
     String siguienteFormula();
+
+    /** Siguiente numero de despacho, por ejemplo DP-000001. Exige una transaccion. */
+    String siguienteDespacho();
 }

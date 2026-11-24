@@ -1,5 +1,6 @@
 package com.uniminuto.clinica.repository;
 
+import java.util.Collection;
 import com.uniminuto.clinica.entity.MovimientoInventario;
 import com.uniminuto.clinica.entity.enums.TipoMovimiento;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -21,4 +22,8 @@ public interface MovimientoInventarioRepository extends JpaRepository<Movimiento
             """)
     List<MovimientoInventario> buscar(@Param("medicamentoId") Long medicamentoId, @Param("tipo") TipoMovimiento tipo,
                                       @Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta);
+
+    List<MovimientoInventario> findByDespacho_IdAndTipo(Long despachoId, TipoMovimiento tipo);
+
+    List<MovimientoInventario> findByDespachoDetalle_IdIn(Collection<Long> despachoDetalleIds);
 }

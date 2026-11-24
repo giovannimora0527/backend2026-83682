@@ -2,7 +2,6 @@ package com.uniminuto.clinica.serviceimpl;
 
 import com.uniminuto.clinica.entity.AtencionMedica;
 import com.uniminuto.clinica.entity.Cita;
-import com.uniminuto.clinica.entity.FormulaHistorialEstado;
 import com.uniminuto.clinica.entity.FormulaMedica;
 import com.uniminuto.clinica.entity.FormulaMedicaDetalle;
 import com.uniminuto.clinica.entity.Medicamento;
@@ -19,12 +18,10 @@ import com.uniminuto.clinica.pdf.FormulaPdf;
 import com.uniminuto.clinica.repository.AtencionMedicaRepository;
 import com.uniminuto.clinica.repository.CitaRepository;
 import com.uniminuto.clinica.repository.DespachoRepository;
-import com.uniminuto.clinica.repository.FormulaHistorialEstadoRepository;
 import com.uniminuto.clinica.repository.FormulaMedicaDetalleRepository;
 import com.uniminuto.clinica.repository.FormulaMedicaRepository;
 import com.uniminuto.clinica.repository.LoteMedicamentoRepository;
 import com.uniminuto.clinica.repository.MedicamentoRepository;
-import com.uniminuto.clinica.repository.UsuarioRepository;
 import com.uniminuto.clinica.security.Rol;
 import com.uniminuto.clinica.security.UsuarioActual;
 import com.uniminuto.clinica.security.UsuarioAutenticado;
@@ -50,33 +47,31 @@ public class FormulaServiceImpl implements FormulaService {
 
     private final FormulaMedicaRepository formulaRepository;
     private final FormulaMedicaDetalleRepository detalleRepository;
-    private final FormulaHistorialEstadoRepository historialRepository;
+    private final HistorialFormulaService historial;
     private final DespachoRepository despachoRepository;
     private final CitaRepository citaRepository;
     private final AtencionMedicaRepository atencionRepository;
     private final MedicamentoRepository medicamentoRepository;
     private final LoteMedicamentoRepository loteRepository;
-    private final UsuarioRepository usuarioRepository;
     private final ConfiguracionService configuracion;
     private final UsuarioActual usuarioActual;
 
     public FormulaServiceImpl(FormulaMedicaRepository formulaRepository,
                               FormulaMedicaDetalleRepository detalleRepository,
-                              FormulaHistorialEstadoRepository historialRepository,
+                              HistorialFormulaService historial,
                               DespachoRepository despachoRepository, CitaRepository citaRepository,
                               AtencionMedicaRepository atencionRepository,
                               MedicamentoRepository medicamentoRepository, LoteMedicamentoRepository loteRepository,
-                              UsuarioRepository usuarioRepository, ConfiguracionService configuracion,
+                              ConfiguracionService configuracion,
                               UsuarioActual usuarioActual) {
         this.formulaRepository = formulaRepository;
         this.detalleRepository = detalleRepository;
-        this.historialRepository = historialRepository;
+        this.historial = historial;
         this.despachoRepository = despachoRepository;
         this.citaRepository = citaRepository;
         this.atencionRepository = atencionRepository;
         this.medicamentoRepository = medicamentoRepository;
         this.loteRepository = loteRepository;
-        this.usuarioRepository = usuarioRepository;
         this.configuracion = configuracion;
         this.usuarioActual = usuarioActual;
     }
@@ -138,7 +133,7 @@ public class FormulaServiceImpl implements FormulaService {
         formula.setEstadoFormula(EstadoFormula.BORRADOR);
         formula = formulaRepository.saveAndFlush(formula);
         guardarDetalles(formula, rq.detalles());
-        registrar(formula, null, null, null);
+        historial.registrar(formula, null, null, null);
         return convertir(formula);
     }
 
@@ -170,7 +165,7 @@ public class FormulaServiceImpl implements FormulaService {
         formula.setEstadoDespacho(EstadoDespacho.PENDIENTE_DESPACHO);
         formula.setFechaConfirmacion(LocalDateTime.now());
         formulaRepository.saveAndFlush(formula);
-        registrar(formula, EstadoFormula.BORRADOR, null, null);
+        historial.registrar(formula, EstadoFormula.BORRADOR, null, null);
         return convertir(formula);
     }
 
@@ -199,7 +194,7 @@ public class FormulaServiceImpl implements FormulaService {
             formula.setEstadoDespacho(EstadoDespacho.CANCELADO);
         }
         formulaRepository.saveAndFlush(formula);
-        registrar(formula, anterior, despachoAnterior, motivo.trim());
+        historial.registrar(formula, anterior, despachoAnterior, motivo.trim());
         return convertir(formula);
     }
 
@@ -274,20 +269,6 @@ public class FormulaServiceImpl implements FormulaService {
         if (formula.getEstadoFormula() != EstadoFormula.BORRADOR) {
             throw new ConflictException("La fórmula está " + formula.getEstadoFormula() + " y ya no se modifica.");
         }
-    }
-
-    private void registrar(FormulaMedica formula, EstadoFormula anterior, EstadoDespacho despachoAnterior,
-                           String motivo) {
-        FormulaHistorialEstado h = new FormulaHistorialEstado();
-        h.setFormula(formula);
-        h.setEstadoFormulaAnterior(anterior);
-        h.setEstadoFormulaNuevo(formula.getEstadoFormula());
-        h.setEstadoDespachoAnterior(despachoAnterior);
-        h.setEstadoDespachoNuevo(formula.getEstadoDespacho());
-        h.setMotivo(motivo);
-        h.setUsuario(usuarioRepository.getReferenceById(usuarioActual.obtener().id()));
-        h.setFecha(LocalDateTime.now());
-        historialRepository.save(h);
     }
 
     private FormulaRs convertir(FormulaMedica formula) {

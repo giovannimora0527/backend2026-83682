@@ -79,6 +79,18 @@ El código del menú de citas es `cita`, no `citas`; la ruta sigue siendo `/inic
 - 409 por duplicado con `detalles`. Las restricciones de la base y los choques de versión también responden 409.
 - `FormulaRs` usa los nombres del frontend: `fecha`, `medicamentoCodigo`, `medicamentoNombre`.
 
+## Fase 7: despacho
+
+- Todo `/despacho` según C6. Las operaciones bloquean siempre en el mismo orden (fórmula, despacho, productos, lotes), así que no se interbloquean. Probado en MySQL 8.4 con peticiones simultáneas: no hay doble descuento ni entregas por encima de lo disponible.
+- Adicional al contrato: `POST /despacho/{despachoId}/liberar`, para que una preparación abandonada no bloquee la fórmula.
+- Si algún item falla se devuelven todos los errores, por posición, y no se despacha nada.
+- `Idempotency-Key` se guarda con el despacho; usarla en otro responde 409.
+- Con existencias disponibles no se admite confirmar sin items.
+- Revertir un despacho de una fórmula cancelada devuelve existencias sin reabrirla.
+- Los lotes vencidos se muestran al final, después de los vigentes en orden FEFO.
+- El historial muestra el estado actual de la fórmula; los pasos intermedios están en `historial-estados`.
+- `docs/reglas-negocio.md` inicia con las reglas de despacho.
+
 ## Fase 6: tarifas, atención y fórmulas
 
 - **Cambio acordado de C5:** `EN_ATENCION` solo se asigna con `POST /atencion/iniciar/{citaId}` y `ATENDIDA` solo con `POST /atencion/{id}/finalizar`. `PATCH /cita/{id}/estado` y `/cita/actualizar` responden 409 para esos estados; siguen permitiendo `CONFIRMADA` y `CANCELADA`.

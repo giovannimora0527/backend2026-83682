@@ -632,6 +632,299 @@ Rol: MEDICO dueño, ADMINISTRADOR. Cuerpo `{ "motivo" }`. 409 si ya se entregó 
 - `GET /formula-medica/cita/{citaId}`: ADMINISTRADOR, MEDICO.
 - `GET /formula-medica/{id}` y `/pdf`: además DESPACHO_MEDICO, que no ve borradores (403).
 
+# Despacho
+
+Operan solo DESPACHO_MEDICO; ADMINISTRADOR cancela, libera, revierte y consulta el historial.
+
+## `GET /despacho/formulas-pendientes?texto=&numero=&desde=&hasta=&estado=`
+
+Rol: DESPACHO_MEDICO. `texto` busca en número, propietario y mascota sin tildes ni mayúsculas. Sin `estado` trae las cuatro pendientes. `usuarioPreparacion` es `null` si nadie la prepara.
+
+```json
+[
+  {
+    "formulaId": 1,
+    "numero": "FM-000001",
+    "fecha": "2026-11-24T13:50:54",
+    "medicoNombre": "Sofía Ramírez",
+    "clienteNombre": "Juan Pérez",
+    "mascotaNombre": "Firulais",
+    "totalMedicamentos": 3,
+    "indicacionesGenerales": null,
+    "estadoDespacho": "PENDIENTE_DESPACHO",
+    "usuarioPreparacion": null,
+    "medicamentos": [
+      {
+        "nombre": "Amoxicilina 500 mg",
+        "dosis": 1.0,
+        "unidadDosis": "tableta",
+        "frecuenciaHoras": 8,
+        "duracionDias": 7,
+        "indicaciones": "Con comida",
+        "cantidadPrescrita": 100,
+        "cantidadDespachada": 0
+      },
+      {
+        "nombre": "Ivermectina 1 %",
+        "dosis": 1.0,
+        "unidadDosis": "tableta",
+        "frecuenciaHoras": 8,
+        "duracionDias": 7,
+        "indicaciones": "Con comida",
+        "cantidadPrescrita": 1,
+        "cantidadDespachada": 0
+      },
+      {
+        "nombre": "Jeringa 5 ml",
+        "dosis": 1.0,
+        "unidadDosis": "tableta",
+        "frecuenciaHoras": 8,
+        "duracionDias": 7,
+        "indicaciones": "Con comida",
+        "cantidadPrescrita": 2,
+        "cantidadDespachada": 0
+      }
+    ]
+  }
+]
+```
+
+## `GET /despacho/formula/{formulaId}` y `POST /despacho/formula/{formulaId}/preparar`
+
+Rol: DESPACHO_MEDICO. Preparar no lleva cuerpo, devuelve lo mismo dentro de `data` y, repetido por el mismo usuario, la misma preparación; si la prepara otro, 409 con su nombre. `despachoId` es `null` si no hay preparación. Los lotes vienen en orden FEFO; los vencidos, al final con sugerencia 0.
+
+```json
+{
+  "formulaId": 1,
+  "despachoId": 1,
+  "despachoNumero": "DP-000001",
+  "usuarioPreparacion": "despacho",
+  "numero": "FM-000001",
+  "fecha": "2026-11-24T13:50:54",
+  "medicoNombre": "Sofía Ramírez",
+  "clienteNombre": "Juan Pérez",
+  "clienteDocumento": "9000000001",
+  "mascotaNombre": "Firulais",
+  "indicacionesGenerales": null,
+  "estadoDespacho": "EN_PREPARACION",
+  "detalles": [
+    {
+      "formulaDetalleId": 1,
+      "medicamentoId": 1,
+      "codigo": "AMX00500",
+      "nombre": "Amoxicilina 500 mg",
+      "dosis": 1.0,
+      "unidadDosis": "tableta",
+      "frecuenciaHoras": 8,
+      "duracionDias": 7,
+      "viaAdministracion": "ORAL",
+      "indicaciones": "Con comida",
+      "cantidadPrescrita": 100,
+      "cantidadDespachada": 0,
+      "cantidadPendiente": 100,
+      "existenciaTotalVigente": 180,
+      "puedeEntregarse": true,
+      "lotes": [
+        {
+          "loteId": 1,
+          "numeroLote": "AMX-A",
+          "fechaVencimiento": "2026-12-14",
+          "cantidadDisponible": 80,
+          "vencido": false,
+          "proximoVencer": true,
+          "cantidadSugerida": 80
+        },
+        {
+          "loteId": 2,
+          "numeroLote": "AMX-B",
+          "fechaVencimiento": "2027-09-20",
+          "cantidadDisponible": 100,
+          "vencido": false,
+          "proximoVencer": false,
+          "cantidadSugerida": 20
+        }
+      ]
+    },
+    {
+      "formulaDetalleId": 2,
+      "medicamentoId": 3,
+      "codigo": "IVE00010",
+      "nombre": "Ivermectina 1 %",
+      "dosis": 1.0,
+      "unidadDosis": "tableta",
+      "frecuenciaHoras": 8,
+      "duracionDias": 7,
+      "viaAdministracion": "ORAL",
+      "indicaciones": "Con comida",
+      "cantidadPrescrita": 1,
+      "cantidadDespachada": 0,
+      "cantidadPendiente": 1,
+      "existenciaTotalVigente": 0,
+      "puedeEntregarse": false,
+      "lotes": []
+    }
+  ]
+}
+```
+
+## `POST /despacho/{despachoId}/confirmar`
+
+Rol: DESPACHO_MEDICO (quien la prepara; otro, 403). Cuerpo: `{ "observacion", "items": [{ "formulaDetalleId", "loteId", "cantidad" }] }`. Encabezado opcional `Idempotency-Key` (hasta 64 caracteres). Sin items solo se admite si nada de lo pendiente tiene existencias. `fecha` es la de confirmación; `estado`, el del despacho; `estadoDespacho`, el actual de la fórmula.
+
+```json
+{
+  "status": 200,
+  "message": "Despacho confirmado.",
+  "data": {
+    "id": 1,
+    "numero": "DP-000001",
+    "formulaId": 1,
+    "formulaNumero": "FM-000001",
+    "fecha": "2026-11-24T13:50:57",
+    "fechaInicio": "2026-11-24T13:50:55",
+    "mascotaNombre": "Firulais",
+    "clienteNombre": "Juan Pérez",
+    "medicoNombre": "Sofía Ramírez",
+    "usuario": "despacho",
+    "estado": "CONFIRMADO",
+    "estadoDespacho": "DESPACHO_PARCIAL",
+    "observacion": "Entrega",
+    "revertido": false,
+    "fechaReversion": null,
+    "usuarioReversion": null,
+    "motivoReversion": null,
+    "items": [
+      {
+        "formulaDetalleId": 1,
+        "medicamentoId": 1,
+        "medicamentoNombre": "Amoxicilina 500 mg",
+        "loteId": 1,
+        "numeroLote": "AMX-A",
+        "fechaVencimiento": "2026-12-14",
+        "cantidad": 80,
+        "facturado": false
+      },
+      {
+        "formulaDetalleId": 1,
+        "medicamentoId": 1,
+        "medicamentoNombre": "Amoxicilina 500 mg",
+        "loteId": 2,
+        "numeroLote": "AMX-B",
+        "fechaVencimiento": "2027-09-20",
+        "cantidad": 20,
+        "facturado": false
+      },
+      {
+        "formulaDetalleId": 3,
+        "medicamentoId": 13,
+        "medicamentoNombre": "Jeringa 5 ml",
+        "loteId": 16,
+        "numeroLote": "JER-A",
+        "fechaVencimiento": null,
+        "cantidad": 2,
+        "facturado": false
+      }
+    ],
+    "sinExistencias": [
+      "Ivermectina 1 %"
+    ]
+  }
+}
+```
+
+Si un item falla no se despacha nada; `detalles` indica cuál por su posición:
+
+```json
+{
+  "detalles": [
+    {
+      "campo": "items[0]",
+      "mensaje": "Amoxicilina 500 mg: el lote AMX-A solo tiene 80."
+    },
+    {
+      "campo": "items[0]",
+      "mensaje": "Amoxicilina 500 mg: solo hay 100 pendientes por entregar."
+    }
+  ],
+  "error": "Conflict",
+  "message": "No se despachó nada: Amoxicilina 500 mg: el lote AMX-A solo tiene 80. Amoxicilina 500 mg: solo hay 100 pendientes por entregar.",
+  "status": 409
+}
+```
+
+## `POST /despacho/{despachoId}/liberar` (adicional al contrato)
+
+Rol: DESPACHO_MEDICO (quien prepara), ADMINISTRADOR. Sin cuerpo. Cierra la preparación sin entregar, para que otro la tome. `data` como en preparar.
+
+## `POST /despacho/formula/{formulaId}/cancelar`
+
+Rol: DESPACHO_MEDICO (sin entregas), ADMINISTRADOR. Cuerpo `{ "motivo" }`. `data` como en preparar.
+
+## `POST /despacho/{despachoId}/revertir`
+
+Rol: ADMINISTRADOR. Cuerpo `{ "motivo" }`. 409 si no está confirmado, no entregó nada o tiene algo facturado. `data` como en confirmar, con `revertido: true`.
+
+## `GET /despacho/historial?desde=&hasta=&texto=&estado=`
+
+Arreglo como el `data` de confirmar, el más reciente primero, sin preparaciones abiertas. `estado` admite el del despacho (`CONFIRMADO`, `REVERTIDO`, `CANCELADO`) o el de la fórmula.
+
+## `GET /despacho/medicamento/{medicamentoId}/historial`
+
+```json
+[
+  {
+    "despachoId": 1,
+    "despachoNumero": "DP-000001",
+    "formulaId": 1,
+    "formulaNumero": "FM-000001",
+    "fecha": "2026-11-24T13:50:57",
+    "usuario": "despacho",
+    "medicoNombre": "Sofía Ramírez",
+    "clienteNombre": "Juan Pérez",
+    "mascotaNombre": "Firulais",
+    "loteId": 2,
+    "numeroLote": "AMX-B",
+    "cantidad": 20,
+    "estado": "CONFIRMADO",
+    "movimientoId": 46,
+    "saldoLote": 80,
+    "saldo": 80,
+    "movimientoReversionId": null
+  }
+]
+```
+
+## `GET /despacho/formula/{formulaId}/historial-estados`
+
+```json
+[
+  {
+    "id": 2,
+    "estadoAnterior": null,
+    "estadoNuevo": "PENDIENTE_DESPACHO",
+    "estadoFormulaAnterior": "BORRADOR",
+    "estadoFormulaNuevo": "CONFIRMADA",
+    "motivo": null,
+    "usuario": "medico1",
+    "fecha": "2026-11-24T13:50:55"
+  },
+  {
+    "id": 3,
+    "estadoAnterior": "PENDIENTE_DESPACHO",
+    "estadoNuevo": "EN_PREPARACION",
+    "estadoFormulaAnterior": "CONFIRMADA",
+    "estadoFormulaNuevo": "CONFIRMADA",
+    "motivo": null,
+    "usuario": "despacho",
+    "fecha": "2026-11-24T13:50:55"
+  }
+]
+```
+
+## `GET /despacho/{despachoId}/comprobante/pdf`
+
+Solo de despachos confirmados o revertidos (409 si no). Descarga `despacho_<numero>.pdf`.
+
 # Citas, horarios y calendario
 
 `desde` y `hasta` aceptan `yyyy-MM-dd` (el día final se incluye), `yyyy-MM-ddTHH:mm:ss` o con zona, como los envía FullCalendar. Un `+` en la URL debe codificarse como `%2B`. Rango máximo: un año.

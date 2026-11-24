@@ -56,6 +56,15 @@ public class ConfiguracionServiceImpl implements ConfiguracionService {
         return numero(c.getPrefijoFormula(), c.getConsecutivoFormula());
     }
 
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public String siguienteDespacho() {
+        ConfiguracionClinica c = bloquear();
+        c.setConsecutivoDespacho(c.getConsecutivoDespacho() + 1);
+        repository.saveAndFlush(c);
+        return numero(c.getPrefijoDespacho(), c.getConsecutivoDespacho());
+    }
+
     private ConfiguracionClinica bloquear() {
         return repository.bloquear().stream().findFirst().orElseThrow(this::sinConfiguracion);
     }

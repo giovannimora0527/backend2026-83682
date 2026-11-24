@@ -1,0 +1,33 @@
+# Reglas de negocio
+
+Se completa con los demás módulos en la fase 10.
+
+## Despacho
+
+| # | Regla | Dónde se valida |
+|---|---|---|
+| D1 | Solo DESPACHO_MEDICO prepara y confirma | `SecurityConfig`, `DespachoApiController` |
+| D2 | Solo el médico crea y confirma fórmulas | `FormulaMedicaApiController`, `FormulaServiceImpl` |
+| D3 | Despacho no modifica indicaciones, dosis ni cantidades prescritas | Ningún endpoint de despacho escribe esos campos |
+| D4 | El inventario solo se descuenta al confirmar | `DespachoServiceImpl.confirmar` |
+| D5 | No se dispensa un lote vencido | `DespachoServiceImpl.validar` |
+| D6 | No se entrega más de lo disponible ni de lo formulado | `DespachoServiceImpl.validar`, `CHECK` de `lote_medicamento` y `formula_medica_detalle` |
+| D7 | Se permiten entregas parciales | `DespachoServiceImpl.calcularEstado` |
+| D8 | Cada salida queda ligada a un despacho y una fórmula | `ExistenciasService.despachar`, `CHECK` de `movimiento_inventario` |
+| D9 | No se descuenta dos veces la misma dispensación | Bloqueo y estado en `confirmar`; `idempotency_key` única; una sola preparación por fórmula en la base |
+| D10 | Toda operación guarda usuario, fecha y hora | Usuario del token en `despacho`, movimientos e historial |
+| D11 | Lo confirmado no se elimina; se revierte con motivo y una sola vez | `DespachoServiceImpl.revertir`; `movimiento_revertido_id` único |
+| D12 | Permisos validados en el backend | `SecurityConfig`, `@PreAuthorize` |
+| D13 | No se revierte lo facturado | `DespachoServiceImpl.revertir` |
+| D14 | Con entregas, solo ADMINISTRADOR cancela | `DespachoServiceImpl.cancelar` |
+
+### Estado de la fórmula después de confirmar, liberar o revertir
+
+| Pendiente | ¿Se ha entregado algo? | ¿Hay existencias vigentes de lo pendiente? | Estado |
+|---|---|---|---|
+| Nada | Sí | No aplica | `DESPACHADO` |
+| Algo | Sí | Sí o no | `DESPACHO_PARCIAL`; `sinExistencias` nombra lo agotado |
+| Algo | No | No | `PENDIENTE_DISPONIBILIDAD` |
+| Algo | No | Sí (solo tras liberar o revertir) | `PENDIENTE_DESPACHO` |
+
+Al revertir se conserva `CANCELADO` o `EN_PREPARACION` si la fórmula estaba así.
