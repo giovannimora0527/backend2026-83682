@@ -1116,6 +1116,166 @@ Cuerpo `{ "motivo" }`. `data` es la factura completa; `message` avisa si hay pag
 - `GET /factura/cliente/{clienteId}` y `GET /factura/mascota/{mascotaId}`
 - `GET /factura/{id}/pdf`: descarga `factura_<numero>.pdf`, con marca de agua si está ANULADA.
 
+# Reportes
+
+Rol: ADMINISTRADOR.
+
+## `GET /reporte/catalogo`
+
+`opciones` solo viene si el filtro tiene valores fijos.
+
+```json
+[
+  {
+    "codigo": "ingresos-periodo",
+    "titulo": "Ingresos por período",
+    "grupo": "Financieros",
+    "filtros": [
+      {
+        "clave": "desde",
+        "obligatorio": true
+      },
+      {
+        "clave": "hasta",
+        "obligatorio": true
+      },
+      {
+        "clave": "agrupacion",
+        "obligatorio": false,
+        "opciones": [
+          "DIA",
+          "MES",
+          "ANIO"
+        ]
+      }
+    ]
+  },
+  {
+    "codigo": "kardex",
+    "titulo": "Kardex por medicamento",
+    "grupo": "Inventario",
+    "filtros": [
+      {
+        "clave": "desde",
+        "obligatorio": true
+      },
+      {
+        "clave": "hasta",
+        "obligatorio": true
+      },
+      {
+        "clave": "medicamentoId",
+        "obligatorio": true
+      }
+    ]
+  }
+]
+```
+
+## `GET /reporte/{codigo}?desde=&hasta=&<filtros>`
+
+Vista previa. `desde` y `hasta` (`yyyy-MM-dd`) son obligatorias, salvo en los de existencias, que muestran la situación actual: `existencias`, `valor-inventario`, `agotados`, `stock-minimo`, `proximos-vencer` y `vencidos`. `totales` usa las claves de las columnas. Un valor puede ser `null`. 400 si falta un filtro obligatorio o no es válido.
+
+```json
+{
+  "codigo": "ingresos-periodo",
+  "titulo": "Ingresos por período",
+  "generadoEn": "2026-11-24T14:48:56",
+  "generadoPor": "admin",
+  "filtros": {
+    "desde": "2026-11-01",
+    "hasta": "2026-12-31",
+    "agrupacion": "MES"
+  },
+  "columnas": [
+    {
+      "clave": "periodo",
+      "titulo": "Período",
+      "tipo": "texto"
+    },
+    {
+      "clave": "facturas",
+      "titulo": "Facturas",
+      "tipo": "numero"
+    },
+    {
+      "clave": "subtotal",
+      "titulo": "Subtotal",
+      "tipo": "moneda"
+    },
+    {
+      "clave": "descuentos",
+      "titulo": "Descuentos",
+      "tipo": "moneda"
+    },
+    {
+      "clave": "iva",
+      "titulo": "IVA",
+      "tipo": "moneda"
+    },
+    {
+      "clave": "facturado",
+      "titulo": "Facturado",
+      "tipo": "moneda"
+    },
+    {
+      "clave": "recaudado",
+      "titulo": "Recaudado",
+      "tipo": "moneda"
+    }
+  ],
+  "filas": [
+    {
+      "periodo": "2026-11",
+      "facturas": 7,
+      "subtotal": 921100.0,
+      "descuentos": 0.0,
+      "iva": 173584.0,
+      "facturado": 1094684.0,
+      "recaudado": 142552.8
+    }
+  ],
+  "totales": {
+    "facturas": 7,
+    "subtotal": 921100.0,
+    "descuentos": 0.0,
+    "iva": 173584.0,
+    "facturado": 1094684.0,
+    "recaudado": 142552.8
+  }
+}
+```
+
+## `GET /reporte/{codigo}/exportar?formato=pdf|xlsx&desde=&hasta=&<filtros>`
+
+Mismos filtros. Descarga `<codigo>_<fecha>.pdf` o `.xlsx`.
+
+## Columnas y totales
+
+| Código | Título | Columnas | Totales |
+|---|---|---|---|
+| `ingresos-periodo` | Ingresos por período | periodo, facturas, subtotal, descuentos, iva, facturado, recaudado | facturas, subtotal, descuentos, iva, facturado, recaudado |
+| `ingresos-consultas` | Ingresos por consultas | nombre, cantidad, subtotal, descuentos, iva, facturado, recaudado | cantidad, subtotal, descuentos, iva, facturado, recaudado |
+| `ingresos-medicamentos` | Ingresos por venta de medicamentos | nombre, cantidad, subtotal, descuentos, iva, facturado, recaudado | cantidad, subtotal, descuentos, iva, facturado, recaudado |
+| `ingresos-especialidad` | Ingresos por especialidad | nombre, facturas, facturado, recaudado | facturas, facturado, recaudado |
+| `ingresos-veterinario` | Ingresos por veterinario | nombre, facturas, facturado, recaudado | facturas, facturado, recaudado |
+| `facturas` | Facturas | numero, fecha, cliente, mascota, veterinario, estado, subtotal, descuentos, iva, total, pagado, saldo | subtotal, descuentos, iva, total, pagado, saldo |
+| `impuestos` | Impuestos | porcentaje, renglones, base, iva | renglones, base, iva |
+| `descuentos` | Descuentos | fecha, factura, cliente, concepto, subtotal, porcentaje, descuento, motivo, usuario | subtotal, descuento |
+| `existencias` | Existencias | codigo, nombre, tipo, unidad, cantidad, vigente, vencida, stockMinimo | cantidad, vigente, vencida |
+| `agotados` | Productos agotados | codigo, nombre, tipo, unidad, cantidad, vigente, vencida, stockMinimo | cantidad, vigente, vencida |
+| `stock-minimo` | Productos en stock mínimo | codigo, nombre, tipo, unidad, cantidad, vigente, vencida, stockMinimo | cantidad, vigente, vencida |
+| `valor-inventario` | Valor del inventario | codigo, nombre, cantidad, precioVenta, valorCosto, valorVenta, utilidad | cantidad, valorCosto, valorVenta, utilidad |
+| `proximos-vencer` | Próximos a vencer | codigo, nombre, lote, vencimiento, dias, cantidad, costo, valorCosto | cantidad, valorCosto |
+| `vencidos` | Vencidos | codigo, nombre, lote, vencimiento, dias, cantidad, costo, valorCosto | cantidad, valorCosto |
+| `movimientos` | Entradas y salidas | fecha, tipo, codigo, nombre, lote, entrada, salida, saldo, costo, valorEntrada, valorSalida, usuario, referencia | entrada, salida, valorEntrada, valorSalida |
+| `kardex` | Kardex por medicamento | fecha, tipo, lote, entrada, salida, saldo, costo, valorEntrada, valorSalida, usuario, referencia | entrada, salida, valorEntrada, valorSalida, saldo |
+| `citas-periodo` | Citas por período | periodo, programadas, confirmadas, enAtencion, atendidas, canceladas, total | programadas, confirmadas, enAtencion, atendidas, canceladas, total |
+| `citas-estado` | Citas por estado | inicio, fin, mascota, cliente, veterinario, servicio, motivo, estado, cantidad | cantidad |
+| `consultas-veterinario` | Consultas por veterinario | nombre, consultas, mascotas, canceladas | consultas, canceladas |
+| `consultas-especialidad` | Consultas por especialidad | nombre, consultas, mascotas, canceladas | consultas, canceladas |
+| `mascotas-atendidas` | Mascotas atendidas | mascota, especie, raza, cliente, atenciones, ultima, mascotas | atenciones, mascotas |
+
 # Citas, horarios y calendario
 
 `desde` y `hasta` aceptan `yyyy-MM-dd` (el día final se incluye), `yyyy-MM-ddTHH:mm:ss` o con zona, como los envía FullCalendar. Un `+` en la URL debe codificarse como `%2B`. Rango máximo: un año.

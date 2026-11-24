@@ -79,6 +79,16 @@ El código del menú de citas es `cita`, no `citas`; la ruta sigue siendo `/inic
 - 409 por duplicado con `detalles`. Las restricciones de la base y los choques de versión también responden 409.
 - `FormulaRs` usa los nombres del frontend: `fecha`, `medicamentoCodigo`, `medicamentoNombre`.
 
+## Fase 9: reportes
+
+- 21 reportes en vista previa, PDF y Excel. Cada uno es un bean `GeneradorReporte`: agregar otro no toca el servicio ni los exportadores.
+- Consultas JPQL agregadas, sin cargar entidades. Los totales se compararon con SQL directo en MySQL 8.4.
+- **Recaudado** en reportes por renglón (consultas y medicamentos): cada pago se reparte según el peso del renglón en su factura. Puede diferir centavos por redondeo.
+- Los pagos de una factura anulada siguen contando como recaudado, porque el dinero entró; por eso recaudado puede superar a facturado.
+- `facturas` lista las anuladas, pero solo las suma si se filtra por ANULADA.
+- `kardex` empieza con el saldo anterior al rango. `consultas-*` cuentan atenciones finalizadas.
+- Los de existencias no dependen del rango de fechas.
+
 ## Fase 8: facturación y pagos
 
 - `/factura` completo según C6. Al generar se bloquean la cita y sus fórmulas: dos facturas simultáneas o facturar mientras se revierte un despacho no dejan datos incoherentes (probado en MySQL 8.4).

@@ -47,3 +47,13 @@ Al revertir se conserva `CANCELADO` o `EN_PREPARACION` si la fórmula estaba as�
 | F9 | PENDIENTE, PAGO_PARCIAL y PAGADA según el saldo | `FacturaServiceImpl.pagar` |
 | F10 | Anular es del ADMINISTRADOR, con motivo, y no borra nada | `SecurityConfig`, `FacturaServiceImpl.anular` |
 | F11 | Cada cambio guarda usuario y fecha | `factura_historial_estado` |
+
+## Reportes
+
+| # | Regla | Dónde se valida |
+|---|---|---|
+| R1 | Acceso por rol en cada reporte | `SecurityConfig`, `ReporteServiceImpl.generar` |
+| R2 | Filtros obligatorios, valores permitidos y `desde <= hasta` | `Filtros` |
+| R3 | Facturado: facturas no anuladas por fecha de generación | `ReportesFinancieros` |
+| R4 | Recaudado: pagos no anulados por fecha de pago | `ReportesFinancieros` |
+| R5 | Inventario desde lotes y movimientos | `ReportesInventario` |

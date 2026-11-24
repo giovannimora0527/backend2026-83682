@@ -37,10 +37,16 @@ public class DocumentoPdf {
     private static final Color GRIS = new Color(225, 230, 236);
 
     private final ByteArrayOutputStream salida = new ByteArrayOutputStream();
-    private final Document documento = new Document(PageSize.LETTER, 40, 40, 40, 45);
+    private final Document documento;
 
     /** @param marcaAgua texto en diagonal, o nulo. */
     public DocumentoPdf(ConfiguracionRs clinica, String titulo, String subtitulo, String marcaAgua) {
+        this(clinica, titulo, subtitulo, marcaAgua, false);
+    }
+
+    public DocumentoPdf(ConfiguracionRs clinica, String titulo, String subtitulo, String marcaAgua,
+                        boolean apaisado) {
+        documento = new Document(apaisado ? PageSize.LETTER.rotate() : PageSize.LETTER, 40, 40, 40, 45);
         PdfWriter.getInstance(documento, salida).setPageEvent(new Pie(marcaAgua));
         documento.addTitle(titulo);
         documento.open();
@@ -71,18 +77,64 @@ public class DocumentoPdf {
 
     /** @param derecha indices de las columnas numericas. El encabezado se repite en cada pagina. */
     public DocumentoPdf tabla(List<String> encabezados, float[] anchos, List<List<String>> filas, Set<Integer> derecha) {
+        return tabla(encabezados, anchos, filas, derecha, false, 8);
+    }
+
+    /** @param conTotal la ultima fila se resalta. */
+    public DocumentoPdf tabla(List<String> encabezados, float[] anchos, List<List<String>> filas, Set<Integer> derecha,
+                              boolean conTotal, float puntos) {
         PdfPTable tabla = new PdfPTable(anchos);
         tabla.setWidthPercentage(100);
         tabla.setHeaderRows(1);
-        encabezados.forEach(e -> tabla.addCell(celda(e, true, GRIS, Element.ALIGN_CENTER)));
-        for (List<String> fila : filas) {
+        encabezados.forEach(e -> tabla.addCell(celda(e, true, GRIS, Element.ALIGN_CENTER, puntos)));
+        for (int n = 0; n < filas.size(); n++) {
+            List<String> fila = filas.get(n);
+            boolean total = conTotal && n == filas.size() - 1;
             for (int i = 0; i < fila.size(); i++) {
-                tabla.addCell(celda(fila.get(i), false, null,
-                        derecha.contains(i) ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT));
+                tabla.addCell(celda(fila.get(i), total, total ? GRIS : null,
+                        derecha.contains(i) ? Element.ALIGN_RIGHT : Element.ALIGN_LEFT, puntos));
             }
         }
         documento.add(tabla);
         return espacio();
+    }
+
+    /**
+     * Anchos segun el texto real. Si no caben, se reduce solo lo que excede la palabra mas larga de cada columna,
+     * para no partir palabras.
+     */
+    public float[] anchos(List<String> encabezados, List<List<String>> filas, float puntos) {
+        int n = encabezados.size();
+        float[] natural = new float[n];
+        float[] minimo = new float[n];
+        for (int i = 0; i < n; i++) {
+            medir(encabezados.get(i), puntos, i, natural, minimo);
+            for (List<String> fila : filas) {
+                medir(fila.get(i), puntos, i, natural, minimo);
+            }
+        }
+        float disponible = documento.right() - documento.left();
+        float total = 0;
+        float base = 0;
+        for (int i = 0; i < n; i++) {
+            total += natural[i];
+            base += minimo[i];
+        }
+        if (total > disponible && total > base) {
+            float factor = Math.max(0, (disponible - base) / (total - base));
+            for (int i = 0; i < n; i++) {
+                natural[i] = minimo[i] + (natural[i] - minimo[i]) * factor;
+            }
+        }
+        return natural;
+    }
+
+    private static void medir(String texto, float puntos, int i, float[] natural, float[] minimo) {
+        BaseFont base = fuente(puntos, true, Color.BLACK).getCalculatedBaseFont(false);
+        natural[i] = Math.max(natural[i], base.getWidthPoint(texto, puntos) + 10);
+        for (String palabra : texto.split("[ -]")) {
+            minimo[i] = Math.max(minimo[i], base.getWidthPoint(palabra + "-", puntos) + 9);
+        }
     }
 
     /** Totales alineados a la derecha; el ultimo va en negrita. */
@@ -146,7 +198,11 @@ public class DocumentoPdf {
     }
 
     private static PdfPCell celda(String texto, boolean negrita, Color fondo, int alineacion) {
-        PdfPCell celda = new PdfPCell(new Phrase(texto == null ? "" : texto, fuente(8, negrita, Color.BLACK)));
+        return celda(texto, negrita, fondo, alineacion, 8);
+    }
+
+    private static PdfPCell celda(String texto, boolean negrita, Color fondo, int alineacion, float puntos) {
+        PdfPCell celda = new PdfPCell(new Phrase(texto == null ? "" : texto, fuente(puntos, negrita, Color.BLACK)));
         celda.setPadding(4);
         celda.setBorderColor(Color.LIGHT_GRAY);
         celda.setHorizontalAlignment(alineacion);
