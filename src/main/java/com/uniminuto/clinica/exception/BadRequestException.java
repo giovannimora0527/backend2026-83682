@@ -3,18 +3,11 @@ package com.uniminuto.clinica.exception;
 import org.springframework.http.HttpStatus;
 
 /**
- * Clase de excepción personalizada para manejar errores de solicitud incorrecta (Bad Request).
+ * Error de validación de datos enviados por el cliente (HTTP 400).
  */
-public class BadRequestException extends RuntimeException {
-
-    private final HttpStatus status;
+public class BadRequestException extends ClinicaException {
 
     public BadRequestException(String message) {
-        super(message);
-        this.status = HttpStatus.BAD_REQUEST;
-    }
-
-    public HttpStatus getStatus() {
-        return status;
+        super(HttpStatus.BAD_REQUEST, message);
     }
 }

@@ -1,22 +1,11 @@
 package com.uniminuto.clinica.exception.dto;
 
-import lombok.Data;
-
 /**
- * Clase que representa la estructura de la respuesta de error
- * para las excepciones manejadas por el GlobalExceptionHandler.
+ * Cuerpo de error devuelto por la API. El frontend muestra el campo {@code mensaje}.
+ *
+ * @param status  código HTTP.
+ * @param error   nombre corto del error.
+ * @param mensaje descripción legible para el usuario.
  */
-@Data
-public class ErrorResponse {
-
-    private int status;
-    private String error;
-    private String message;
-
-    public ErrorResponse(int status, String error, String message) {
-        this.status = status;
-        this.error = error;
-        this.message = message;
-    }
-
+public record ErrorResponse(int status, String error, String mensaje) {
 }
