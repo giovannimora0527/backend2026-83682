@@ -337,6 +337,303 @@ Rol: ADMINISTRADOR, SECRETARIA. Lista vacía mientras no haya facturas; 404 si e
    "total": 59500.00, "pagado": 0.00, "saldo": 59500.00, "estado": "PENDIENTE", "observacion": null }]
 ```
 
+# Inventario
+
+ADMINISTRADOR escribe; DESPACHO_MEDICO consulta todo; MEDICO solo productos y disponibilidad.
+
+## `GET /inventario/productos?texto=&tipo=&estadoStock=&soloActivos=`
+
+Busca en código y nombre, sin distinguir tildes ni mayúsculas. No incluye `lotes`.
+
+```json
+[
+  {
+    "id": 1,
+    "codigo": "AMX00500",
+    "nombre": "Amoxicilina 500 mg",
+    "tipoProducto": "MEDICAMENTO",
+    "descripcion": "Amoxicilina 500 mg",
+    "presentacion": "Caja x 10 tabletas",
+    "unidadMedida": "tableta",
+    "requiereInvima": true,
+    "registroInvima": "INVIMA PRUEBA-001",
+    "precioVenta": 1500.0,
+    "impuestoId": 1,
+    "porcentajeIva": 0.0,
+    "stockMinimo": 20,
+    "fechaProximoPedido": "2026-12-14",
+    "activo": true,
+    "cantidadDisponible": 180,
+    "precioCompraUltimo": 950.0,
+    "precioCompraPromedio": 927.78,
+    "proximoVencimiento": "2026-12-14",
+    "estadosStock": [
+      "PROXIMO_VENCER"
+    ]
+  }
+]
+```
+
+## `GET /inventario/productos/{id}`
+
+Igual, con `lotes` (el más reciente primero).
+
+```json
+{
+  "id": 1,
+  "codigo": "AMX00500",
+  "nombre": "Amoxicilina 500 mg",
+  "tipoProducto": "MEDICAMENTO",
+  "descripcion": "Amoxicilina 500 mg",
+  "presentacion": "Caja x 10 tabletas",
+  "unidadMedida": "tableta",
+  "requiereInvima": true,
+  "registroInvima": "INVIMA PRUEBA-001",
+  "precioVenta": 1500.0,
+  "impuestoId": 1,
+  "porcentajeIva": 0.0,
+  "stockMinimo": 20,
+  "fechaProximoPedido": "2026-12-14",
+  "activo": true,
+  "cantidadDisponible": 180,
+  "precioCompraUltimo": 950.0,
+  "precioCompraPromedio": 927.78,
+  "proximoVencimiento": "2026-12-14",
+  "estadosStock": [
+    "PROXIMO_VENCER"
+  ],
+  "lotes": [
+    {
+      "id": 2,
+      "numeroLote": "AMX-B",
+      "precioCompra": 950.0,
+      "cantidadInicial": 100,
+      "cantidadDisponible": 100,
+      "fechaCompra": "2026-11-04",
+      "fechaIngreso": "2026-11-05",
+      "fechaVencimiento": "2027-09-20",
+      "vencido": false,
+      "diasParaVencer": 300
+    },
+    {
+      "id": 1,
+      "numeroLote": "AMX-A",
+      "precioCompra": 900.0,
+      "cantidadInicial": 100,
+      "cantidadDisponible": 80,
+      "fechaCompra": "2026-09-25",
+      "fechaIngreso": "2026-09-26",
+      "fechaVencimiento": "2026-12-14",
+      "vencido": false,
+      "diasParaVencer": 20
+    }
+  ]
+}
+```
+
+## `POST /inventario/productos`, `PUT /inventario/productos/{id}`
+
+Cuerpo: `codigo`, `nombre`, `tipoProducto`, `descripcion`, `presentacion`, `unidadMedida`, `requiereInvima`, `registroInvima`, `precioVenta`, `impuestoId` o `porcentajeIva`, `stockMinimo`, `fechaProximoPedido` y, solo al crear, `loteInicial` (cuerpo de lotes). Editar no cambia cantidades.
+
+Respuesta de crear, editar, `PATCH /{id}/estado`, `POST /{id}/lotes` y `POST /{id}/ajustes`: `{ "status": 200, "message": "...", "data": <producto con lotes> }`.
+
+## `POST /inventario/productos/{id}/lotes`
+
+Cuerpo: `{ "numeroLote", "precioCompra", "cantidad", "fechaCompra", "fechaIngreso" (hoy si falta), "fechaVencimiento" (obligatoria en MEDICAMENTO), "observacion" }`.
+
+## `POST /inventario/productos/{id}/ajustes`
+
+Cuerpo: `{ "loteId", "tipo": "AJUSTE_POSITIVO" | "AJUSTE_NEGATIVO", "cantidad", "motivo" }`. 409 si dejaría el lote en negativo.
+
+## `GET /inventario/productos/{id}/lotes?soloVigentes=`
+
+Arreglo de lotes, con la forma mostrada arriba.
+
+## `GET /inventario/productos/{id}/movimientos?desde=&hasta=` y `GET /inventario/movimientos?desde=&hasta=&tipo=&medicamentoId=`
+
+Más reciente primero. `saldo` es el del producto. `referencia` indica el despacho o la carga.
+
+```json
+[
+  {
+    "id": 32,
+    "fecha": "2026-11-24T17:49:37",
+    "tipo": "AJUSTE_NEGATIVO",
+    "medicamentoId": 1,
+    "medicamentoCodigo": "AMX00500",
+    "medicamentoNombre": "Amoxicilina 500 mg",
+    "loteId": 1,
+    "numeroLote": "AMX-A",
+    "cantidad": 20,
+    "saldoLote": 80,
+    "saldo": 180,
+    "costoUnitario": 900.0,
+    "usuario": "admin",
+    "formulaId": null,
+    "despachoId": null,
+    "cargaId": null,
+    "movimientoRevertidoId": null,
+    "referencia": null,
+    "motivo": "Conteo físico"
+  }
+]
+```
+
+## `GET /inventario/alertas`
+
+```json
+{
+  "agotados": 2,
+  "bajoStock": 3,
+  "proximosVencer": 3,
+  "vencidos": 2
+}
+```
+
+## `GET /inventario/disponibilidad/{medicamentoId}`
+
+Lotes en orden FEFO.
+
+```json
+{
+  "medicamentoId": 1,
+  "cantidadDisponibleVigente": 90,
+  "cantidadVencida": 0,
+  "lotesVigentes": [
+    {
+      "id": 1,
+      "numeroLote": "AMX-A",
+      "precioCompra": 900.0,
+      "cantidadInicial": 100,
+      "cantidadDisponible": 80,
+      "fechaCompra": "2026-09-25",
+      "fechaIngreso": "2026-09-26",
+      "fechaVencimiento": "2026-12-14",
+      "vencido": false,
+      "diasParaVencer": 20
+    }
+  ]
+}
+```
+
+# Carga masiva
+
+Rol: ADMINISTRADOR.
+
+## `POST /inventario/carga/previsualizar`
+
+`multipart/form-data`, campo `archivo` (.xlsx o .csv UTF-8; 5 MB y 5000 filas). `GET /inventario/carga/{cargaId}` devuelve lo mismo. `fila` es el número visible en el archivo. Las `advertencias` no impiden importar.
+
+```json
+{
+  "cargaId": 1,
+  "nombreArchivo": "carga_inventario_60.xlsx",
+  "formato": "xlsx",
+  "estado": "PREVISUALIZADA",
+  "totalFilas": 60,
+  "filasValidas": 55,
+  "filasConError": 5,
+  "filasImportadas": 0,
+  "usuario": "admin",
+  "fecha": "2026-11-24T12:59:04",
+  "usuarioConfirmacion": null,
+  "fechaConfirmacion": null,
+  "filas": [
+    {
+      "fila": 2,
+      "valida": true,
+      "accion": "NUEVO_PRODUCTO",
+      "datos": {
+        "codigo": "EVI00001",
+        "nombre": "Producto evidencia 01",
+        "tipo_producto": "MEDICAMENTO",
+        "descripcion": "Dato ficticio de evidencia",
+        "presentacion": "Caja x 10",
+        "unidad_medida": "unidad",
+        "requiere_invima": "SI",
+        "registro_invima": "INVIMA PRUEBA-E001",
+        "precio_compra": "510",
+        "precio_venta": "915",
+        "porcentaje_iva": "0",
+        "stock_minimo": "10",
+        "numero_lote": "LEV001",
+        "cantidad": "21",
+        "fecha_compra": "2026-10-01",
+        "fecha_vencimiento": "2028-06-30",
+        "fecha_proximo_pedido": "2027-01-15"
+      },
+      "errores": [],
+      "advertencias": [],
+      "importada": false,
+      "errorImportacion": null
+    },
+    {
+      "fila": 11,
+      "valida": false,
+      "accion": null,
+      "datos": {
+        "codigo": "EVI00010",
+        "nombre": "Producto evidencia 10",
+        "tipo_producto": "MEDICAMENTO",
+        "descripcion": "Dato ficticio de evidencia",
+        "presentacion": "Caja x 10",
+        "unidad_medida": "unidad",
+        "requiere_invima": "SI",
+        "registro_invima": "INVIMA PRUEBA-E010",
+        "precio_compra": "600",
+        "precio_venta": "-100",
+        "porcentaje_iva": "0",
+        "stock_minimo": "10",
+        "numero_lote": "LEV010",
+        "cantidad": "30",
+        "fecha_compra": "2026-10-01",
+        "fecha_vencimiento": "2028-06-30",
+        "fecha_proximo_pedido": "2027-01-15"
+      },
+      "errores": [
+        {
+          "campo": "precio_venta",
+          "mensaje": "Debe ser mayor que 0"
+        }
+      ],
+      "advertencias": [],
+      "importada": false,
+      "errorImportacion": null
+    }
+  ]
+}
+```
+
+## `POST /inventario/carga/{cargaId}/confirmar` y `/descartar`
+
+`{ "status": 200, "message": "...", "data": <carga con filas> }`. Confirmar dos veces: 409. Estado `CONFIRMADA` si se importaron todas las filas del archivo; `CONFIRMADA_CON_ERRORES` si alguna no. Una fila válida que falla al importar lleva `importada: false` y `errorImportacion`.
+
+## `GET /inventario/carga/historial?desde=&hasta=`
+
+```json
+[
+  {
+    "cargaId": 1,
+    "nombreArchivo": "carga_inventario_60.xlsx",
+    "formato": "xlsx",
+    "estado": "CONFIRMADA_CON_ERRORES",
+    "totalFilas": 60,
+    "filasValidas": 55,
+    "filasConError": 5,
+    "filasImportadas": 55,
+    "usuario": "admin",
+    "fecha": "2026-11-24T12:59:04",
+    "usuarioConfirmacion": "admin",
+    "fechaConfirmacion": "2026-11-24T12:59:08"
+  }
+]
+```
+
+## Descargas
+
+- `GET /inventario/carga/plantilla?formato=xlsx|csv`
+- `GET /inventario/carga/{cargaId}/errores/archivo?formato=xlsx|csv`: columnas `fila, campo, valor, motivo` y los datos originales.
+
 # Endpoints existentes cuya respuesta cambió
 
 ## `GET /medico/listar`

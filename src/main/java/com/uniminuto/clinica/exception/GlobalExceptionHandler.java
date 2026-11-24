@@ -15,6 +15,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.util.Comparator;
@@ -82,6 +84,16 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         return responder(HttpStatus.BAD_REQUEST, "El parametro " + ex.getName() + " no es valido.");
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUpload(MaxUploadSizeExceededException ex) {
+        return responder(HttpStatus.BAD_REQUEST, "El archivo supera el tamaño máximo permitido (5 MB).");
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponse> handleMissingPart(MissingServletRequestPartException ex) {
+        return responder(HttpStatus.BAD_REQUEST, "El archivo es obligatorio (campo " + ex.getRequestPartName() + ").");
     }
 
     @ExceptionHandler(MissingServletRequestParameterException.class)

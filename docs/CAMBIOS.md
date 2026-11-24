@@ -53,7 +53,6 @@
 
 - Duración de la cita según `servicio` y bloqueo frente a citas simultáneas (fase 5).
 - `/medico/listar-disponibles` todavía recibe `fechaInicio` y `fechaFin`; pasará a `inicio` y `fin` (fase 5).
-- 200 de DESPACHO_MEDICO en `GET /inventario/productos`: se prueba en la fase 4, cuando exista.
 
 ## Fase 3: modelo de datos
 
@@ -85,7 +84,19 @@ El código del menú de citas es `cita`, no `citas`; la ruta sigue siendo `/inic
 - 409 por duplicado con `detalles`. Las restricciones de la base y los choques de versión también responden 409.
 - `FormulaRs` usa los nombres del frontend: `fecha`, `medicamentoCodigo`, `medicamentoNombre`.
 
+## Fase 4: inventario y carga masiva
+
+- `/inventario/**` y `/inventario/carga/**` completos según C6. `ExistenciasService` es el único punto que cambia cantidades: bloquea el producto y deja siempre un movimiento con los saldos.
+- Carga: cada fila se importa en su propia transacción y se revalida al confirmar. La confirmación reserva la carga antes de importar, así que dos a la vez no la duplican; si el servidor se cae a mitad, se puede reanudar a los 10 minutos sin repetir filas.
+- Un `AJUSTE_POSITIVO` que supere lo ingresado sube también la cantidad inicial del lote.
+- `cantidadDisponible` incluye lotes vencidos (5.1); `DISPONIBLE` aparece solo cuando no hay otro estado.
+- Los 409 de ajustes y vencimientos también traen `detalles`. Las fechas con hora salen sin fracciones de segundo en todo el API.
+- El CSV de errores antepone `'` a textos que Excel ejecutaría como fórmula.
+- Librerías: Apache POI 5.5.1 y Commons CSV 1.14.1.
+
 ## Desviaciones del contrato
+
+- Campos añadidos: `impuestoId` en producto; `formato`, `usuarioConfirmacion`, `fechaConfirmacion`, y por fila `advertencias`, `importada` y `errorImportacion` en la carga.
 
 - `factura_detalle.despacho_detalle_id` no es `UNIQUE` simple: impediría volver a facturar tras anular. Se permite un solo renglón vigente por entrega.
 - `formula_medica` conserva `fecha_actualizacion_registro` en lugar de `fecha_modificacion_registro`.
