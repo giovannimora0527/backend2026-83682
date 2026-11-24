@@ -37,6 +37,11 @@
 			<artifactId>mysql-connector-j</artifactId>
 			<scope>runtime</scope>
 		</dependency>
+		<!-- Envío de correos (código de verificación y recuperación de contraseña) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
 		<!-- Documentación Swagger / OpenAPI -->
 		<dependency>
 			<groupId>org.springdoc</groupId>
