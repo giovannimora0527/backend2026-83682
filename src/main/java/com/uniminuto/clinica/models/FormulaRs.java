@@ -12,11 +12,12 @@ import java.util.List;
 
 /** Formula con sus medicamentos. */
 public record FormulaRs(Long id, String numero, Long citaId, Long medicoId, String medicoNombre, Integer mascotaId,
-                        String mascotaNombre, Long clienteId, String clienteNombre, LocalDateTime fechaGeneracion,
+                        String mascotaNombre, Long clienteId, String clienteNombre, LocalDateTime fecha,
                         String indicacionesGenerales, EstadoFormula estadoFormula, EstadoDespacho estadoDespacho,
                         LocalDateTime fechaConfirmacion, List<Detalle> detalles) {
 
-    public record Detalle(Long id, Long medicamentoId, String codigo, String nombre, BigDecimal dosis,
+    public record Detalle(Long id, Long medicamentoId, String medicamentoCodigo,
+                          String medicamentoNombre, BigDecimal dosis,
                           String unidadDosis, Integer frecuenciaHoras, Integer duracionDias,
                           ViaAdministracion viaAdministracion, Integer cantidadPrescrita,
                           Integer cantidadDespachada, String indicaciones) {

@@ -9,11 +9,13 @@ import java.util.List;
 
 public interface EspecializacionService {
 
-    List<Especializacion> listarEspecializaciones();
+    List<Especializacion> listarEspecializaciones(boolean soloActivas);
 
     MiRespuestaRS crearEspecializacion(Especializacion especializacion)
             throws BadRequestException;
 
     MiRespuestaRS actualizarEspecializacion(Especializacion especializacion)
             throws BadRequestException;
+
+    Especializacion cambiarEstado(Long id, boolean activo);
 }

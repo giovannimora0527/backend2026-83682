@@ -79,6 +79,12 @@
 
 El código del menú de citas es `cita`, no `citas`; la ruta sigue siendo `/inicio/citas`. Los `@PreAuthorize` usan roles, no códigos de menú, así que no cambian.
 
+## Pendientes reportados por el frontend
+
+- `GET /perfil/listar`, `PATCH /usuario/{id}/estado`, horarios del médico, `PATCH /especializacion/{id}/estado` y facturas por cliente y mascota.
+- 409 por duplicado con `detalles`. Las restricciones de la base y los choques de versión también responden 409.
+- `FormulaRs` usa los nombres del frontend: `fecha`, `medicamentoCodigo`, `medicamentoNombre`.
+
 ## Desviaciones del contrato
 
 - `factura_detalle.despacho_detalle_id` no es `UNIQUE` simple: impediría volver a facturar tras anular. Se permite un solo renglón vigente por entrega.

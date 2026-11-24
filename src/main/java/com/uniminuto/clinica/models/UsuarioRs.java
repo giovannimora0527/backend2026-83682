@@ -23,6 +23,11 @@ public class UsuarioRs {
      */
     private String rol;
 
+    /** Codigo del perfil (C2). */
+    private String rolCodigo;
+
+    private Integer perfilId;
+
     /**
      * Fecha de creación del usuario.
      */

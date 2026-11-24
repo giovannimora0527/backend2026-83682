@@ -27,7 +27,7 @@ public class RazaServiceImpl implements RazaService {
         Optional<Raza> optRaza = this.razaRepository.findByEspecieAndNombre(razaRq.getEspecie(), razaRq.getNombre());
 
         if (optRaza.isPresent()) {
-            throw new ConflictException("La raza ya existe para la especie especificada.");
+            throw new ConflictException("nombre", "La raza ya existe para la especie especificada.");
         }
 
         Raza nuevaRaza = new Raza();

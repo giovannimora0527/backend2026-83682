@@ -1,5 +1,10 @@
 package com.uniminuto.clinica.api;
 
+import com.uniminuto.clinica.models.HorarioRq;
+import com.uniminuto.clinica.models.HorarioRs;
+import com.uniminuto.clinica.models.RespuestaRs;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import com.uniminuto.clinica.entity.Medico;
 import com.uniminuto.clinica.exception.BadRequestException;
 import com.uniminuto.clinica.models.MedicoRq;
@@ -45,4 +50,14 @@ public interface MedicoApi {
             @RequestBody MedicoRq medicoRq
     )
             throws BadRequestException;
+
+    @GetMapping(value = "/{id}/horarios", produces = {"application/json"})
+    ResponseEntity<List<HorarioRs>> listarHorarios(@PathVariable("id") Long id);
+
+    @PutMapping(value = "/{id}/horarios", produces = {"application/json"}, consumes = {"application/json"})
+    ResponseEntity<RespuestaRs<List<HorarioRs>>> guardarHorarios(@PathVariable("id") Long id,
+                                                                 @RequestBody List<HorarioRq> horarios);
+
+    @GetMapping(value = "/mis-horarios", produces = {"application/json"})
+    ResponseEntity<List<HorarioRs>> misHorarios();
 }

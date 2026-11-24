@@ -1,5 +1,11 @@
 package com.uniminuto.clinica.api;
 
+import com.uniminuto.clinica.models.EstadoRq;
+import com.uniminuto.clinica.models.RespuestaRs;
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestBody;
 import com.uniminuto.clinica.entity.Medico;
 import com.uniminuto.clinica.exception.BadRequestException;
 import com.uniminuto.clinica.models.MiRespuestaRS;
@@ -54,4 +60,7 @@ public interface UsuarioApi {
             @RequestBody UsuarioRq usuarioRq
     )
             throws BadRequestException;
+
+    @PatchMapping(value = "/{id}/estado", produces = {"application/json"}, consumes = {"application/json"})
+    ResponseEntity<RespuestaRs<UsuarioRs>> cambiarEstado(@PathVariable("id") Long id, @Valid @RequestBody EstadoRq rq);
 }

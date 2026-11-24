@@ -14,9 +14,17 @@ Error 409:
 {
   "error": "Conflict",
   "message": "El numero de documento ya pertenece a otro cliente.",
-  "status": 409
+  "status": 409,
+  "detalles": [
+    {
+      "campo": "numeroDocumento",
+      "mensaje": "El numero de documento ya pertenece a otro cliente."
+    }
+  ]
 }
 ```
+
+Los 409 por duplicado incluyen `detalles: [{ "campo", "mensaje" }]`, con el nombre del campo de la petición. Los de regla de negocio pueden no incluirlo.
 
 Error 400 con `detalles` (opcional):
 
@@ -136,7 +144,7 @@ Rol: ADMINISTRADOR, SECRETARIA. Mismo cuerpo que `POST /cliente/{id}`, con `corr
 
 ## `GET /cita/{id}`
 
-Rol: ADMINISTRADOR, SECRETARIA, MEDICO (solo las suyas). `fechaHora` es el nombre anterior de `fechaInicio`. El detalle puede ampliarse en la fase 5.
+Rol: ADMINISTRADOR, SECRETARIA, MEDICO (solo las suyas). **JSON definitivo de la cita**, igual en `/cita/listar`, `/cita/listar-rango` y `/cita/listar-por-mascota` (arreglos). Use `fechaInicio` y `fechaFin`; `fechaHora` se mantiene como alias de solo lectura. En `/cita/crear` y `/cita/actualizar` el cuerpo acepta `fechaInicio` o `fechaHora`. `servicio` y `motivoCancelacion` pueden ser `null`. Estados en mayúsculas (C5). El evento de `/cita/calendario` será el del contrato.
 
 ```json
 {
@@ -235,7 +243,7 @@ Rol: ADMINISTRADOR, SECRETARIA, MEDICO (solo las suyas). `fechaHora` es el nombr
 
 ## `GET /formula-medica/listar`
 
-Rol: ADMINISTRADOR, MEDICO (las suyas). Cambió: encabezado con detalles. Los filtros llegan en la fase 6. `POST /guardar` y `POST /actualizar` responden 410.
+Rol: ADMINISTRADOR, MEDICO (las suyas). **JSON definitivo de la fórmula**: encabezado con detalles; es el mismo objeto que devolverán `GET /formula-medica/{id}`, `/cita/{citaId}` y el `data` de crear, editar, confirmar y anular (estos agregarán `cantidadSugerida` en cada detalle). `numero` y `estadoDespacho` son `null` en BORRADOR. Los filtros llegan en la fase 6. `POST /guardar` y `POST /actualizar` responden 410.
 
 ```json
 [
@@ -249,7 +257,7 @@ Rol: ADMINISTRADOR, MEDICO (las suyas). Cambió: encabezado con detalles. Los fi
     "mascotaNombre": "Luna",
     "clienteId": 1,
     "clienteNombre": "Juan Pérez",
-    "fechaGeneracion": "2026-11-16T09:25:00",
+    "fecha": "2026-11-16T09:25:00",
     "indicacionesGenerales": "Reposo",
     "estadoFormula": "CONFIRMADA",
     "estadoDespacho": "PENDIENTE_DESPACHO",
@@ -258,8 +266,8 @@ Rol: ADMINISTRADOR, MEDICO (las suyas). Cambió: encabezado con detalles. Los fi
       {
         "id": 1,
         "medicamentoId": 1,
-        "codigo": "AMX00500",
-        "nombre": "Amoxicilina 500 mg",
+        "medicamentoCodigo": "AMX00500",
+        "medicamentoNombre": "Amoxicilina 500 mg",
         "dosis": 1.0,
         "unidadDosis": "tableta",
         "frecuenciaHoras": 8,
@@ -272,6 +280,61 @@ Rol: ADMINISTRADOR, MEDICO (las suyas). Cambió: encabezado con detalles. Los fi
     ]
   }
 ]
+```
+
+## `GET /perfil/listar`
+
+Rol: ADMINISTRADOR. Perfiles activos con código.
+
+```json
+[{ "id": 1, "codigo": "ADMINISTRADOR", "nombre": "Administrador", "activo": true }]
+```
+
+## `PATCH /usuario/{id}/estado`
+
+Rol: ADMINISTRADOR. Cuerpo `{ "activo": false }`. Inactivar invalida sus tokens; no permite inactivarse a sí mismo (409). `GET /usuario/listar-ordenado` devuelve el mismo objeto en un arreglo (nuevos: `rolCodigo`, `perfilId`).
+
+```json
+{ "status": 200, "message": "Estado actualizado correctamente.",
+  "data": { "id": 34, "username": "despacho", "rol": "Despacho Medico", "rolCodigo": "DESPACHO_MEDICO", "perfilId": 4,
+            "fechaCreacion": "2026-11-24T12:20:00", "activo": false, "email": "despacho@clinica.example" } }
+```
+
+## `GET /medico/{id}/horarios` y `GET /medico/mis-horarios`
+
+Rol: ADMINISTRADOR, SECRETARIA, MEDICO; `mis-horarios` solo MEDICO.
+
+```json
+[{ "id": 1, "diaSemana": 1, "horaInicio": "08:00", "horaFin": "12:00", "activo": true }]
+```
+
+## `PUT /medico/{id}/horarios`
+
+Rol: ADMINISTRADOR, SECRETARIA. Cuerpo: arreglo completo (reemplaza; los `id` se ignoran y cambian). 400 si el día o las horas no son válidos; 409 si hay bloques superpuestos.
+
+```json
+{ "status": 200, "message": "Horarios guardados correctamente.",
+  "data": [{ "id": 41, "diaSemana": 1, "horaInicio": "08:00", "horaFin": "12:00", "activo": true }] }
+```
+
+## `PATCH /especializacion/{id}/estado`
+
+Rol: ADMINISTRADOR. Cuerpo `{ "activo": false }`. `GET /especializacion/listar` acepta `soloActivas=true`.
+
+```json
+{ "status": 200, "message": "Estado actualizado correctamente.",
+  "data": { "id": 2, "nombre": "Cirugía veterinaria", "descripcion": "Procedimientos quirúrgicos", "codigoEspecializacion": "VET_CIR", "activo": false } }
+```
+
+## `GET /factura/cliente/{clienteId}` y `GET /factura/mascota/{mascotaId}`
+
+Rol: ADMINISTRADOR, SECRETARIA. Lista vacía mientras no haya facturas; 404 si el cliente o la mascota no existe.
+
+```json
+[{ "id": 1, "numero": "FV-000001", "fecha": "2026-11-16T10:00:00", "citaId": 5, "clienteId": 1, "clienteNombre": "Juan Pérez",
+   "clienteDocumento": "9000000001", "mascotaId": 3, "mascotaNombre": "Luna", "medicoNombre": "Sofía Ramírez",
+   "especialidadNombre": "Medicina general veterinaria", "subtotal": 50000.00, "descuentos": 0.00, "iva": 9500.00,
+   "total": 59500.00, "pagado": 0.00, "saldo": 59500.00, "estado": "PENDIENTE", "observacion": null }]
 ```
 
 # Endpoints existentes cuya respuesta cambió

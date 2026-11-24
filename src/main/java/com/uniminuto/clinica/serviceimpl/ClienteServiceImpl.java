@@ -104,7 +104,7 @@ public class ClienteServiceImpl implements ClienteService {
         clienteRepository.findByNumeroDocumento(documento)
                 .filter(cliente -> !cliente.getId().equals(id))
                 .ifPresent(cliente -> {
-                    throw new ConflictException("El numero de documento ya pertenece a otro cliente.");
+                    throw new ConflictException("numeroDocumento", "El numero de documento ya pertenece a otro cliente.");
                 });
     }
 

@@ -3,6 +3,8 @@ package com.uniminuto.clinica.exception;
 import com.uniminuto.clinica.exception.dto.ErrorResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ResponseEntity;
@@ -31,7 +33,8 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ConflictException.class)
     public ResponseEntity<ErrorResponse> handleConflict(ConflictException ex) {
-        return responder(HttpStatus.CONFLICT, ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(new ErrorResponse(HttpStatus.CONFLICT, ex.getMessage(), ex.getDetalles()));
     }
 
     @ExceptionHandler(GoneException.class)
@@ -56,6 +59,18 @@ public class GlobalExceptionHandler {
                 .collect(Collectors.joining("; "));
         return ResponseEntity.badRequest()
                 .body(new ErrorResponse(HttpStatus.BAD_REQUEST, mensaje, detalles));
+    }
+
+    /** Duplicado detectado por la base de datos (dos peticiones simultaneas). */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleIntegrity(DataIntegrityViolationException ex) {
+        LOGGER.warn("Restriccion de la base de datos incumplida", ex);
+        return responder(HttpStatus.CONFLICT, "La operación entra en conflicto con datos existentes.");
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> handleConcurrency(OptimisticLockingFailureException ex) {
+        return responder(HttpStatus.CONFLICT, "Otro usuario modificó el registro. Vuelva a consultarlo.");
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)

@@ -1,5 +1,7 @@
 package com.uniminuto.clinica.apicontroller;
 
+import com.uniminuto.clinica.models.EstadoRq;
+import com.uniminuto.clinica.models.RespuestaRs;
 import com.uniminuto.clinica.api.EspecializacionApi;
 import com.uniminuto.clinica.entity.Especializacion;
 import com.uniminuto.clinica.exception.BadRequestException;
@@ -20,8 +22,8 @@ public class EspecializacionApiController implements EspecializacionApi {
 
     @Override
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<Especializacion>> listarEspecializaciones() throws BadRequestException {
-        return ResponseEntity.ok(this.especializacionService.listarEspecializaciones());
+    public ResponseEntity<List<Especializacion>> listarEspecializaciones(boolean soloActivas) throws BadRequestException {
+        return ResponseEntity.ok(this.especializacionService.listarEspecializaciones(soloActivas));
     }
 
     @Override
@@ -34,5 +36,12 @@ public class EspecializacionApiController implements EspecializacionApi {
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<MiRespuestaRS> actualizarEspecializacion(Especializacion especializacion) throws BadRequestException {
         return ResponseEntity.ok(this.especializacionService.actualizarEspecializacion(especializacion));
+    }
+
+    @Override
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<RespuestaRs<Especializacion>> cambiarEstado(Long id, EstadoRq rq) {
+        return ResponseEntity.ok(RespuestaRs.ok("Estado actualizado correctamente.",
+                this.especializacionService.cambiarEstado(id, rq.activo())));
     }
 }

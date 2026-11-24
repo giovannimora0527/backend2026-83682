@@ -20,8 +20,9 @@ public class EspecializacionServiceImpl implements EspecializacionService {
     private EspecializacionRepository especializacionRepository;
 
     @Override
-    public List<Especializacion> listarEspecializaciones() {
+    public List<Especializacion> listarEspecializaciones(boolean soloActivas) {
         return especializacionRepository.findAll().stream()
+                .filter(e -> !soloActivas || Boolean.TRUE.equals(e.getActivo()))
                 .sorted((e1, e2) -> e1.getNombre()
                         .compareToIgnoreCase(e2.getNombre())).toList();
     }
@@ -32,13 +33,13 @@ public class EspecializacionServiceImpl implements EspecializacionService {
         Optional<Especializacion> especializacionExistente = especializacionRepository
                 .findByCodigoEspecializacion(especializacion.getCodigoEspecializacion());
         if (especializacionExistente.isPresent()) {
-            throw new ConflictException("La especialización con el código proporcionado ya existe.");
+            throw new ConflictException("codigoEspecializacion", "La especialización con el código proporcionado ya existe.");
         }
 
         Optional<Especializacion> especializacionPorNombre = especializacionRepository
                 .findByNombre(especializacion.getNombre());
         if (especializacionPorNombre.isPresent()) {
-            throw new ConflictException("La especialización con el nombre proporcionado ya existe.");
+            throw new ConflictException("nombre", "La especialización con el nombre proporcionado ya existe.");
         }
 
         especializacion.setId(null);
@@ -76,7 +77,7 @@ public class EspecializacionServiceImpl implements EspecializacionService {
                     .findByCodigoEspecializacion(especializacion.getCodigoEspecializacion());
             if (especializacionPorCodigo.isPresent() && !especializacionPorCodigo.get().getId()
                     .equals(especializacion.getId())) {
-                throw new ConflictException("La especialización con el código proporcionado ya existe.");
+                throw new ConflictException("codigoEspecializacion", "La especialización con el código proporcionado ya existe.");
             }
         }
 
@@ -85,7 +86,7 @@ public class EspecializacionServiceImpl implements EspecializacionService {
                     .findByNombre(especializacion.getNombre());
             if (especializacionPorNombre.isPresent() && !especializacionPorNombre.get().getId()
                     .equals(especializacion.getId())) {
-                throw new ConflictException("La especialización con el nombre proporcionado ya existe.");
+                throw new ConflictException("nombre", "La especialización con el nombre proporcionado ya existe.");
             }
         }
 
@@ -97,5 +98,13 @@ public class EspecializacionServiceImpl implements EspecializacionService {
         rta.setMessage("Especialización actualizada exitosamente.");
         rta.setStatus(200);
         return rta;
+    }
+
+    @Override
+    public Especializacion cambiarEstado(Long id, boolean activo) {
+        Especializacion especializacion = especializacionRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("La especialización no existe."));
+        especializacion.setActivo(activo);
+        return especializacionRepository.save(especializacion);
     }
 }

@@ -1,5 +1,11 @@
 package com.uniminuto.clinica.api;
 
+import org.springframework.web.bind.annotation.RequestParam;
+import com.uniminuto.clinica.models.EstadoRq;
+import com.uniminuto.clinica.models.RespuestaRs;
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import com.uniminuto.clinica.entity.Especializacion;
 import com.uniminuto.clinica.entity.Raza;
 import com.uniminuto.clinica.exception.BadRequestException;
@@ -18,7 +24,8 @@ public interface EspecializacionApi {
 
     @GetMapping(value = "/listar",
             produces = {"application/json"})
-    ResponseEntity<List<Especializacion>> listarEspecializaciones()
+    ResponseEntity<List<Especializacion>> listarEspecializaciones(
+            @RequestParam(defaultValue = "false") boolean soloActivas)
             throws BadRequestException;
 
 
@@ -38,4 +45,7 @@ public interface EspecializacionApi {
             @RequestBody Especializacion especializacion
     )
             throws BadRequestException;
+
+    @PatchMapping(value = "/{id}/estado", produces = {"application/json"}, consumes = {"application/json"})
+    ResponseEntity<RespuestaRs<Especializacion>> cambiarEstado(@PathVariable("id") Long id, @Valid @RequestBody EstadoRq rq);
 }

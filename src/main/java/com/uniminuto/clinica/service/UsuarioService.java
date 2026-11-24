@@ -15,4 +15,6 @@ public interface UsuarioService {
     MiRespuestaRS crearUsuario(UsuarioRq usuarioRq);
 
     MiRespuestaRS actualizarUsuario(UsuarioRq usuarioRq);
+
+    UsuarioRs cambiarEstado(Long id, boolean activo);
 }

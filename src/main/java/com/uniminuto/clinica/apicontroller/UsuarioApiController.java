@@ -1,5 +1,7 @@
 package com.uniminuto.clinica.apicontroller;
 
+import com.uniminuto.clinica.models.EstadoRq;
+import com.uniminuto.clinica.models.RespuestaRs;
 import com.uniminuto.clinica.api.UsuarioApi;
 import com.uniminuto.clinica.exception.BadRequestException;
 import com.uniminuto.clinica.models.MiRespuestaRS;
@@ -36,5 +38,12 @@ public class UsuarioApiController implements UsuarioApi {
     @PreAuthorize("hasRole('ADMINISTRADOR')")
     public ResponseEntity<MiRespuestaRS> actualizar(UsuarioRq usuarioRq) throws BadRequestException {
         return ResponseEntity.ok(this.usuarioService.actualizarUsuario(usuarioRq));
+    }
+
+    @Override
+    @PreAuthorize("hasRole('ADMINISTRADOR')")
+    public ResponseEntity<RespuestaRs<UsuarioRs>> cambiarEstado(Long id, EstadoRq rq) {
+        return ResponseEntity.ok(RespuestaRs.ok("Estado actualizado correctamente.",
+                this.usuarioService.cambiarEstado(id, rq.activo())));
     }
 }

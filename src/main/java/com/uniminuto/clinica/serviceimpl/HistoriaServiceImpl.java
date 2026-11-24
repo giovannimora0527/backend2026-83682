@@ -77,7 +77,7 @@ public class HistoriaServiceImpl implements HistoriaService {
         this.validarHistoria(historiaMedicaRq);
         Mascota mascota = this.existeMascota(historiaMedicaRq);
         if (this.historiaMedicaRepository.existsByMascota(mascota)) {
-            throw new ConflictException("La mascota ya tiene una historia clínica registrada.");
+            throw new ConflictException("mascotaId", "La mascota ya tiene una historia clínica registrada.");
         }
 
         HistoriaMedica historiaNueva = new HistoriaMedica();
@@ -104,7 +104,7 @@ public class HistoriaServiceImpl implements HistoriaService {
         }
         Mascota mascota = this.existeMascota(historiaMedicaRq);
         if (this.historiaMedicaRepository.existsByMascotaAndIdNot(mascota, historiaMedicaRq.getId())) {
-            throw new ConflictException("La mascota ya tiene otra historia clínica registrada.");
+            throw new ConflictException("mascotaId", "La mascota ya tiene otra historia clínica registrada.");
         }
 
         HistoriaMedica historiaExistente = optionalHistoria.get();

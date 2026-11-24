@@ -56,10 +56,10 @@ public class MedicoServiceImpl implements MedicoService {
     public MiRespuestaRS guardarMedico(MedicoRq medicoRq) throws BadRequestException {
         this.validarMedico(medicoRq);
         if (this.medicoRepository.existsByNumeroDocumento(medicoRq.getNumeroDocumento().trim())) {
-            throw new ConflictException("Ya existe un médico con el número de documento proporcionado.");
+            throw new ConflictException("numeroDocumento", "Ya existe un médico con el número de documento proporcionado.");
         }
         if (this.medicoRepository.existsByRegistroProfesional(medicoRq.getRegistroProfesional().trim())) {
-            throw new ConflictException("Ya existe un médico con el registro profesional proporcionado.");
+            throw new ConflictException("registroProfesional", "Ya existe un médico con el registro profesional proporcionado.");
         }
         Especializacion especializacion = this.existeEspecializacion(medicoRq);
 
@@ -86,11 +86,11 @@ public class MedicoServiceImpl implements MedicoService {
         }
         if (this.medicoRepository.existsByNumeroDocumentoAndIdNot(
                 medicoRq.getNumeroDocumento().trim(), medicoRq.getId())) {
-            throw new ConflictException("Ya existe otro médico con el número de documento proporcionado.");
+            throw new ConflictException("numeroDocumento", "Ya existe otro médico con el número de documento proporcionado.");
         }
         if (this.medicoRepository.existsByRegistroProfesionalAndIdNot(
                 medicoRq.getRegistroProfesional().trim(), medicoRq.getId())) {
-            throw new ConflictException("Ya existe otro médico con el registro profesional proporcionado.");
+            throw new ConflictException("registroProfesional", "Ya existe otro médico con el registro profesional proporcionado.");
         }
         Especializacion especializacion = this.existeEspecializacion(medicoRq);
 
@@ -127,7 +127,7 @@ public class MedicoServiceImpl implements MedicoService {
         this.medicoRepository.findByUsuarioId(usuarioId)
                 .filter(otro -> !otro.getId().equals(medicoId))
                 .ifPresent(otro -> {
-                    throw new ConflictException("El usuario ya está vinculado a otro médico.");
+                    throw new ConflictException("usuarioId", "El usuario ya está vinculado a otro médico.");
                 });
     }
 

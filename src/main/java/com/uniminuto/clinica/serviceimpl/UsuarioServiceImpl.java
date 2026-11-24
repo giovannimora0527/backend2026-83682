@@ -1,5 +1,6 @@
 package com.uniminuto.clinica.serviceimpl;
 
+import com.uniminuto.clinica.security.UsuarioActual;
 import com.uniminuto.clinica.entity.Perfil;
 import com.uniminuto.clinica.entity.Usuario;
 import com.uniminuto.clinica.exception.BadRequestException;
@@ -25,9 +26,11 @@ public class UsuarioServiceImpl implements UsuarioService {
     private final UsuarioRepository usuarioRepository;
     private final PerfilRepository perfilRepository;
     private final PasswordEncoder passwordEncoder;
+    private final UsuarioActual usuarioActual;
 
     public UsuarioServiceImpl(UsuarioRepository usuarioRepository, PerfilRepository perfilRepository,
-                              PasswordEncoder passwordEncoder) {
+                              PasswordEncoder passwordEncoder, UsuarioActual usuarioActual) {
+        this.usuarioActual = usuarioActual;
         this.passwordEncoder = passwordEncoder;
         this.usuarioRepository = usuarioRepository;
         this.perfilRepository = perfilRepository;
@@ -40,16 +43,32 @@ public class UsuarioServiceImpl implements UsuarioService {
     }
 
     private List<UsuarioRs> convertirUsuarioToUsuarioRs(List<Usuario> usuarios) {
-        return usuarios.stream().map(usuario -> {
-            UsuarioRs usuarioRs = new UsuarioRs();
-            usuarioRs.setId(usuario.getId());
-            usuarioRs.setUsername(usuario.getUsername());
-            usuarioRs.setRol(usuario.getPerfil().getNombre());
-            usuarioRs.setFechaCreacion(usuario.getFechaCreacion());
-            usuarioRs.setActivo(usuario.getActivo());
-            usuarioRs.setEmail(usuario.getEmail());
-            return usuarioRs;
-        }).toList();
+        return usuarios.stream().map(this::convertir).toList();
+    }
+
+    private UsuarioRs convertir(Usuario usuario) {
+        UsuarioRs usuarioRs = new UsuarioRs();
+        usuarioRs.setId(usuario.getId());
+        usuarioRs.setUsername(usuario.getUsername());
+        usuarioRs.setRol(usuario.getPerfil().getNombre());
+        usuarioRs.setRolCodigo(usuario.getPerfil().getCodigo());
+        usuarioRs.setPerfilId(usuario.getPerfil().getPerfilId());
+        usuarioRs.setFechaCreacion(usuario.getFechaCreacion());
+        usuarioRs.setActivo(usuario.getActivo());
+        usuarioRs.setEmail(usuario.getEmail());
+        return usuarioRs;
+    }
+
+    /** Al inactivar, los tokens del usuario dejan de servir (lo comprueba el filtro JWT). */
+    @Override
+    public UsuarioRs cambiarEstado(Long id, boolean activo) {
+        Usuario usuario = usuarioRepository.findById(id)
+                .orElseThrow(() -> new NotFoundException("El usuario no existe"));
+        if (!activo && id.equals(usuarioActual.obtener().id())) {
+            throw new ConflictException("No puede inactivar su propio usuario.");
+        }
+        usuario.setActivo(activo);
+        return convertir(usuarioRepository.save(usuario));
     }
 
     @Override
@@ -60,10 +79,10 @@ public class UsuarioServiceImpl implements UsuarioService {
         }
 
         if (this.usuarioRepository.existsByUsername(usuarioRq.getUsername())) {
-            throw new ConflictException("El nombre de usuario ya existe");
+            throw new ConflictException("username", "El nombre de usuario ya existe");
         }
         if (this.usuarioRepository.existsByEmail(usuarioRq.getEmail())) {
-            throw new ConflictException("El correo electrónico ya existe");
+            throw new ConflictException("email", "El correo electrónico ya existe");
         }
 
         Optional<Perfil> optPerfil = this.perfilRepository
@@ -104,13 +123,13 @@ public class UsuarioServiceImpl implements UsuarioService {
         Usuario usuarioExistente = optUser.get();
         if (!usuarioExistente.getUsername().equals(usuarioRq.getUsername())) {
             if (this.usuarioRepository.existsByUsername(usuarioRq.getUsername())) {
-                throw new ConflictException("El nombre de usuario ya existe");
+                throw new ConflictException("username", "El nombre de usuario ya existe");
             }
         }
         usuarioExistente.setUsername(usuarioRq.getUsername());
         if (!usuarioExistente.getEmail().equals(usuarioRq.getEmail())) {
             if (this.usuarioRepository.existsByEmail(usuarioRq.getEmail())) {
-                throw new ConflictException("El correo electrónico ya existe");
+                throw new ConflictException("email", "El correo electrónico ya existe");
             }
         }
         Optional<Perfil> optPerfil = this.perfilRepository
