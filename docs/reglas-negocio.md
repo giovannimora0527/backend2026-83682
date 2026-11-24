@@ -1,6 +1,65 @@
 # Reglas de negocio
 
-Se completa con los demás módulos en la fase 10.
+Cada regla indica dónde se valida. Las clases están en `src/main/java/com/uniminuto/clinica`.
+
+## Seguridad
+
+| # | Regla | Dónde se valida |
+|---|---|---|
+| S1 | Toda ruta exige JWT con sesión activa, salvo las públicas | `SecurityConfig`, `JwtAuthenticationFilter` |
+| S2 | Permisos por rol en el backend | `SecurityConfig`, `@PreAuthorize` |
+| S3 | Un MEDICO solo opera sobre lo suyo | `UsuarioActual.verificarPropiedad` |
+| S4 | Contraseñas en BCrypt; las MD5 se migran al entrar | `AuthServiceImpl.validarPassword` |
+| S5 | OTP de un solo uso, 15 minutos y 3 intentos | `AuthServiceImpl.validateOtpToken` |
+| S6 | Cerrar sesión o inactivar al usuario invalida su token | `JwtAuthenticationFilter` |
+| S7 | El responsable sale del token, nunca del cuerpo | `UsuarioActual` |
+
+## Inventario y carga masiva
+
+| # | Regla | Dónde se valida |
+|---|---|---|
+| I1 | Código de 8 alfanuméricos y nombre únicos | `InventarioServiceImpl.copiar`, `CHECK` y `UNIQUE` |
+| I2 | MEDICAMENTO exige Invima | `InventarioServiceImpl.copiar`, `CHECK` |
+| I3 | Editar un producto no cambia cantidades | `InventarioServiceImpl.actualizar` |
+| I4 | La cantidad es la suma de los lotes | `InventarioServiceImpl.convertir` |
+| I5 | Lote de medicamento con vencimiento posterior a la compra y no vencido | `ExistenciasService.validarLote` |
+| I6 | Nunca hay cantidades negativas | `ExistenciasService`, `CHECK` |
+| I7 | Cada cambio deja un movimiento con saldos, usuario y fecha | `ExistenciasService` |
+| I8 | La previsualización no escribe en inventario | `CargaInventarioServiceImpl.previsualizar` |
+| I9 | Encabezados exactos | `LectorArchivo` |
+| I10 | Validación por fila, en el archivo y contra la base | `ConvertidorFila`, `ValidadorCarga` |
+| I11 | Una fila con error no afecta a las demás | `ImportadorFila` (transacción propia) |
+| I12 | Una carga se confirma una sola vez | `CargaInventarioServiceImpl.reservar` |
+
+## Citas y horarios
+
+| # | Regla | Dónde se valida |
+|---|---|---|
+| C1 | Fecha futura al crear y reprogramar | `AgendaService.reservar` |
+| C2 | Médico y mascota activos; cliente dueño de la mascota | `AgendaService.reservar` |
+| C3 | Duración según el servicio; no cruza la medianoche | `AgendaService.reservar` |
+| C4 | Cabe completa en un bloque del horario | `AgendaService.cabe` |
+| C5 | Sin solapamiento de médico ni de mascota, sin contar canceladas ni la propia cita | `CitaRepository.medicoOcupado`, `mascotaOcupada` |
+| C6 | Solo se editan PROGRAMADAS y CONFIRMADAS | `CitaServiceImpl.exigirEditable` |
+| C7 | Transiciones válidas; EN_ATENCION y ATENDIDA solo desde la atención | `EstadoCita`, `CitaServiceImpl.exigirTransicion` |
+| C8 | Cancelar exige motivo y no borra | `CitaServiceImpl.aplicarEstado` |
+| C9 | Cada cambio queda en el historial | `HistorialCitaService` |
+| C10 | Bloques de horario sin superponerse | `HorarioServiceImpl.validar` |
+
+## Tarifas, atención y fórmulas
+
+| # | Regla | Dónde se valida |
+|---|---|---|
+| A1 | Una tarifa vigente por servicio; cambiarla exige motivo y deja log | `TarifaServiceImpl`, columna `servicio_vigente` única |
+| A2 | Los valores e impuestos se configuran sin tocar código | `/tarifa`, `/impuesto`, `/configuracion-clinica` |
+| A3 | Atender el día de la cita, desde 30 minutos antes | `AtencionServiceImpl.iniciar` |
+| A4 | Finalizar exige motivo, síntomas, diagnóstico y tarifa | `AtencionServiceImpl.finalizar` |
+| A5 | No se finaliza con fórmulas en borrador | `AtencionServiceImpl.finalizar` |
+| A6 | Formular solo durante la atención o el mismo día | `FormulaServiceImpl.atencionParaFormular` |
+| A7 | Cantidad sugerida = techo(dosis × 24 / frecuencia × días) | `FormulaRs.sugerida` |
+| A8 | Una fórmula confirmada no se edita | `FormulaServiceImpl.exigirBorrador` |
+| A9 | Formular no descuenta inventario | `FormulaServiceImpl` no usa `ExistenciasService` |
+| A10 | No se anula una fórmula con entregas | `FormulaServiceImpl.anular` |
 
 ## Despacho
 

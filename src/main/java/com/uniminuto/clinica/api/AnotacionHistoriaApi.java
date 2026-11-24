@@ -1,5 +1,7 @@
 package com.uniminuto.clinica.api;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.uniminuto.clinica.exception.BadRequestException;
 import com.uniminuto.clinica.models.AnotacionHistoriaRq;
 import com.uniminuto.clinica.models.MiRespuestaRS;
@@ -10,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.List;
 
+@Tag(name = "Historias clínicas")
 @RequestMapping("/anotacion-historia")
 public interface AnotacionHistoriaApi {
 
@@ -19,6 +22,7 @@ public interface AnotacionHistoriaApi {
      * @return Servicio funcionando correctamente.
      * @throws BadRequestException excepcion.
      */
+    @Operation(summary = "Crear una anotación en la historia clínica")
     @PostMapping(value = "/crear",
             produces = {"application/json"},
             consumes = {"application/json"})

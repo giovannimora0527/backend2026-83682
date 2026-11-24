@@ -1,5 +1,7 @@
 package com.uniminuto.clinica.api;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.uniminuto.clinica.entity.Raza;
 import com.uniminuto.clinica.exception.BadRequestException;
 import com.uniminuto.clinica.models.MascotaRq;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.List;
 
+@Tag(name = "Mascotas")
 @RequestMapping("/raza")
 public interface RazaApi {
 
@@ -22,6 +25,7 @@ public interface RazaApi {
      * @return Servicio funcionando correctamente.
      * @throws BadRequestException excepcion.
      */
+    @Operation(summary = "Crear una raza")
     @PostMapping(value = "/guardar",
             produces = {"application/json"},
             consumes = {"application/json"})
@@ -35,6 +39,7 @@ public interface RazaApi {
      * @return Servicio funcionando correctamente.
      * @throws BadRequestException excepcion.
      */
+    @Operation(summary = "Listar razas")
     @GetMapping(value = "/listar",
             produces = {"application/json"})
     ResponseEntity<List<Raza>> listarRazas()

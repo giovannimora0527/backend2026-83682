@@ -1,5 +1,7 @@
 package com.uniminuto.clinica.api;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.uniminuto.clinica.models.EstadoRq;
 import com.uniminuto.clinica.models.RespuestaRs;
 import jakarta.validation.Valid;
@@ -16,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Tag(name = "Usuarios y perfiles")
 @RequestMapping("/usuario")
 public interface UsuarioApi {
 
@@ -25,6 +28,7 @@ public interface UsuarioApi {
      * @return Lista<UsuarioRs> </>.
      * @throws BadRequestException excepcion.
      */
+    @Operation(summary = "Listar usuarios")
     @GetMapping(value = "/listar-ordenado",
             produces = {"application/json"})
     ResponseEntity<List<UsuarioRs>> getUsuarios()
@@ -38,6 +42,7 @@ public interface UsuarioApi {
      * @return Lista<UsuarioRs> </>.
      * @throws BadRequestException excepcion.
      */
+    @Operation(summary = "Crear un usuario")
     @PostMapping(value = "/guardar",
             produces = {"application/json"},
             consumes = {"application/json"})
@@ -53,6 +58,7 @@ public interface UsuarioApi {
      * @return Lista<UsuarioRs> </>.
      * @throws BadRequestException excepcion.
      */
+    @Operation(summary = "Actualizar un usuario")
     @PostMapping(value = "/actualizar",
             produces = {"application/json"},
             consumes = {"application/json"})
@@ -61,6 +67,7 @@ public interface UsuarioApi {
     )
             throws BadRequestException;
 
+    @Operation(summary = "Activar o inactivar un usuario")
     @PatchMapping(value = "/{id}/estado", produces = {"application/json"}, consumes = {"application/json"})
     ResponseEntity<RespuestaRs<UsuarioRs>> cambiarEstado(@PathVariable("id") Long id, @Valid @RequestBody EstadoRq rq);
 }

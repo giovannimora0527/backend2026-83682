@@ -1,5 +1,7 @@
 package com.uniminuto.clinica.api;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.uniminuto.clinica.models.RespuestaRs;
 import com.uniminuto.clinica.models.TarifaActualizarRq;
 import com.uniminuto.clinica.models.TarifaCrearRq;
@@ -17,21 +19,27 @@ import org.springframework.web.bind.annotation.RequestParam;
 import java.time.LocalDate;
 import java.util.List;
 
+@Tag(name = "Tarifas")
 @RequestMapping("/tarifa")
 public interface TarifaApi {
 
+    @Operation(summary = "Listar tarifas")
     @GetMapping(value = "/listar", produces = {"application/json"})
     ResponseEntity<List<TarifaRs>> listar(@RequestParam(required = false) Long servicioId, @RequestParam(defaultValue = "false") boolean soloVigentes);
 
+    @Operation(summary = "Crear la tarifa de un servicio")
     @PostMapping(value = "/crear", produces = {"application/json"}, consumes = {"application/json"})
     ResponseEntity<RespuestaRs<TarifaRs>> crear(@Valid @RequestBody TarifaCrearRq rq);
 
+    @Operation(summary = "Cambiar una tarifa", description = "Cierra la vigente y crea otra; exige motivo.")
     @PutMapping(value = "/{id}", produces = {"application/json"}, consumes = {"application/json"})
     ResponseEntity<RespuestaRs<TarifaRs>> actualizar(@PathVariable("id") Long id, @Valid @RequestBody TarifaActualizarRq rq);
 
+    @Operation(summary = "Historial de cambios de la tarifa de un servicio")
     @GetMapping(value = "/{id}/historial", produces = {"application/json"})
     ResponseEntity<List<TarifaHistorialRs>> historialTarifa(@PathVariable("id") Long id);
 
+    @Operation(summary = "Historial de cambios de tarifas")
     @GetMapping(value = "/historial", produces = {"application/json"})
     ResponseEntity<List<TarifaHistorialRs>> historial(@RequestParam(required = false) LocalDate desde, @RequestParam(required = false) LocalDate hasta);
 }

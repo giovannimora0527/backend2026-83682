@@ -1,5 +1,7 @@
 package com.uniminuto.clinica.api;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.uniminuto.clinica.models.CargaRs;
 import com.uniminuto.clinica.models.RespuestaRs;
 import org.springframework.http.ResponseEntity;
@@ -13,28 +15,36 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDate;
 import java.util.List;
 
+@Tag(name = "Carga masiva de inventario")
 @RequestMapping("/inventario/carga")
 public interface CargaInventarioApi {
 
+    @Operation(summary = "Descargar la plantilla")
     @GetMapping(value = "/plantilla")
     ResponseEntity<byte[]> plantilla(@RequestParam(defaultValue = "xlsx") String formato);
 
+    @Operation(summary = "Previsualizar un archivo .xlsx o .csv", description = "Valida sin escribir en inventario.")
     @PostMapping(value = "/previsualizar", produces = {"application/json"}, consumes = {"multipart/form-data"})
     ResponseEntity<CargaRs> previsualizar(@RequestPart("archivo") MultipartFile archivo);
 
+    @Operation(summary = "Historial de cargas")
     @GetMapping(value = "/historial", produces = {"application/json"})
     ResponseEntity<List<CargaRs>> historial(@RequestParam(required = false) LocalDate desde,
             @RequestParam(required = false) LocalDate hasta);
 
+    @Operation(summary = "Consultar una carga con sus filas")
     @GetMapping(value = "/{cargaId}", produces = {"application/json"})
     ResponseEntity<CargaRs> obtener(@PathVariable("cargaId") Long cargaId);
 
+    @Operation(summary = "Confirmar la carga", description = "Importa solo las filas válidas, cada una por separado.")
     @PostMapping(value = "/{cargaId}/confirmar", produces = {"application/json"})
     ResponseEntity<RespuestaRs<CargaRs>> confirmar(@PathVariable("cargaId") Long cargaId);
 
+    @Operation(summary = "Descartar la carga")
     @PostMapping(value = "/{cargaId}/descartar", produces = {"application/json"})
     ResponseEntity<RespuestaRs<CargaRs>> descartar(@PathVariable("cargaId") Long cargaId);
 
+    @Operation(summary = "Descargar el informe de errores")
     @GetMapping(value = "/{cargaId}/errores/archivo")
     ResponseEntity<byte[]> errores(@PathVariable("cargaId") Long cargaId,
             @RequestParam(defaultValue = "xlsx") String formato);

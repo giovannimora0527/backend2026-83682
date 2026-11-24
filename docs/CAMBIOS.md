@@ -79,6 +79,15 @@ El código del menú de citas es `cita`, no `citas`; la ruta sigue siendo `/inic
 - 409 por duplicado con `detalles`. Las restricciones de la base y los choques de versión también responden 409.
 - `FormulaRs` usa los nombres del frontend: `fecha`, `medicamentoCodigo`, `medicamentoNombre`.
 
+## Fase 10: Swagger, Docker y documentación
+
+- Swagger con 128 operaciones. Los roles de cada una se leen de `@PreAuthorize`; una prueba exige resumen, grupo y roles en todas.
+- `docker-compose.yml`: MySQL, Mailpit, backend y frontend. El Dockerfile y el nginx del frontend están en `deploy/frontend`; su carpeta solo se lee.
+- **Demora de MySQL:** no era MySQL ni Docker. El registro de energía de Windows muestra que el equipo se suspendió durante esos arranques (12:32–12:48 y 14:05–14:35 del 24/11/2026). Medido sin suspensión: 21 s en frío y 4 s al reiniciar. Aun así: datos en volumen de Docker, scripts solo con el volumen vacío, healthcheck por TCP y menos memoria (256 MB de buffer, sin `performance_schema` ni binlog).
+- `scripts/levantar.ps1` evita la suspensión automática mientras levanta.
+- El backend corre sin privilegios y genera su clave JWT si no se le da una.
+- `MAIL_AUTH` y `MAIL_STARTTLS` configurables; `/actuator/health` público, sin detalles.
+
 ## Fase 9: reportes
 
 - 21 reportes en vista previa, PDF y Excel. Cada uno es un bean `GeneradorReporte`: agregar otro no toca el servicio ni los exportadores.

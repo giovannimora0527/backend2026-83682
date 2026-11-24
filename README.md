@@ -1,171 +1,103 @@
 # Backend de Clínica Veterinaria
 
-API backend para la gestión de una clínica veterinaria. El proyecto expone servicios REST para usuarios, clientes, mascotas, citas, médicos, historias clínicas, fórmulas y catálogos.
+API REST para la gestión de una clínica veterinaria: usuarios y perfiles, clientes, mascotas, citas con calendario, atención médica, fórmulas, inventario con lotes y carga masiva, despacho, facturación, pagos y reportes en PDF y Excel.
 
-## Tecnologías
+**Tecnologías:** Java 21, Spring Boot 4.0.4 (Web, JPA, Security, Validation, Mail), MySQL 8, JWT, Apache POI, Commons CSV, OpenPDF, springdoc y Maven.
 
-- Java 21
-- Spring Boot 4.0.4, Spring Web y Spring Data JPA
-- MySQL Connector/J
-- Maven (incluye Maven Wrapper)
-- JUnit 5 y Spring Boot Test
-- Lombok
+## Ejecutar todo con Docker
 
-## Arquitectura
+Requisitos: Docker Desktop abierto y la carpeta del frontend junto a esta (`../frontend26-83682`). Los puertos 4200, 8080, 8025 y 3307 deben estar libres.
 
-Aplicación monolítica organizada por capas bajo `com.uniminuto.clinica`:
-
-```text
-Cliente HTTP
-    -> apicontroller (adaptadores REST)
-    -> service / serviceimpl (casos de uso y lógica)
-    -> repository (Spring Data JPA)
-    -> entity (modelo persistido)
-    -> MySQL
+```powershell
+docker compose up --build -d --wait
 ```
 
-Los contratos de endpoints están definidos en `api`; sus implementaciones están en `apicontroller`. `models` contiene objetos de solicitud/respuesta, `exception` maneja errores HTTP, `util` agrupa utilidades (OTP/JWT y contraseñas) y `config` contiene configuración de infraestructura. El envío de correo se implementa en `EmailServiceImpl`.
-
-## Componentes y servicios
-
-| Área | Responsabilidad |
+| Servicio | Dirección |
 |---|---|
-| Autenticación (`Auth*`, `Session`, `OtpToken`) | Inicio con usuario/contraseña, OTP por correo y emisión/validación de JWT |
-| Usuarios, perfiles y menús | Administración de usuarios, roles/perfiles y menús incluidos en el JWT |
-| Clientes y mascotas | Consulta de clientes y gestión/búsqueda de mascotas por cliente, raza o nombre |
-| Citas | Creación, actualización, consulta por fechas y consulta por mascota |
-| Personal y catálogos | Médicos, especializaciones, razas y medicamentos |
-| Historias clínicas | Historias médicas y anotaciones asociadas |
-| Fórmulas médicas | Consulta, creación y actualización de fórmulas |
-| Correo | Servicio SMTP para OTP y endpoint de comprobación |
-| Persistencia | Repositorios JPA para entidades de negocio, autenticación y configuración de perfiles/menús |
+| Aplicación | http://localhost:4200 |
+| Swagger | http://localhost:8080/clinica/v1/swagger-ui.html |
+| Correo de prueba (OTP) | http://localhost:8025 |
+| MySQL | `localhost:3307`, base y usuario `clinica` |
 
-Entidades principales: `Usuario`, `Perfil`, `Menu`, `Cliente`, `Mascota`, `Raza`, `Medico`, `Especializacion`, `Cita`, `HistoriaMedica`, `AnotacionHistoria`, `FormulaMedica` y `Medicamento`.
+No hace falta configurar nada: la base se crea con datos de prueba y la clave JWT se genera sola. Otros comandos:
 
-## API REST
+```powershell
+docker compose ps                  # estado
+docker compose logs -f backend     # registro
+docker compose down                # apagar, conserva los datos
+docker compose down -v             # apagar y borrar los datos
+powershell -ExecutionPolicy Bypass -File scripts\levantar.ps1 -DesdeCero   # todo desde cero, evita la suspensión y mide el tiempo
+```
 
-La aplicación usa el prefijo `/clinica/v1`. URL local base: `http://localhost:8080/clinica/v1`. Las rutas siguientes están declaradas en los contratos de `api`; los métodos que reciben cuerpos usan JSON (`Content-Type: application/json`). Los nombres y campos de cada DTO/entidad se consultan en `models` y `entity`.
+Si otro programa usa un puerto, cámbialo: `$env:BACKEND_PORT='18080'` (también `FRONTEND_PORT`, `MAILPIT_PORT` y `DB_PORT_HOST`). La primera vez descarga imágenes y dependencias; después tarda cerca de un minuto.
 
-| Recurso | Método y ruta | Función / parámetros |
+**Si el equipo se suspende, los contenedores se congelan.** Antes de una presentación: `powercfg /change standby-timeout-ac 0`.
+
+## Usuarios de prueba
+
+Datos ficticios, solo para desarrollo. El código OTP llega a Mailpit.
+
+| Usuario | Contraseña | Rol |
 |---|---|---|
-| Autenticación | `POST /auth/login` | Verifica credenciales e inicia desafío OTP |
-| | `POST /auth/validate-token` | Valida OTP y devuelve JWT |
-| | `POST /auth/cerrar-sesion` | Solicita cierre de sesión |
-| Clínica | `GET /clinica/test`, `/clinica/test2`, `/clinica/test3` | Comprobaciones de servicio |
-| Correo | `GET /email/test` | Comprobación del correo SMTP |
-| Usuarios | `GET /usuario/listar-ordenado` | Lista usuarios |
-| | `POST /usuario/guardar`, `/usuario/actualizar` | Crea o actualiza usuario |
-| Clientes | `GET /cliente/listar` | Lista clientes |
-| | `GET /cliente/buscar-por-documento?documento=...` | Busca por documento |
-| | `POST /cliente/guardar` | Crea un cliente con documento único |
-| | `POST /cliente/{id}` | Actualiza completamente los campos editables de un cliente existente |
-| Mascotas | `GET /mascota/listar`, `/mascota/listar-ordenado?ascendente=...` | Lista mascotas |
-| | `GET /mascota/buscar-nombre?nombre=...` | Busca por nombre |
-| | `GET /mascota/buscar-by-cliente?clienteId=...` | Filtra por cliente |
-| | `GET /mascota/buscar-by-raza?razaId=...` | Filtra por raza |
-| | `POST /mascota/guardar`, `/mascota/actualizar` | Crea o actualiza mascota |
-| Citas | `GET /cita/listar` | Lista citas |
-| | `GET /cita/listar-rango?fechaInicio=...&fechaFin=...` | Filtra por intervalo `LocalDateTime` |
-| | `GET /cita/listar-por-mascota?mascotaId=...` | Filtra por mascota |
-| | `POST /cita/crear`, `/cita/actualizar` | Crea o actualiza cita |
-| Médicos | `GET /medico/listar`, `/medico/listar-disponibles?fechaInicio=...&fechaFin=...` | Lista médicos o disponibilidad |
-| | `POST /medico/crear`, `/medico/actualizar` | Crea o actualiza médico |
-| Razas | `GET /raza/listar` | Lista razas |
-| | `POST /raza/guardar` | Crea raza |
-| Especializaciones | `GET /especializacion/listar` | Lista especializaciones |
-| | `POST /especializacion/crear` | Crea especialización |
-| | `PUT /especializacion/actualizar` | Actualiza especialización |
-| Medicamentos | `GET /medicamento/listar` | Lista medicamentos |
-| Historias clínicas | `GET /historia-clinica/listar` | Lista historias |
-| | `POST /historia-clinica/guardar`, `/historia-clinica/actualizar` | Crea o actualiza historia |
-| Anotaciones | `POST /anotacion-historia/crear` | Crea anotación de historia clínica |
-| Fórmulas | `GET /formula-medica/listar` | Lista fórmulas |
-| | `POST /formula-medica/guardar`, `/formula-medica/actualizar` | Crea o actualiza fórmula |
+| `admin` | `Admin2026*` | ADMINISTRADOR |
+| `secretaria` | `Secre2026*` | SECRETARIA |
+| `medico1` | `Medico2026*` | MEDICO |
+| `medico2` | `Medico2026*` | MEDICO |
+| `despacho` | `Despacho2026*` | DESPACHO_MEDICO |
 
-No hay especificación OpenAPI/Swagger configurada en las dependencias actuales.
+## Ejecutar sin Docker
 
-### Actualizacion de clientes
+Requisitos: JDK 21 y MySQL 8 con una base `clinica`.
 
-`POST /clinica/v1/cliente/{id}` recibe JSON y devuelve `200 OK` con el cliente actualizado.
-El ID debe ser positivo. `tipoDocumento` (hasta 10 caracteres), `numeroDocumento`
-(hasta 20), `nombres` y `apellidos` (hasta 100 cada uno) son obligatorios y no pueden
-estar en blanco. `fechaNacimiento` es obligatoria, usa `yyyy-MM-dd` y no admite fechas futuras.
-`genero` es opcional y, si se envia, debe ser un caracter no blanco; `telefono` admite
-hasta 20 caracteres y `direccion` es opcional.
+1. Copia `.env.example` como `.env` y complétalo. `.env` no se sube a Git.
+2. Ejecuta en orden los scripts de `db/`. En una base con datos, respáldala antes y omite el `01`:
 
-```json
-{
-  "tipoDocumento": "CC",
-  "numeroDocumento": "0012345678",
-  "nombres": "Laura",
-  "apellidos": "Morales",
-  "fechaNacimiento": "1995-06-15",
-  "genero": "F",
-  "telefono": "3001234567",
-  "direccion": "Calle 10 # 20-30"
-}
-```
+   | Script | Contenido |
+   |---|---|
+   | `01_esquema_base.sql` | Esquema inicial (solo base vacía) |
+   | `02_migracion_examen_final.sql` | Migración; se puede repetir y conserva los datos |
+   | `03_datos_iniciales.sql` | Datos de prueba |
+   | `04_horarios_medicos_existentes.sql` | Horario para médicos sin uno |
 
-Los campos opcionales omitidos o enviados como `null` borran su valor anterior:
-esta operacion no es una actualizacion parcial. Se eliminan espacios extremos de
-tipo/documento y nombres/apellidos antes de persistir. Se conservan `id`, `activo`
-y `usuarioId`, y se rechaza cualquier propiedad JSON fuera del DTO, incluidos esos
-tres campos. Tambien se permite actualizar clientes inactivos sin reactivarlos.
+3. Inicia con una de estas opciones:
 
-Errores: `400` para entrada invalida, `404` para cliente inexistente y `409` para
-documento asociado a otro cliente. Se permite conservar el documento actual.
-La actualizacion es transaccional; los conflictos concurrentes de integridad se
-reclasifican como duplicados solo si, despues de terminar la transaccion, se encuentra
-otro cliente con ese documento. Otros errores de integridad no se ocultan como conflictos.
-La garantia frente a documentos duplicados requiere la restriccion unica fisica:
-las anotaciones JPA la declaran, pero no se incluyen migraciones que acrediten el esquema desplegado.
+   ```powershell
+   .\mvnw.cmd spring-boot:run
+   # En segundo plano y con el correo en Mailpit (-Parar para detenerlo):
+   powershell -ExecutionPolicy Bypass -File scripts\iniciar-dev.ps1
+   ```
 
-## Configuración
+## Variables de entorno
 
-Las credenciales se toman de variables de entorno. En `dev`, copia `.env.example` como `.env` y complétalo; en `prod`, define las variables en el entorno. `JWT_SECRET` debe ser Base64 de al menos 64 bytes aleatorios.
+| Variable | Uso |
+|---|---|
+| `DB_URL`, `DB_USER`, `DB_PASSWORD` | Conexión a MySQL |
+| `JWT_SECRET` | Base64 de al menos 64 bytes aleatorios |
+| `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASSWORD` | Servidor de correo |
+| `MAIL_AUTH`, `MAIL_STARTTLS` | `true` por defecto; `false` con Mailpit |
+| `CORS_ORIGINS` | Orígenes permitidos, separados por coma |
 
-Antes del primer arranque, respalda la base y ejecuta en orden `db/01_esquema_base.sql` (solo si la base está vacía), `db/02_migracion_examen_final.sql` y, para datos de prueba, `db/03_datos_iniciales.sql`. `db/04_horarios_medicos_existentes.sql` da horario a los médicos que no lo tengan. Los detalles están en `docs/CAMBIOS.md`.
-
-## Ejecución local
-
-Requisitos: JDK 21, MySQL disponible y una base de datos `clinica` inicializada con el esquema requerido por las entidades. No se incluye un script de migraciones ni Docker Compose; prepara el esquema antes de iniciar.
-
-```powershell
-# Configurar las variables de entorno indicadas arriba y luego:
-.\mvnw.cmd spring-boot:run
-```
-
-Para desarrollo con correo en Mailpit: `powershell -ExecutionPolicy Bypass -File scripts\iniciar-dev.ps1` (`-Parar` para detenerlo).
-
-La aplicación inicia en `http://localhost:8080/clinica/v1`. Para crear el artefacto ejecutable:
-
-```powershell
-.\mvnw.cmd clean package
-java -jar target/clinica-0.0.1-SNAPSHOT.jar
-```
-
-Para seleccionar perfil explícitamente: `java -jar target/clinica-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod`. Revisa y completa la configuración de producción antes de usar ese perfil.
+Las de Docker Compose son opcionales y están en `.env.example`. Perfiles: `dev` (por defecto), `test`, `docker` y `prod`.
 
 ## Pruebas
-
-Ejecuta la suite con:
 
 ```powershell
 .\mvnw.cmd test
 ```
 
-La suite incluye una prueba de carga del contexto de Spring, pruebas unitarias de utilidades para JWT y OTP,
-y pruebas de servicio y HTTP de clientes con Mockito, Bean Validation y MockMvc sin una base de datos real.
-Las pruebas de clientes cubren actualizacion completa, preservacion de atributos no editables,
-documentos duplicados, entrada invalida y respuestas HTTP. Las pruebas de integracion usan el perfil `test` con H2, sin necesidad de MySQL.
+Usan H2 en memoria: no necesitan MySQL ni correo.
 
-## Seguridad y operación
+## Documentación
 
-- Todas las rutas exigen `Authorization: Bearer <JWT>`, salvo `/auth/login`, `/auth/validate-token`, `/clinica/test` y Swagger/health cuando existan.
-- El cierre de sesión invalida el token. Contraseñas en BCrypt, con migración automática desde MD5 al iniciar sesión. El OTP es de un solo uso.
-- CORS restringido a `CORS_ORIGINS`. Los permisos por rol se validan con `@PreAuthorize`.
-- Las credenciales que estuvieron versionadas deben rotarse.
+| Documento | Contenido |
+|---|---|
+| [docs/evidencias.md](docs/evidencias.md) | Guion de la sustentación |
+| [docs/arquitectura.md](docs/arquitectura.md) | Contenedores, capas y flujos |
+| [docs/modelo-datos.md](docs/modelo-datos.md) | Diagrama, tablas, relaciones y justificación |
+| [docs/reglas-negocio.md](docs/reglas-negocio.md) | Reglas y dónde se validan |
+| [docs/api.md](docs/api.md) | Ejemplos JSON y tabla de endpoints |
+| [docs/CAMBIOS.md](docs/CAMBIOS.md) | Cambios, decisiones y desviaciones del contrato |
 
-## Despliegue
+## Seguridad
 
-Empaqueta como JAR con Java 21 y Maven Wrapper, provisiona MySQL y aplica el esquema compatible, configura las variables de entorno seguras, activa el perfil requerido y ejecuta el JAR detrás de un proxy con HTTPS. Configura supervisión de proceso, logs con redacción de datos sensibles, respaldos y estrategia de migración de base de datos. No hay imagen Docker, pipeline CI/CD, migraciones versionadas ni manifiestos de infraestructura incluidos en el repositorio.
+Las credenciales que estuvieron en versiones anteriores del repositorio siguen en el historial de Git: deben rotarse. Los usuarios y contraseñas de prueba no deben usarse en producción.

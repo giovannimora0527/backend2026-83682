@@ -1,5 +1,7 @@
 package com.uniminuto.clinica.api;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.uniminuto.clinica.entity.Cliente;
 import com.uniminuto.clinica.exception.BadRequestException;
 import com.uniminuto.clinica.models.ClienteActualizarRq;
@@ -15,14 +17,17 @@ import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
 
+@Tag(name = "Clientes")
 @RequestMapping("/cliente")
 public interface ClienteApi {
 
+    @Operation(summary = "Crear un cliente")
     @PostMapping(value = "/guardar",
             produces = {"application/json"},
             consumes = {"application/json"})
     ResponseEntity<RespuestaRs<Cliente>> crearCliente(@Valid @RequestBody ClienteActualizarRq clienteRq);
 
+    @Operation(summary = "Actualizar un cliente")
     @PostMapping(value = "/{id}",
             produces = {"application/json"},
             consumes = {"application/json"})
@@ -30,12 +35,14 @@ public interface ClienteApi {
             @PathVariable("id") Long id,
             @Valid @RequestBody ClienteActualizarRq clienteRq);
 
+    @Operation(summary = "Listar clientes")
     @GetMapping(value = "/listar",
             produces = {"application/json"})
     ResponseEntity<List<Cliente>> listarClientes()
             throws BadRequestException;
 
 
+    @Operation(summary = "Buscar un cliente por documento")
     @GetMapping(value = "/buscar-por-documento",
             produces = {"application/json"})
     ResponseEntity<Cliente> buscarClientesPorDocumento(

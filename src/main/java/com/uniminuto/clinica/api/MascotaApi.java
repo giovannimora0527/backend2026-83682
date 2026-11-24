@@ -1,5 +1,7 @@
 package com.uniminuto.clinica.api;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import com.uniminuto.clinica.entity.Mascota;
 import com.uniminuto.clinica.exception.BadRequestException;
 import com.uniminuto.clinica.models.MascotaRq;
@@ -16,6 +18,7 @@ import java.util.List;
 /**
  * API para la gestión de mascotas.
  */
+@Tag(name = "Mascotas")
 @RequestMapping("/mascota")
 public interface MascotaApi {
 
@@ -25,6 +28,7 @@ public interface MascotaApi {
      * @return Servicio funcionando correctamente.
      * @throws BadRequestException excepcion.
      */
+    @Operation(summary = "Listar mascotas")
     @GetMapping(value = "/listar",
             produces = {"application/json"})
     ResponseEntity<List<Mascota>> listarMascotas()
@@ -37,6 +41,7 @@ public interface MascotaApi {
      * @return Servicio funcionando correctamente.
      * @throws BadRequestException excepcion.
      */
+    @Operation(summary = "Listar mascotas ordenadas por nombre")
     @GetMapping(value = "/listar-ordenado",
             produces = {"application/json"})
     ResponseEntity<List<Mascota>> listarMascotasOrdenado(
@@ -50,6 +55,7 @@ public interface MascotaApi {
      * @return Servicio funcionando correctamente.
      * @throws BadRequestException excepcion.
      */
+    @Operation(summary = "Buscar mascotas por nombre")
     @GetMapping(value = "/buscar-nombre",
             produces = {"application/json"})
     ResponseEntity<List<Mascota>> buscarMascotaPorNombre(
@@ -63,6 +69,7 @@ public interface MascotaApi {
      * @return Servicio funcionando correctamente.
      * @throws BadRequestException excepcion.
      */
+    @Operation(summary = "Mascotas de un cliente")
     @GetMapping(value = "/buscar-by-cliente",
             produces = {"application/json"})
     ResponseEntity<List<Mascota>> buscarMascotaPorCliente(
@@ -75,6 +82,7 @@ public interface MascotaApi {
      * @return Servicio funcionando correctamente.
      * @throws BadRequestException excepcion.
      */
+    @Operation(summary = "Mascotas de una raza")
     @GetMapping(value = "/buscar-by-raza",
             produces = {"application/json"})
     ResponseEntity<List<Mascota>> buscarMascotaPorRaza(
@@ -88,6 +96,7 @@ public interface MascotaApi {
      * @return Servicio funcionando correctamente.
      * @throws BadRequestException excepcion.
      */
+    @Operation(summary = "Crear una mascota")
     @PostMapping(value = "/guardar",
             produces = {"application/json"},
             consumes = {"application/json"})
@@ -101,6 +110,7 @@ public interface MascotaApi {
      * @return Servicio funcionando correctamente.
      * @throws BadRequestException excepcion.
      */
+    @Operation(summary = "Actualizar una mascota")
     @PostMapping(value = "/actualizar",
             produces = {"application/json"},
             consumes = {"application/json"})

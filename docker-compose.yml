@@ -1,0 +1,103 @@
+# Levanta todo:  docker compose up --build -d --wait
+# Desde cero:    docker compose down -v   (borra los datos de los contenedores)
+# Los valores por defecto son de desarrollo; ver .env.example.
+name: clinica
+
+services:
+  db:
+    image: mysql:8.4
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_0900_ai_ci
+      - --skip-log-bin
+      - --performance-schema=OFF
+      - --innodb-buffer-pool-size=256M
+    environment:
+      TZ: America/Bogota
+      MYSQL_DATABASE: clinica
+      MYSQL_USER: clinica
+      MYSQL_PASSWORD: ${DOCKER_DB_PASSWORD:-clinica_desarrollo}
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    volumes:
+      # Datos en un volumen de Docker (no en una carpeta de Windows).
+      - datos_mysql:/var/lib/mysql
+      # Solo se ejecutan la primera vez, con el volumen vacio.
+      - ./db/01_esquema_base.sql:/docker-entrypoint-initdb.d/01_esquema_base.sql:ro
+      - ./db/02_migracion_examen_final.sql:/docker-entrypoint-initdb.d/02_migracion_examen_final.sql:ro
+      - ./db/03_datos_iniciales.sql:/docker-entrypoint-initdb.d/03_datos_iniciales.sql:ro
+      - ./db/04_horarios_medicos_existentes.sql:/docker-entrypoint-initdb.d/04_horarios_medicos_existentes.sql:ro
+    ports:
+      - "127.0.0.1:${DB_PORT_HOST:-3307}:3306"
+    healthcheck:
+      # Por TCP: el servidor temporal que ejecuta los scripts no escucha en la red.
+      test: ["CMD-SHELL", "mysqladmin ping -h127.0.0.1 -uclinica -p$$MYSQL_PASSWORD --silent"]
+      interval: 3s
+      timeout: 5s
+      retries: 60
+      start_period: 60s
+    restart: unless-stopped
+
+  mailpit:
+    image: axllent/mailpit:latest
+    environment:
+      TZ: America/Bogota
+    ports:
+      - "127.0.0.1:${MAILPIT_PORT:-8025}:8025"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/backend/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      TZ: America/Bogota
+      DB_URL: jdbc:mysql://db:3306/clinica?allowPublicKeyRetrieval=true&useSSL=false&serverTimezone=America/Bogota
+      DB_USER: clinica
+      DB_PASSWORD: ${DOCKER_DB_PASSWORD:-clinica_desarrollo}
+      # Vacio: el contenedor genera una clave y la conserva en el volumen.
+      JWT_SECRET: ${DOCKER_JWT_SECRET:-}
+      MAIL_HOST: mailpit
+      MAIL_PORT: "1025"
+      MAIL_USER: no-responder@clinica.example
+      MAIL_PASSWORD: sin-uso
+      MAIL_AUTH: "false"
+      MAIL_STARTTLS: "false"
+      CORS_ORIGINS: ${DOCKER_CORS_ORIGINS:-http://localhost:4200,http://localhost}
+    volumes:
+      - secretos:/secretos
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/clinica/v1/actuator/health || exit 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 60
+      start_period: 60s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./deploy/frontend
+      additional_contexts:
+        app: ${FRONTEND_PATH:-../frontend26-83682}
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-4200}:80"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/ || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  datos_mysql:
+  secretos:

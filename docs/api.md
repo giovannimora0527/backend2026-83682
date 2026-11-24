@@ -2,7 +2,7 @@
 
 URL base: `http://localhost:8080/clinica/v1`. Autenticación: `Authorization: Bearer <jwt>`.
 
-Solo se documentan endpoints ya implementados; cada fase agrega los suyos. Los ejemplos provienen del sistema en ejecución con los datos de prueba, salvo el de fórmulas y el OTP, escritos según el DTO.
+Los ejemplos provienen del sistema en ejecución con los datos de prueba. Al final está la tabla completa de endpoints con sus roles.
 
 ## Respuestas comunes
 
@@ -1807,3 +1807,236 @@ Rol: autenticado. Nuevos: datos de producto. `fechaCompra` y `fechaVence` son hi
   }
 ]
 ```
+
+# Todos los endpoints
+
+Tabla generada desde OpenAPI (128 operaciones). Swagger: http://localhost:8080/clinica/v1/swagger-ui.html
+
+## Atención médica
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| GET | `/atencion/cita/{citaId}` | Consultar atención, mascota, propietario y antecedentes | ADMINISTRADOR, MEDICO |
+| POST | `/atencion/iniciar/{citaId}` | Iniciar la atención de una cita | MEDICO |
+| PUT | `/atencion/{id}` | Guardar el borrador de la atención | MEDICO |
+| POST | `/atencion/{id}/finalizar` | Finalizar la atención | MEDICO |
+| GET | `/atencion/{id}/prefactura/pdf` | Descargar la prefactura en PDF | ADMINISTRADOR, MEDICO |
+
+## Autenticación
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| POST | `/auth/cerrar-sesion` | Cerrar la sesión del token | cualquier usuario autenticado |
+| POST | `/auth/login` | Iniciar sesión: verifica credenciales y envía el OTP por correo | público |
+| POST | `/auth/validate-token` | Validar el OTP y obtener el JWT | público |
+
+## Carga masiva de inventario
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| GET | `/inventario/carga/historial` | Historial de cargas | ADMINISTRADOR |
+| GET | `/inventario/carga/plantilla` | Descargar la plantilla | ADMINISTRADOR |
+| POST | `/inventario/carga/previsualizar` | Previsualizar un archivo .xlsx o .csv | ADMINISTRADOR |
+| GET | `/inventario/carga/{cargaId}` | Consultar una carga con sus filas | ADMINISTRADOR |
+| POST | `/inventario/carga/{cargaId}/confirmar` | Confirmar la carga | ADMINISTRADOR |
+| POST | `/inventario/carga/{cargaId}/descartar` | Descartar la carga | ADMINISTRADOR |
+| GET | `/inventario/carga/{cargaId}/errores/archivo` | Descargar el informe de errores | ADMINISTRADOR |
+
+## Citas y calendario
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| POST | `/cita/actualizar` | Editar una cita | ADMINISTRADOR, SECRETARIA, MEDICO |
+| GET | `/cita/calendario` | Eventos del calendario | ADMINISTRADOR, SECRETARIA, MEDICO |
+| POST | `/cita/crear` | Crear una cita | ADMINISTRADOR, SECRETARIA, MEDICO |
+| GET | `/cita/historial-mascota/{mascotaId}` | Historial de citas de una mascota, incluidas canceladas | ADMINISTRADOR, SECRETARIA, MEDICO |
+| GET | `/cita/listar` | Listar citas | ADMINISTRADOR, SECRETARIA |
+| GET | `/cita/listar-por-mascota` | Listar citas de una mascota | ADMINISTRADOR, SECRETARIA, MEDICO |
+| GET | `/cita/listar-rango` | Listar citas por rango de fechas | ADMINISTRADOR, SECRETARIA |
+| GET | `/cita/reporte/excel` | Reporte Excel de citas | ADMINISTRADOR, MEDICO |
+| GET | `/cita/resumen-estados` | Conteo de citas por estado | ADMINISTRADOR, MEDICO |
+| GET | `/cita/{id}` | Consultar una cita | ADMINISTRADOR, SECRETARIA, MEDICO |
+| PATCH | `/cita/{id}/estado` | Confirmar o cancelar una cita | ADMINISTRADOR, SECRETARIA, MEDICO |
+| GET | `/cita/{id}/historial-estados` | Historial de estados de la cita | ADMINISTRADOR, SECRETARIA, MEDICO |
+| PATCH | `/cita/{id}/reprogramar` | Reprogramar una cita | ADMINISTRADOR, SECRETARIA, MEDICO |
+
+## Clientes
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| GET | `/cliente/buscar-por-documento` | Buscar un cliente por documento | ADMINISTRADOR, SECRETARIA, MEDICO |
+| POST | `/cliente/guardar` | Crear un cliente | ADMINISTRADOR, SECRETARIA |
+| GET | `/cliente/listar` | Listar clientes | ADMINISTRADOR, SECRETARIA, MEDICO |
+| POST | `/cliente/{id}` | Actualizar un cliente | ADMINISTRADOR, SECRETARIA |
+
+## Configuración de la clínica
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| GET | `/configuracion-clinica` | Consultar la configuración | cualquier usuario autenticado |
+| PUT | `/configuracion-clinica` | Actualizar la configuración | ADMINISTRADOR |
+
+## Despacho
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| GET | `/despacho/formula/{formulaId}` | Consultar una fórmula con lotes sugeridos (FEFO) | DESPACHO_MEDICO |
+| POST | `/despacho/formula/{formulaId}/cancelar` | Cancelar el despacho de una fórmula | DESPACHO_MEDICO, ADMINISTRADOR |
+| GET | `/despacho/formula/{formulaId}/historial-estados` | Historial de estados del despacho de una fórmula | DESPACHO_MEDICO, ADMINISTRADOR |
+| POST | `/despacho/formula/{formulaId}/preparar` | Iniciar la preparación | DESPACHO_MEDICO |
+| GET | `/despacho/formulas-pendientes` | Bandeja de fórmulas pendientes | DESPACHO_MEDICO |
+| GET | `/despacho/historial` | Historial de despachos | DESPACHO_MEDICO, ADMINISTRADOR |
+| GET | `/despacho/medicamento/{medicamentoId}/historial` | Historial de dispensaciones de un medicamento | DESPACHO_MEDICO, ADMINISTRADOR |
+| GET | `/despacho/{despachoId}/comprobante/pdf` | Descargar el comprobante en PDF | DESPACHO_MEDICO, ADMINISTRADOR |
+| POST | `/despacho/{despachoId}/confirmar` | Confirmar el despacho | DESPACHO_MEDICO |
+| POST | `/despacho/{despachoId}/liberar` | Liberar una preparación sin entregar | DESPACHO_MEDICO, ADMINISTRADOR |
+| POST | `/despacho/{despachoId}/revertir` | Revertir un despacho confirmado | ADMINISTRADOR |
+
+## Especialidades
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| PUT | `/especializacion/actualizar` | Actualizar una especialidad | ADMINISTRADOR |
+| POST | `/especializacion/crear` | Crear una especialidad | ADMINISTRADOR |
+| GET | `/especializacion/listar` | Listar especialidades | cualquier usuario autenticado |
+| PATCH | `/especializacion/{id}/estado` | Activar o inactivar una especialidad | ADMINISTRADOR |
+
+## Facturación y pagos
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| GET | `/factura/citas-pendientes` | Citas atendidas por facturar | ADMINISTRADOR, SECRETARIA |
+| GET | `/factura/cliente/{clienteId}` | Facturas de un cliente | ADMINISTRADOR, SECRETARIA |
+| POST | `/factura/generar` | Generar la factura | ADMINISTRADOR, SECRETARIA |
+| GET | `/factura/listar` | Listar facturas | ADMINISTRADOR, SECRETARIA |
+| GET | `/factura/mascota/{mascotaId}` | Facturas de una mascota | ADMINISTRADOR, SECRETARIA |
+| GET | `/factura/previsualizar/{citaId}` | Previsualizar la factura de una cita | ADMINISTRADOR, SECRETARIA |
+| GET | `/factura/{id}` | Consultar una factura con renglones y pagos | ADMINISTRADOR, SECRETARIA |
+| POST | `/factura/{id}/anular` | Anular una factura | ADMINISTRADOR |
+| GET | `/factura/{id}/historial-estados` | Historial de estados de la factura | ADMINISTRADOR, SECRETARIA |
+| GET | `/factura/{id}/pagos` | Listar los pagos de una factura | ADMINISTRADOR, SECRETARIA |
+| POST | `/factura/{id}/pagos` | Registrar un pago | ADMINISTRADOR, SECRETARIA |
+| GET | `/factura/{id}/pdf` | Descargar la factura en PDF | ADMINISTRADOR, SECRETARIA |
+
+## Fórmulas médicas
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| POST | `/formula-medica/actualizar` | Retirado: responde 410 | MEDICO |
+| GET | `/formula-medica/cita/{citaId}` | Fórmulas de una cita | ADMINISTRADOR, MEDICO |
+| POST | `/formula-medica/crear` | Crear una fórmula en borrador | MEDICO |
+| POST | `/formula-medica/guardar` | Retirado: responde 410 | MEDICO |
+| GET | `/formula-medica/listar` | Listar fórmulas | ADMINISTRADOR, MEDICO |
+| GET | `/formula-medica/{id}` | Consultar una fórmula | ADMINISTRADOR, MEDICO, DESPACHO_MEDICO |
+| PUT | `/formula-medica/{id}` | Editar una fórmula en borrador | MEDICO |
+| POST | `/formula-medica/{id}/anular` | Anular la fórmula | ADMINISTRADOR, MEDICO |
+| POST | `/formula-medica/{id}/confirmar` | Confirmar la fórmula | MEDICO |
+| GET | `/formula-medica/{id}/pdf` | Descargar la fórmula en PDF | ADMINISTRADOR, MEDICO, DESPACHO_MEDICO |
+
+## Historias clínicas
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| POST | `/anotacion-historia/crear` | Crear una anotación en la historia clínica | MEDICO |
+| POST | `/historia-clinica/actualizar` | Actualizar una historia clínica | ADMINISTRADOR, MEDICO |
+| POST | `/historia-clinica/guardar` | Crear una historia clínica | ADMINISTRADOR, MEDICO |
+| GET | `/historia-clinica/listar` | Listar historias con anotaciones y fórmulas | ADMINISTRADOR, MEDICO |
+
+## Impuestos
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| POST | `/impuesto/crear` | Crear un impuesto | ADMINISTRADOR |
+| GET | `/impuesto/listar` | Listar impuestos | cualquier usuario autenticado |
+| PUT | `/impuesto/{id}` | Actualizar un impuesto | ADMINISTRADOR |
+
+## Inventario
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| GET | `/inventario/alertas` | Conteo de alertas | ADMINISTRADOR, DESPACHO_MEDICO |
+| GET | `/inventario/disponibilidad/{medicamentoId}` | Disponibilidad vigente de un producto | ADMINISTRADOR, DESPACHO_MEDICO, MEDICO |
+| GET | `/inventario/movimientos` | Movimientos de inventario | ADMINISTRADOR, DESPACHO_MEDICO |
+| GET | `/inventario/productos` | Listar productos | ADMINISTRADOR, DESPACHO_MEDICO, MEDICO |
+| POST | `/inventario/productos` | Crear un producto, con lote inicial opcional | ADMINISTRADOR |
+| GET | `/inventario/productos/{id}` | Consultar un producto con sus lotes | ADMINISTRADOR, DESPACHO_MEDICO, MEDICO |
+| PUT | `/inventario/productos/{id}` | Actualizar un producto | ADMINISTRADOR |
+| POST | `/inventario/productos/{id}/ajustes` | Ajustar existencias con motivo | ADMINISTRADOR |
+| PATCH | `/inventario/productos/{id}/estado` | Activar o inactivar un producto | ADMINISTRADOR |
+| GET | `/inventario/productos/{id}/lotes` | Listar lotes de un producto | ADMINISTRADOR, DESPACHO_MEDICO |
+| POST | `/inventario/productos/{id}/lotes` | Registrar una entrada por compra | ADMINISTRADOR |
+| GET | `/inventario/productos/{id}/movimientos` | Movimientos de un producto | ADMINISTRADOR, DESPACHO_MEDICO |
+| GET | `/medicamento/listar` | Listar medicamentos | cualquier usuario autenticado |
+
+## Mascotas
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| POST | `/mascota/actualizar` | Actualizar una mascota | ADMINISTRADOR, SECRETARIA |
+| GET | `/mascota/buscar-by-cliente` | Mascotas de un cliente | ADMINISTRADOR, SECRETARIA, MEDICO |
+| GET | `/mascota/buscar-by-raza` | Mascotas de una raza | ADMINISTRADOR, SECRETARIA, MEDICO |
+| GET | `/mascota/buscar-nombre` | Buscar mascotas por nombre | ADMINISTRADOR, SECRETARIA, MEDICO |
+| POST | `/mascota/guardar` | Crear una mascota | ADMINISTRADOR, SECRETARIA |
+| GET | `/mascota/listar` | Listar mascotas | ADMINISTRADOR, SECRETARIA, MEDICO |
+| GET | `/mascota/listar-ordenado` | Listar mascotas ordenadas por nombre | ADMINISTRADOR, SECRETARIA, MEDICO |
+| POST | `/raza/guardar` | Crear una raza | ADMINISTRADOR, SECRETARIA |
+| GET | `/raza/listar` | Listar razas | ADMINISTRADOR, SECRETARIA, MEDICO |
+
+## Médicos y horarios
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| POST | `/medico/actualizar` | Actualizar un médico | ADMINISTRADOR, SECRETARIA |
+| POST | `/medico/crear` | Crear un médico | ADMINISTRADOR, SECRETARIA |
+| GET | `/medico/listar` | Listar médicos | ADMINISTRADOR, SECRETARIA, MEDICO |
+| GET | `/medico/listar-disponibles` | Médicos disponibles en un rango | ADMINISTRADOR, SECRETARIA, MEDICO |
+| GET | `/medico/mis-horarios` | Horarios del médico autenticado | MEDICO |
+| GET | `/medico/{id}/horarios` | Horarios de un médico | ADMINISTRADOR, SECRETARIA, MEDICO |
+| PUT | `/medico/{id}/horarios` | Reemplazar los horarios de un médico | ADMINISTRADOR, SECRETARIA |
+
+## Reportes
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| GET | `/reporte/catalogo` | Catálogo de reportes y sus filtros | ADMINISTRADOR |
+| GET | `/reporte/{codigo}` | Vista previa de un reporte | ADMINISTRADOR |
+| GET | `/reporte/{codigo}/exportar` | Exportar un reporte a PDF o Excel | ADMINISTRADOR |
+
+## Servicio
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| GET | `/clinica/test` | Comprobar que el servicio responde | público |
+| GET | `/clinica/test2` | Comprobación con sesión | cualquier usuario autenticado |
+| GET | `/clinica/test3` | Comprobación con sesión y respuesta JSON | cualquier usuario autenticado |
+| GET | `/email/test` | Enviar un correo de prueba | ADMINISTRADOR |
+
+## Servicios
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| POST | `/servicio/crear` | Crear un servicio | ADMINISTRADOR |
+| GET | `/servicio/listar` | Listar servicios con su tarifa vigente | cualquier usuario autenticado |
+| PUT | `/servicio/{id}` | Actualizar un servicio | ADMINISTRADOR |
+| PATCH | `/servicio/{id}/estado` | Activar o inactivar un servicio | ADMINISTRADOR |
+
+## Tarifas
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| POST | `/tarifa/crear` | Crear la tarifa de un servicio | ADMINISTRADOR |
+| GET | `/tarifa/historial` | Historial de cambios de tarifas | cualquier usuario autenticado |
+| GET | `/tarifa/listar` | Listar tarifas | cualquier usuario autenticado |
+| PUT | `/tarifa/{id}` | Cambiar una tarifa | ADMINISTRADOR |
+| GET | `/tarifa/{id}/historial` | Historial de cambios de la tarifa de un servicio | cualquier usuario autenticado |
+
+## Usuarios y perfiles
+
+| Método | Ruta | Descripción | Roles |
+|---|---|---|---|
+| GET | `/perfil/listar` | Listar perfiles | ADMINISTRADOR |
+| POST | `/usuario/actualizar` | Actualizar un usuario | ADMINISTRADOR |
+| POST | `/usuario/guardar` | Crear un usuario | ADMINISTRADOR |
+| GET | `/usuario/listar-ordenado` | Listar usuarios | ADMINISTRADOR |
+| PATCH | `/usuario/{id}/estado` | Activar o inactivar un usuario | ADMINISTRADOR |
+
