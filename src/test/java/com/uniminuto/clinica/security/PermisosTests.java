@@ -225,8 +225,9 @@ class PermisosTests {
         cita.setMascota(mascotas.save(mascota));
         cita.setCliente(mascota.getCliente());
         cita.setMedico(medico);
-        cita.setFechaHora(LocalDate.now().plusDays(2).atTime(9, 0));
-        cita.setEstado("PROGRAMADA");
+        cita.setFechaInicio(LocalDate.now().plusDays(2).atTime(9, 0));
+        cita.setFechaFin(cita.getFechaInicio().plusMinutes(30));
+        cita.setEstado(com.uniminuto.clinica.entity.enums.EstadoCita.PROGRAMADA);
         cita.setMotivo("Control");
         return citas.save(cita);
     }

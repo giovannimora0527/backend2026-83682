@@ -96,6 +96,7 @@ public class ClienteServiceImpl implements ClienteService {
         cliente.setFechaNacimiento(clienteRq.getFechaNacimiento());
         cliente.setGenero(clienteRq.getGenero());
         cliente.setTelefono(clienteRq.getTelefono());
+        cliente.setCorreo(clienteRq.getCorreo());
         cliente.setDireccion(clienteRq.getDireccion());
     }
 

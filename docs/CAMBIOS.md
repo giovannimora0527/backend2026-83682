@@ -4,7 +4,7 @@
 
 ### Pasos obligatorios antes de ejecutar
 
-1. Respaldar la base `clinica` y ejecutar una sola vez `db/02_migracion_examen_final.sql`. Sin ella no se puede iniciar sesión.
+1. Respaldar la base `clinica` y ejecutar `db/02_migracion_examen_final.sql` (repetible) y, si se quieren datos de prueba, `db/03_datos_iniciales.sql`. Sin la migración no se puede iniciar sesión.
 2. Copiar `.env.example` como `.env` en la raíz del backend y completarlo (en `dev` se carga automáticamente; en `prod` se usan variables de entorno reales).
 3. **Rotar las credenciales filtradas.** La contraseña de correo, la de la base de datos y la clave JWT siguen en el historial de Git. Quitarlas del código no las invalida: hay que cambiarlas en Gmail y en MySQL y generar otro `JWT_SECRET`.
 
@@ -55,7 +55,21 @@
 - `/medico/listar-disponibles` todavía recibe `fechaInicio` y `fechaFin`; pasará a `inicio` y `fin` (fase 5).
 - 200 de DESPACHO_MEDICO en `GET /inventario/productos`: se prueba en la fase 4, cuando exista.
 
+## Fase 3: modelo de datos
+
+- Scripts `db/01` a `db/03`, repetibles. Probados en MySQL 8.4 sobre una base nueva y sobre una copia de la base existente. `ddl-auto=validate` en `dev` y `prod`.
+- 21 tablas nuevas con sus entidades y repositorios. Detalle y justificación en `modelo-datos.md`.
+- Evidencias: `db/evidencias/carga_inventario_60.xlsx` y `.csv`. Errores en las filas 11 (precio negativo), 21 (código de 7 caracteres), 32 (sin Invima), 41 (vence antes de la compra) y 51 (repite la fila 50).
+- `/formula-medica/listar` devuelve encabezados con `detalles`. `guardar` y `actualizar` responden 410 hasta que el frontend use `crear` y `PUT /{id}` (fase 6).
+- Las citas exponen `fechaInicio`, `fechaFin`, `servicio` y `version`, y conservan `fechaHora`. `CitaRq` acepta `fechaInicio` o `fechaHora`.
+- `cliente.correo` nuevo, opcional.
+- Médicos disponibles: se descartan por cualquier cita no cancelada que se cruce, no solo las `PROGRAMADA`.
+
 ## Desviaciones del contrato
+
+- `factura_detalle.despacho_detalle_id` no es `UNIQUE` simple: impediría volver a facturar tras anular. Se permite un solo renglón vigente por entrega.
+- `formula_medica` conserva `fecha_actualizacion_registro` en lugar de `fecha_modificacion_registro`.
+- `medicoId` se omite del JWT, en vez de ir como `null`, cuando el usuario no es médico.
 
 - El JWT agrega el claim `jti`, que C3 no lista pero la sección 4 exige.
 - Los menús del JWT incluyen, además de `code`, `name` y `activo`, los campos que el frontend actual exige (`menuId`, `title`, `url`, `icon`, `fechaCreacion`, `fechaModificacion`). Al migrar el frontend a C3 se pueden quitar.

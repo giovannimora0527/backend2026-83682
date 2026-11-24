@@ -21,9 +21,12 @@ public class Especializacion {
     @Column(name = "nombre")
     private String nombre;
 
-    @Column(name = "descripcion")
+    @Column(name = "descripcion", columnDefinition = "TEXT")
     private String descripcion;
 
     @Column(name = "codigo_especializacion")
     private String codigoEspecializacion;
+
+    @Column(name = "activo", nullable = false)
+    private Boolean activo = true;
 }

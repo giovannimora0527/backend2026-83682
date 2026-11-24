@@ -1,14 +1,11 @@
 package com.uniminuto.clinica.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.uniminuto.clinica.entity.enums.EstadoCita;
+import jakarta.persistence.*;
 import lombok.Data;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
@@ -34,12 +31,53 @@ public class Cita {
     @JoinColumn(name = "medico_id", nullable = false)
     private Medico medico;
 
-    @Column(name = "fecha_hora", nullable = false)
-    private LocalDateTime fechaHora;
+    @Column(name = "fecha_inicio", nullable = false)
+    private LocalDateTime fechaInicio;
 
+    @Column(name = "fecha_fin", nullable = false)
+    private LocalDateTime fechaFin;
+
+    @ManyToOne
+    @JoinColumn(name = "servicio_id")
+    private Servicio servicio;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "estado", nullable = false, length = 20)
-    private String estado;
+    private EstadoCita estado;
 
     @Column(name = "motivo", columnDefinition = "TEXT")
     private String motivo;
+
+    @Column(name = "motivo_cancelacion", length = 255)
+    private String motivoCancelacion;
+
+    @Column(name = "usuario_creacion_id")
+    private Long usuarioCreacionId;
+
+    @Column(name = "fecha_creacion_registro", nullable = false, updatable = false)
+    private LocalDateTime fechaCreacionRegistro;
+
+    @Column(name = "fecha_modificacion_registro")
+    private LocalDateTime fechaModificacionRegistro;
+
+    @Version
+    @Column(name = "version", nullable = false)
+    private Integer version;
+
+    /** Nombre anterior de fechaInicio, para los consumidores actuales del API. */
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    public LocalDateTime getFechaHora() {
+        return fechaInicio;
+    }
+
+    @PrePersist
+    void alCrear() {
+        fechaCreacionRegistro = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    void alModificar() {
+        fechaModificacionRegistro = LocalDateTime.now();
+    }
 }

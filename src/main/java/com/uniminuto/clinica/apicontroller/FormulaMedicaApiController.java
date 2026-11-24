@@ -1,9 +1,8 @@
 package com.uniminuto.clinica.apicontroller;
 
 import com.uniminuto.clinica.api.FormulaMedicaApi;
-import com.uniminuto.clinica.entity.FormulaMedica;
-import com.uniminuto.clinica.exception.BadRequestException;
-import com.uniminuto.clinica.models.FormulaRq;
+import com.uniminuto.clinica.exception.GoneException;
+import com.uniminuto.clinica.models.FormulaRs;
 import com.uniminuto.clinica.models.MiRespuestaRS;
 import com.uniminuto.clinica.service.FormulaService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,19 +20,19 @@ public class FormulaMedicaApiController implements FormulaMedicaApi {
 
     @Override
     @PreAuthorize("hasAnyRole('ADMINISTRADOR', 'MEDICO')")
-    public ResponseEntity<List<FormulaMedica>> listarFormulas() {
-        return ResponseEntity.ok(this.formulaService.findAllFormulas());
+    public ResponseEntity<List<FormulaRs>> listarFormulas() {
+        return ResponseEntity.ok(this.formulaService.listar());
     }
 
     @Override
     @PreAuthorize("hasRole('MEDICO')")
-    public ResponseEntity<MiRespuestaRS> guardarFormula(FormulaRq formulaRq) throws BadRequestException {
-        return ResponseEntity.ok(this.formulaService.guardarFormula(formulaRq));
+    public ResponseEntity<MiRespuestaRS> guardarFormula() {
+        throw new GoneException("Use POST /formula-medica/crear.");
     }
 
     @Override
     @PreAuthorize("hasRole('MEDICO')")
-    public ResponseEntity<MiRespuestaRS> actualizarFormula(FormulaRq formulaRq) throws BadRequestException {
-        return ResponseEntity.ok(this.formulaService.actualizarFormula(formulaRq));
+    public ResponseEntity<MiRespuestaRS> actualizarFormula() {
+        throw new GoneException("Use PUT /formula-medica/{id}.");
     }
 }

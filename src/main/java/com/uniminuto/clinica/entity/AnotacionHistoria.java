@@ -23,7 +23,8 @@ public class AnotacionHistoria {
     @ManyToOne
     private Medico medico;
 
-    @JoinColumn(name = "cita_id", nullable = false)
+    /** Nula solo en anotaciones anteriores a la migracion. */
+    @JoinColumn(name = "cita_id")
     @ManyToOne
     private Cita cita;
 

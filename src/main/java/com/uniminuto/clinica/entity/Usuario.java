@@ -26,7 +26,7 @@ public class Usuario {
 
     /** * Rol del usuario. */
     @ManyToOne
-    @JoinColumn(name = "rol", nullable = false)
+    @JoinColumn(name = "perfil_id", nullable = false)
     private Perfil perfil;
 
     /** * Fecha de creación del usuario. */

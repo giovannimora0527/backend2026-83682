@@ -60,7 +60,6 @@ class Fase1IntegracionTests {
     @Autowired CitaService citaService;
     @Autowired UsuarioService usuarioService;
     @Autowired EspecializacionService especializacionService;
-    @Autowired FormulaService formulaService;
     @MockitoBean EmailService emailService;
 
     private MockMvc mvc;
@@ -289,11 +288,12 @@ class Fase1IntegracionTests {
     }
 
     @Test
-    void formulaSinMedicamentoSeRechaza() {
-        FormulaRq rq = new FormulaRq();
-        rq.setCitaId(1L);
-        BadRequestException ex = assertThrows(BadRequestException.class, () -> formulaService.guardarFormula(rq));
-        assertTrue(ex.getMessage().contains("medicamento"));
+    void endpointsAntiguosDeFormulaResponden410() throws Exception {
+        Perfil perfil = usuario.getPerfil();
+        perfil.setCodigo("MEDICO");
+        perfiles.save(perfil);
+        mvc.perform(post("/formula-medica/guardar").header("Authorization", "Bearer " + iniciarSesion()))
+                .andExpect(status().isGone());
     }
 
     private void autenticar() {

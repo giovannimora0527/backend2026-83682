@@ -14,23 +14,20 @@ import java.util.List;
 @Repository
 public interface CitaRepository extends JpaRepository<Cita, Long> {
 
-    List<Cita> findByFechaHoraBetween(LocalDateTime fechaInicio, LocalDateTime fechaFin);
+    List<Cita> findByFechaInicioBetween(LocalDateTime fechaInicio, LocalDateTime fechaFin);
 
-    /**
-     * Indica si el medico o la mascota tienen una cita no cancelada que se cruza con la nueva. Como todas duran
-     * lo mismo, se cruzan si la existente empieza despues de (inicio - duracion) y antes de (inicio + duracion).
-     */
+    /** Indica si el medico o la mascota tienen una cita no cancelada que se cruza con el rango. */
     @Query("""
             SELECT COUNT(c) > 0 FROM Cita c
             WHERE (c.medico = :medico OR c.mascota = :mascota)
-              AND UPPER(c.estado) <> 'CANCELADA'
-              AND c.fechaHora > :desde AND c.fechaHora < :hasta
+              AND c.estado <> com.uniminuto.clinica.entity.enums.EstadoCita.CANCELADA
+              AND c.fechaInicio < :fin AND c.fechaFin > :inicio
               AND (:idExcluido IS NULL OR c.id <> :idExcluido)
             """)
     boolean existeSolapamiento(@Param("medico") Medico medico, @Param("mascota") Mascota mascota,
-                               @Param("desde") LocalDateTime desde, @Param("hasta") LocalDateTime hasta,
+                               @Param("inicio") LocalDateTime inicio, @Param("fin") LocalDateTime fin,
                                @Param("idExcluido") Long idExcluido);
 
-    List<Cita> findByMascotaOrderByFechaHoraDesc(Mascota mascota);
+    List<Cita> findByMascotaOrderByFechaInicioDesc(Mascota mascota);
 
 }

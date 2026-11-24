@@ -1,7 +1,6 @@
 package com.uniminuto.clinica.serviceimpl;
 
 import com.uniminuto.clinica.entity.HistoriaMedica;
-import com.uniminuto.clinica.entity.FormulaMedica;
 import com.uniminuto.clinica.entity.Mascota;
 import com.uniminuto.clinica.exception.BadRequestException;
 import com.uniminuto.clinica.exception.ConflictException;
@@ -12,7 +11,8 @@ import com.uniminuto.clinica.models.HistoriaMedicaRs;
 import com.uniminuto.clinica.models.MiRespuestaRS;
 import com.uniminuto.clinica.repository.AnotacionHistoriaRepository;
 import com.uniminuto.clinica.repository.HistoriaMedicaRepository;
-import com.uniminuto.clinica.repository.FormulaMedicaRepository;
+import com.uniminuto.clinica.models.FormulaRs;
+import com.uniminuto.clinica.service.FormulaService;
 import com.uniminuto.clinica.repository.MascotaRepository;
 import com.uniminuto.clinica.service.HistoriaService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,7 +39,7 @@ public class HistoriaServiceImpl implements HistoriaService {
     private AnotacionHistoriaRepository anotacionHistoriaRepository;
 
     @Autowired
-    private FormulaMedicaRepository formulaMedicaRepository;
+    private FormulaService formulaService;
 
     @Override
     public List<HistoriaMedicaRs> getAllHistorias() {
@@ -63,9 +63,8 @@ public class HistoriaServiceImpl implements HistoriaService {
                 .map(cita -> cita.getId())
                 .distinct().toList();
         if (!citaIds.isEmpty()) {
-            Map<Long, List<FormulaMedica>> formulasPorCita = formulaMedicaRepository
-                    .findByCita_IdInOrderByFechaCreacionRegistroDesc(citaIds).stream()
-                    .collect(Collectors.groupingBy(formula -> formula.getCita().getId()));
+            Map<Long, List<FormulaRs>> formulasPorCita = formulaService.listarPorCitas(citaIds).stream()
+                    .collect(Collectors.groupingBy(FormulaRs::citaId));
             anotaciones.stream().filter(anotacion -> anotacion.getCita() != null)
                     .forEach(anotacion -> anotacion.setFormulasMedicas(
                             formulasPorCita.getOrDefault(anotacion.getCita().getId(), List.of())));

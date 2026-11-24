@@ -34,6 +34,11 @@ public class GlobalExceptionHandler {
         return responder(HttpStatus.CONFLICT, ex.getMessage());
     }
 
+    @ExceptionHandler(GoneException.class)
+    public ResponseEntity<ErrorResponse> handleGone(GoneException ex) {
+        return responder(HttpStatus.GONE, ex.getMessage());
+    }
+
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ErrorResponse> handleBadRequest(BadRequestException ex) {
         return responder(ex.getStatus(), ex.getMessage());

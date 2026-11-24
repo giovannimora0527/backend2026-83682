@@ -32,8 +32,6 @@ public class MedicoServiceImpl implements MedicoService {
     @Autowired
     private EspecializacionRepository especializacionRepository;
 
-    private static final String ESTADO_CITA = "PROGRAMADA";
-
     @Override
     public List<Medico> listarMedicos() {
         return this.medicoRepository.findAll().stream().sorted((m1, m2) -> m1.getApellidos()
@@ -51,7 +49,7 @@ public class MedicoServiceImpl implements MedicoService {
             throw new BadRequestException("La fecha de inicio no puede ser mayor a la fecha de fin");
         }
 
-        return this.medicoRepository.findDisponiblesPorFecha(fechaInicio, fechaFin, ESTADO_CITA);
+        return this.medicoRepository.findDisponiblesPorFecha(fechaInicio, fechaFin);
     }
 
     @Override

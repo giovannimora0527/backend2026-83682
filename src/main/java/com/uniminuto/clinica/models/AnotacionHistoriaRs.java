@@ -2,7 +2,6 @@ package com.uniminuto.clinica.models;
 
 import com.uniminuto.clinica.entity.AnotacionHistoria;
 import com.uniminuto.clinica.entity.Cita;
-import com.uniminuto.clinica.entity.FormulaMedica;
 import com.uniminuto.clinica.entity.HistoriaMedica;
 import com.uniminuto.clinica.entity.Medico;
 import lombok.Data;
@@ -20,7 +19,7 @@ public class AnotacionHistoriaRs {
     private String descripcion;
     private String diagnostico;
     private String observaciones;
-    private List<FormulaMedica> formulasMedicas = List.of();
+    private List<FormulaRs> formulasMedicas = List.of();
 
     public AnotacionHistoriaRs(AnotacionHistoria anotacion) {
         this.id = anotacion.getId();

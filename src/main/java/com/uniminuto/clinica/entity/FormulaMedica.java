@@ -1,43 +1,93 @@
 package com.uniminuto.clinica.entity;
 
+import com.uniminuto.clinica.entity.enums.EstadoDespacho;
+import com.uniminuto.clinica.entity.enums.EstadoFormula;
 import jakarta.persistence.*;
-import lombok.Data;
+import lombok.Getter;
+import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
+/** Encabezado de la formula; los medicamentos estan en FormulaMedicaDetalle. */
 @Entity
 @Table(name = "formula_medica")
-@Data
+@Getter
+@Setter
 public class FormulaMedica {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id", nullable = false, updatable = false)
     private Long id;
 
-    @ManyToOne
+    /** Se asigna al confirmar. */
+    @Column(name = "numero", unique = true, length = 20)
+    private String numero;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "cita_id", nullable = false)
     private Cita cita;
 
-    @ManyToOne
-    @JoinColumn(name = "medicamento_id", nullable = false)
-    private Medicamento medicamento;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "atencion_id")
+    private AtencionMedica atencion;
 
-    @Column(name = "dosis", nullable = false, columnDefinition = "TEXT")
-    private String dosis;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "medico_id", nullable = false)
+    private Medico medico;
 
-    @Column(name = "indicaciones", columnDefinition = "TEXT")
-    private String indicaciones;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "mascota_id", nullable = false)
+    private Mascota mascota;
 
-    @Column(name = "fecha_creacion_registro", nullable = false)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "cliente_id", nullable = false)
+    private Cliente cliente;
+
+    @Column(name = "fecha_generacion", nullable = false)
+    private LocalDateTime fechaGeneracion;
+
+    @Column(name = "indicaciones_generales", columnDefinition = "TEXT")
+    private String indicacionesGenerales;
+
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "estado_formula", nullable = false, length = 30)
+    private EstadoFormula estadoFormula;
+
+    /** Nulo mientras la formula es un borrador. */
+    @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "estado_despacho", length = 30)
+    private EstadoDespacho estadoDespacho;
+
+    @Column(name = "fecha_confirmacion")
+    private LocalDateTime fechaConfirmacion;
+
+    @Column(name = "motivo_anulacion", length = 500)
+    private String motivoAnulacion;
+
+    @Column(name = "fecha_creacion_registro", nullable = false, updatable = false)
     private LocalDateTime fechaCreacionRegistro;
 
     @Column(name = "fecha_actualizacion_registro")
     private LocalDateTime fechaActualizacionRegistro;
 
-    @Column(name = "frecuencia")
-    private String frecuencia;
+    @Version
+    @Column(name = "version", nullable = false)
+    private Integer version;
 
-    @Column(name = "duracion")
-    private String duracion;
+    @PrePersist
+    void alCrear() {
+        fechaCreacionRegistro = LocalDateTime.now();
+        if (fechaGeneracion == null) {
+            fechaGeneracion = fechaCreacionRegistro;
+        }
+    }
+
+    @PreUpdate
+    void alModificar() {
+        fechaActualizacionRegistro = LocalDateTime.now();
+    }
 }

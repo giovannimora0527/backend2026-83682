@@ -43,6 +43,9 @@ public class Cliente {
     @Column(name = "telefono", length = 20)
     private String telefono;
 
+    @Column(name = "correo", length = 255)
+    private String correo;
+
     @Column(name = "direccion", columnDefinition = "TEXT")
     private String direccion;
 

@@ -1,0 +1,61 @@
+﻿codigo,nombre,tipo_producto,descripcion,presentacion,unidad_medida,requiere_invima,registro_invima,precio_compra,precio_venta,porcentaje_iva,stock_minimo,numero_lote,cantidad,fecha_compra,fecha_vencimiento,fecha_proximo_pedido
+EVI00001,Producto evidencia 01,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E001,510,915,0,10,LEV001,21,2026-10-01,2028-06-30,2027-01-15
+EVI00002,Producto evidencia 02,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E002,520,930,0,10,LEV002,22,2026-10-01,2028-06-30,2027-01-15
+EVI00003,Producto evidencia 03,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E003,530,945,0,10,LEV003,23,2026-10-01,2028-06-30,2027-01-15
+EVI00004,Producto evidencia 04,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E004,540,960,0,10,LEV004,24,2026-10-01,2028-06-30,2027-01-15
+EVI00005,Producto evidencia 05,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E005,550,975,0,10,LEV005,25,2026-10-01,2028-06-30,2027-01-15
+EVI00006,Producto evidencia 06,INSUMO,Dato ficticio de evidencia,Caja x 10,unidad,NO,,560,990,19,10,LEV006,26,2026-10-01,,2027-01-15
+EVI00007,Producto evidencia 07,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E007,570,1005,0,10,LEV007,27,2026-10-01,2028-06-30,2027-01-15
+EVI00008,Producto evidencia 08,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E008,580,1020,0,10,LEV008,28,2026-10-01,2028-06-30,2027-01-15
+EVI00009,Producto evidencia 09,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E009,590,1035,0,10,LEV009,29,2026-10-01,2028-06-30,2027-01-15
+EVI00010,Producto evidencia 10,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E010,600,-100,0,10,LEV010,30,2026-10-01,2028-06-30,2027-01-15
+EVI00011,Producto evidencia 11,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E011,610,1065,0,10,LEV011,31,2026-10-01,2028-06-30,2027-01-15
+EVI00012,Producto evidencia 12,INSUMO,Dato ficticio de evidencia,Caja x 10,unidad,NO,,620,1080,19,10,LEV012,32,2026-10-01,,2027-01-15
+EVI00013,Producto evidencia 13,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E013,630,1095,0,10,LEV013,33,2026-10-01,2028-06-30,2027-01-15
+EVI00014,Producto evidencia 14,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E014,640,1110,0,10,LEV014,34,2026-10-01,2028-06-30,2027-01-15
+EVI00015,Producto evidencia 15,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E015,650,1125,0,10,LEV015,35,2026-10-01,2028-06-30,2027-01-15
+EVI00016,Producto evidencia 16,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E016,660,1140,0,10,LEV016,36,2026-10-01,2028-06-30,2027-01-15
+EVI00017,Producto evidencia 17,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E017,670,1155,0,10,LEV017,37,2026-10-01,2028-06-30,2027-01-15
+EVI00018,Producto evidencia 18,INSUMO,Dato ficticio de evidencia,Caja x 10,unidad,NO,,680,1170,19,10,LEV018,38,2026-10-01,,2027-01-15
+EVI00019,Producto evidencia 19,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E019,690,1185,0,10,LEV019,39,2026-10-01,2028-06-30,2027-01-15
+EVI0020,Producto evidencia 20,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E020,700,1200,0,10,LEV020,40,2026-10-01,2028-06-30,2027-01-15
+EVI00021,Producto evidencia 21,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E021,710,1215,0,10,LEV021,41,2026-10-01,2028-06-30,2027-01-15
+EVI00022,Producto evidencia 22,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E022,720,1230,0,10,LEV022,42,2026-10-01,2028-06-30,2027-01-15
+EVI00023,Producto evidencia 23,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E023,730,1245,0,10,LEV023,43,2026-10-01,2028-06-30,2027-01-15
+EVI00024,Producto evidencia 24,INSUMO,Dato ficticio de evidencia,Caja x 10,unidad,NO,,740,1260,19,10,LEV024,44,2026-10-01,,2027-01-15
+EVI00025,Producto evidencia 25,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E025,750,1275,0,10,LEV025,45,2026-10-01,2028-06-30,2027-01-15
+EVI00026,Producto evidencia 26,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E026,760,1290,0,10,LEV026,46,2026-10-01,2028-06-30,2027-01-15
+EVI00027,Producto evidencia 27,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E027,770,1305,0,10,LEV027,47,2026-10-01,2028-06-30,2027-01-15
+EVI00028,Producto evidencia 28,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E028,780,1320,0,10,LEV028,48,2026-10-01,2028-06-30,2027-01-15
+EVI00029,Producto evidencia 29,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E029,790,1335,0,10,LEV029,49,2026-10-01,2028-06-30,2027-01-15
+EVI00030,Producto evidencia 30,INSUMO,Dato ficticio de evidencia,Caja x 10,unidad,NO,,800,1350,19,10,LEV030,50,2026-10-01,,2027-01-15
+EVI00031,Producto evidencia 31,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,,810,1365,0,10,LEV031,51,2026-10-01,2028-06-30,2027-01-15
+EVI00032,Producto evidencia 32,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E032,820,1380,0,10,LEV032,52,2026-10-01,2028-06-30,2027-01-15
+EVI00033,Producto evidencia 33,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E033,830,1395,0,10,LEV033,53,2026-10-01,2028-06-30,2027-01-15
+EVI00034,Producto evidencia 34,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E034,840,1410,0,10,LEV034,54,2026-10-01,2028-06-30,2027-01-15
+EVI00035,Producto evidencia 35,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E035,850,1425,0,10,LEV035,55,2026-10-01,2028-06-30,2027-01-15
+EVI00036,Producto evidencia 36,INSUMO,Dato ficticio de evidencia,Caja x 10,unidad,NO,,860,1440,19,10,LEV036,56,2026-10-01,,2027-01-15
+EVI00037,Producto evidencia 37,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E037,870,1455,0,10,LEV037,57,2026-10-01,2028-06-30,2027-01-15
+EVI00038,Producto evidencia 38,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E038,880,1470,0,10,LEV038,58,2026-10-01,2028-06-30,2027-01-15
+EVI00039,Producto evidencia 39,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E039,890,1485,0,10,LEV039,59,2026-10-01,2028-06-30,2027-01-15
+EVI00040,Producto evidencia 40,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E040,900,1500,0,10,LEV040,60,2026-10-01,2026-09-01,2027-01-15
+EVI00041,Producto evidencia 41,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E041,910,1515,0,10,LEV041,61,2026-10-01,2028-06-30,2027-01-15
+EVI00042,Producto evidencia 42,INSUMO,Dato ficticio de evidencia,Caja x 10,unidad,NO,,920,1530,19,10,LEV042,62,2026-10-01,,2027-01-15
+EVI00043,Producto evidencia 43,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E043,930,1545,0,10,LEV043,63,2026-10-01,2028-06-30,2027-01-15
+EVI00044,Producto evidencia 44,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E044,940,1560,0,10,LEV044,64,2026-10-01,2028-06-30,2027-01-15
+EVI00045,Producto evidencia 45,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E045,950,1575,0,10,LEV045,65,2026-10-01,2028-06-30,2027-01-15
+EVI00046,Producto evidencia 46,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E046,960,1590,0,10,LEV046,66,2026-10-01,2028-06-30,2027-01-15
+EVI00047,Producto evidencia 47,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E047,970,1605,0,10,LEV047,67,2026-10-01,2028-06-30,2027-01-15
+EVI00048,Producto evidencia 48,INSUMO,Dato ficticio de evidencia,Caja x 10,unidad,NO,,980,1620,19,10,LEV048,68,2026-10-01,,2027-01-15
+EVI00049,Producto evidencia 49,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E049,990,1635,0,10,LEV049,69,2026-10-01,2028-06-30,2027-01-15
+EVI00049,Producto evidencia 49,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E049,990,1635,0,10,LEV049,69,2026-10-01,2028-06-30,2027-01-15
+EVI00051,Producto evidencia 51,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E051,1010,1665,0,10,LEV051,71,2026-10-01,2028-06-30,2027-01-15
+EVI00052,Producto evidencia 52,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E052,1020,1680,0,10,LEV052,72,2026-10-01,2028-06-30,2027-01-15
+EVI00053,Producto evidencia 53,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E053,1030,1695,0,10,LEV053,73,2026-10-01,2028-06-30,2027-01-15
+EVI00054,Producto evidencia 54,INSUMO,Dato ficticio de evidencia,Caja x 10,unidad,NO,,1040,1710,19,10,LEV054,74,2026-10-01,,2027-01-15
+EVI00055,Producto evidencia 55,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E055,1050,1725,0,10,LEV055,75,2026-10-01,2028-06-30,2027-01-15
+EVI00056,Producto evidencia 56,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E056,1060,1740,0,10,LEV056,76,2026-10-01,2028-06-30,2027-01-15
+EVI00057,Producto evidencia 57,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E057,1070,1755,0,10,LEV057,77,2026-10-01,2028-06-30,2027-01-15
+EVI00058,Producto evidencia 58,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E058,1080,1770,0,10,LEV058,78,2026-10-01,2028-06-30,2027-01-15
+EVI00059,Producto evidencia 59,MEDICAMENTO,Dato ficticio de evidencia,Caja x 10,unidad,SI,INVIMA PRUEBA-E059,1090,1785,0,10,LEV059,79,2026-10-01,2028-06-30,2027-01-15
+EVI00060,Producto evidencia 60,INSUMO,Dato ficticio de evidencia,Caja x 10,unidad,NO,,1100,1800,19,10,LEV060,80,2026-10-01,,2027-01-15

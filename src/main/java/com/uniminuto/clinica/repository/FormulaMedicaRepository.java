@@ -1,6 +1,7 @@
 package com.uniminuto.clinica.repository;
 
 import com.uniminuto.clinica.entity.FormulaMedica;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -9,11 +10,12 @@ import java.util.List;
 @Repository
 public interface FormulaMedicaRepository extends JpaRepository<FormulaMedica, Long> {
 
-    List<FormulaMedica> findAllByOrderByFechaCreacionRegistroAsc();
+    @EntityGraph(attributePaths = {"medico", "mascota", "cliente"})
+    List<FormulaMedica> findAllByOrderByFechaGeneracionDesc();
 
-    List<FormulaMedica> findByCita_IdInOrderByFechaCreacionRegistroDesc(List<Long> citaIds);
+    @EntityGraph(attributePaths = {"medico", "mascota", "cliente"})
+    List<FormulaMedica> findByMedico_IdOrderByFechaGeneracionDesc(Long medicoId);
 
-    List<FormulaMedica> findAllByOrderByFechaCreacionRegistroDesc();
-
-    List<FormulaMedica> findByCita_Medico_IdOrderByFechaCreacionRegistroDesc(Long medicoId);
+    @EntityGraph(attributePaths = {"medico", "mascota", "cliente"})
+    List<FormulaMedica> findByCita_IdInOrderByFechaGeneracionDesc(List<Long> citaIds);
 }

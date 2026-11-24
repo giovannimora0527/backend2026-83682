@@ -2,6 +2,7 @@ package com.uniminuto.clinica.serviceimpl;
 
 import com.uniminuto.clinica.entity.Cita;
 import com.uniminuto.clinica.entity.Cliente;
+import com.uniminuto.clinica.entity.enums.EstadoCita;
 import com.uniminuto.clinica.entity.Mascota;
 import com.uniminuto.clinica.entity.Medico;
 import com.uniminuto.clinica.models.CitaRq;
@@ -19,13 +20,12 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 @Service
 public class CitaServiceImpl implements CitaService {
 
-    private static final String ESTADO_PROGRAMADA = "PROGRAMADA";
-    private static final String ESTADO_CANCELADA = "CANCELADA";
     /** Duracion por defecto; pasa a salir del servicio cuando exista ese modelo. */
     private static final int DURACION_MINUTOS = 30;
 
@@ -51,9 +51,9 @@ public class CitaServiceImpl implements CitaService {
     public List<Cita> listarCitasRango(LocalDateTime fechaInicio, LocalDateTime fechaFin)
             throws BadRequestException {
         this.validarFechas(fechaInicio, fechaFin);
-        List<Cita> citas = citaRepository.findByFechaHoraBetween(fechaInicio, fechaFin);
+        List<Cita> citas = citaRepository.findByFechaInicioBetween(fechaInicio, fechaFin);
         citas.sort((cita1, cita2)
-                -> cita1.getFechaHora().compareTo(cita2.getFechaHora()));
+                -> cita1.getFechaInicio().compareTo(cita2.getFechaInicio()));
         return citas;
     }
 
@@ -66,7 +66,7 @@ public class CitaServiceImpl implements CitaService {
         if (mascotaOptional.isEmpty()) {
             throw new NotFoundException("La mascota no existe");
         }
-        return citaRepository.findByMascotaOrderByFechaHoraDesc(mascotaOptional.get());
+        return citaRepository.findByMascotaOrderByFechaInicioDesc(mascotaOptional.get());
     }
 
     private void validarFechas(LocalDateTime fechaInicio, LocalDateTime fechaFin) throws BadRequestException {
@@ -102,15 +102,15 @@ public class CitaServiceImpl implements CitaService {
         Cita citaActualizar = optCita.get();
         usuarioActual.verificarPropiedad(citaActualizar.getMedico().getId());
         usuarioActual.verificarPropiedad(citaRq.getMedicoId());
-        String estado = citaRq.getEstado() == null || citaRq.getEstado().isBlank()
-                ? citaActualizar.getEstado() : citaRq.getEstado();
-        if (!ESTADO_CANCELADA.equalsIgnoreCase(estado)) {
+        EstadoCita estado = this.leerEstado(citaRq.getEstado(), citaActualizar.getEstado());
+        if (estado != EstadoCita.CANCELADA) {
             this.validarSolapamiento(citaRq, medicoOptional.get(), mascotaOptional.get());
         }
         citaActualizar.setMedico(medicoOptional.get());
         citaActualizar.setMascota(mascotaOptional.get());
         citaActualizar.setCliente(mascotaOptional.get().getCliente());
-        citaActualizar.setFechaHora(citaRq.getFechaHora());
+        citaActualizar.setFechaInicio(citaRq.getFechaHora());
+        citaActualizar.setFechaFin(citaRq.getFechaHora().plusMinutes(DURACION_MINUTOS));
         citaActualizar.setMotivo(citaRq.getMotivo());
         citaActualizar.setEstado(estado);
         citaRepository.save(citaActualizar);
@@ -143,12 +143,14 @@ public class CitaServiceImpl implements CitaService {
         Mascota mascota = mascotaOptional.get();
         Medico medico = medicoOptional.get();
         Cita nuevaCita = new Cita();
-        nuevaCita.setFechaHora(citaRq.getFechaHora());
+        nuevaCita.setFechaInicio(citaRq.getFechaHora());
+        nuevaCita.setFechaFin(citaRq.getFechaHora().plusMinutes(DURACION_MINUTOS));
+        nuevaCita.setUsuarioCreacionId(usuarioActual.obtener().id());
         nuevaCita.setCliente(mascota.getCliente());
         nuevaCita.setMascota(mascota);
         nuevaCita.setMedico(medico);
         nuevaCita.setMotivo(citaRq.getMotivo());
-        nuevaCita.setEstado(ESTADO_PROGRAMADA);
+        nuevaCita.setEstado(EstadoCita.PROGRAMADA);
         citaRepository.save(nuevaCita);
 
         MiRespuestaRS rta = new MiRespuestaRS();
@@ -159,10 +161,20 @@ public class CitaServiceImpl implements CitaService {
         return rta;
     }
 
+    private EstadoCita leerEstado(String valor, EstadoCita actual) {
+        if (valor == null || valor.isBlank()) {
+            return actual;
+        }
+        try {
+            return EstadoCita.valueOf(valor.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException ex) {
+            throw new BadRequestException("El estado de la cita no es válido");
+        }
+    }
+
     private void validarSolapamiento(CitaRq citaRq, Medico medico, Mascota mascota) throws BadRequestException {
         LocalDateTime inicio = citaRq.getFechaHora();
-        if (citaRepository.existeSolapamiento(medico, mascota, inicio.minusMinutes(DURACION_MINUTOS),
-                inicio.plusMinutes(DURACION_MINUTOS), citaRq.getId())) {
+        if (citaRepository.existeSolapamiento(medico, mascota, inicio, inicio.plusMinutes(DURACION_MINUTOS), citaRq.getId())) {
             throw new ConflictException("El médico o la mascota ya tienen una cita en ese rango de hora.");
         }
     }

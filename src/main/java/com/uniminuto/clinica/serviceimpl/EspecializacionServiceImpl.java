@@ -41,6 +41,8 @@ public class EspecializacionServiceImpl implements EspecializacionService {
             throw new ConflictException("La especialización con el nombre proporcionado ya existe.");
         }
 
+        especializacion.setId(null);
+        especializacion.setActivo(true);
         especializacionRepository.save(especializacion);
         MiRespuestaRS rta = new MiRespuestaRS();
         rta.setMessage("Especialización creada exitosamente.");

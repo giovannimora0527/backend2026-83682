@@ -1,0 +1,566 @@
+erDiagram
+    cita |o--o{ anotacion_historia : "cita_id"
+    historia_medica ||--o{ anotacion_historia : "historia_id"
+    medico ||--o{ anotacion_historia : "medico_id"
+    cita ||--o| atencion_medica : "cita_id"
+    historia_medica ||--o{ atencion_medica : "historia_medica_id"
+    mascota ||--o{ atencion_medica : "mascota_id"
+    medico ||--o{ atencion_medica : "medico_id"
+    atencion_medica ||--o{ atencion_servicio : "atencion_id"
+    servicio ||--o{ atencion_servicio : "servicio_id"
+    usuario |o--o{ carga_inventario : "usuario_confirmacion_id"
+    usuario ||--o{ carga_inventario : "usuario_id"
+    carga_inventario ||--o{ carga_inventario_fila : "carga_id"
+    lote_medicamento |o--o{ carga_inventario_fila : "lote_id"
+    medicamento |o--o{ carga_inventario_fila : "medicamento_id"
+    cliente ||--o{ cita : "cliente_id"
+    mascota ||--o{ cita : "mascota_id"
+    medico ||--o{ cita : "medico_id"
+    servicio |o--o{ cita : "servicio_id"
+    usuario |o--o{ cita : "usuario_creacion_id"
+    cita ||--o{ cita_historial_estado : "cita_id"
+    usuario ||--o{ cita_historial_estado : "usuario_id"
+    formula_medica ||--o{ despacho : "formula_id"
+    usuario ||--o{ despacho : "usuario_id"
+    usuario |o--o{ despacho : "usuario_reversion_id"
+    despacho ||--o{ despacho_detalle : "despacho_id"
+    formula_medica_detalle ||--o{ despacho_detalle : "formula_detalle_id"
+    lote_medicamento ||--o{ despacho_detalle : "lote_id"
+    medicamento ||--o{ despacho_detalle : "medicamento_id"
+    atencion_medica ||--o{ factura : "atencion_id"
+    cita ||--o{ factura : "cita_id"
+    cliente ||--o{ factura : "cliente_id"
+    mascota ||--o{ factura : "mascota_id"
+    medico ||--o{ factura : "medico_id"
+    usuario |o--o{ factura : "usuario_anulacion_id"
+    usuario ||--o{ factura : "usuario_id"
+    despacho_detalle |o--o{ factura_detalle : "despacho_detalle_id"
+    factura ||--o{ factura_detalle : "factura_id"
+    medicamento |o--o{ factura_detalle : "medicamento_id"
+    servicio |o--o{ factura_detalle : "servicio_id"
+    tarifa |o--o{ factura_detalle : "tarifa_id"
+    factura ||--o{ factura_historial_estado : "factura_id"
+    usuario ||--o{ factura_historial_estado : "usuario_id"
+    formula_medica ||--o{ formula_historial_estado : "formula_id"
+    usuario ||--o{ formula_historial_estado : "usuario_id"
+    atencion_medica |o--o{ formula_medica : "atencion_id"
+    cita ||--o{ formula_medica : "cita_id"
+    cliente ||--o{ formula_medica : "cliente_id"
+    mascota ||--o{ formula_medica : "mascota_id"
+    medicamento |o--o{ formula_medica : "medicamento_id"
+    medico ||--o{ formula_medica : "medico_id"
+    formula_medica ||--o{ formula_medica_detalle : "formula_id"
+    medicamento ||--o{ formula_medica_detalle : "medicamento_id"
+    mascota ||--o{ historia_medica : "paciente_id"
+    medico ||--o{ horario_medico : "medico_id"
+    medicamento ||--o{ lote_medicamento : "medicamento_id"
+    cliente ||--o{ mascota : "cliente_id"
+    raza ||--o{ mascota : "raza_id"
+    impuesto |o--o{ medicamento : "impuesto_id"
+    especializacion ||--o{ medico : "especializacion_id"
+    usuario |o--o| medico : "usuario_id"
+    carga_inventario |o--o{ movimiento_inventario : "carga_id"
+    despacho_detalle |o--o{ movimiento_inventario : "despacho_detalle_id"
+    despacho |o--o{ movimiento_inventario : "despacho_id"
+    formula_medica |o--o{ movimiento_inventario : "formula_id"
+    lote_medicamento ||--o{ movimiento_inventario : "lote_id"
+    medicamento ||--o{ movimiento_inventario : "medicamento_id"
+    movimiento_inventario |o--o| movimiento_inventario : "movimiento_revertido_id"
+    usuario ||--o{ movimiento_inventario : "usuario_id"
+    usuario ||--o{ otp_token : "usuario_id"
+    factura ||--o{ pago : "factura_id"
+    usuario ||--o{ pago : "usuario_id"
+    menu ||--o{ perfil_menu : "menu_id"
+    perfil ||--o{ perfil_menu : "perfil_id"
+    especializacion |o--o{ servicio : "especializacion_id"
+    impuesto ||--o{ tarifa : "impuesto_id"
+    servicio ||--o{ tarifa : "servicio_id"
+    servicio ||--o{ tarifa_historial : "servicio_id"
+    tarifa ||--o{ tarifa_historial : "tarifa_id"
+    usuario ||--o{ tarifa_historial : "usuario_id"
+    perfil |o--o{ usuario : "perfil_id"
+    anotacion_historia {
+        bigint_unsigned id PK
+        bigint_unsigned historia_id FK
+        bigint_unsigned medico_id FK
+        datetime fecha
+        text descripcion
+        bigint_unsigned cita_id FK
+        text diagnostico
+        text observaciones
+    }
+    atencion_medica {
+        bigint_unsigned id PK
+        bigint_unsigned cita_id FK
+        bigint_unsigned historia_medica_id FK
+        bigint_unsigned medico_id FK
+        int mascota_id FK
+        text motivo_consulta
+        text sintomas
+        text diagnostico
+        text observaciones
+        text recomendaciones
+        datetime fecha_inicio
+        datetime fecha_fin
+        tinyint finalizada
+        int version
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+    }
+    atencion_servicio {
+        bigint_unsigned id PK
+        bigint_unsigned atencion_id FK
+        bigint_unsigned servicio_id FK
+        int cantidad
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+    }
+    carga_inventario {
+        bigint_unsigned id PK
+        varchar nombre_archivo
+        varchar formato
+        bigint_unsigned usuario_id FK
+        datetime fecha_carga
+        bigint_unsigned usuario_confirmacion_id FK
+        datetime fecha_confirmacion
+        varchar estado
+        int total_filas
+        int filas_validas
+        int filas_con_error
+        int filas_importadas
+        int version
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+    }
+    carga_inventario_fila {
+        bigint_unsigned id PK
+        bigint_unsigned carga_id FK
+        int numero_fila
+        json datos_json
+        tinyint valida
+        varchar accion
+        json errores_json
+        tinyint importada
+        varchar error_importacion
+        bigint_unsigned medicamento_id FK
+        bigint_unsigned lote_id FK
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+    }
+    cita {
+        bigint_unsigned id PK
+        bigint_unsigned cliente_id FK
+        int mascota_id FK
+        bigint_unsigned medico_id FK
+        datetime fecha_inicio
+        varchar estado
+        text motivo
+        datetime fecha_fin
+        bigint_unsigned servicio_id FK
+        varchar motivo_cancelacion
+        bigint_unsigned usuario_creacion_id FK
+        int version
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+    }
+    cita_historial_estado {
+        bigint_unsigned id PK
+        bigint_unsigned cita_id FK
+        varchar estado_anterior
+        varchar estado_nuevo
+        datetime fecha_inicio_anterior
+        datetime fecha_inicio_nueva
+        varchar motivo
+        bigint_unsigned usuario_id FK
+        datetime fecha
+    }
+    cliente {
+        bigint_unsigned cliente_id PK
+        int usuario_id UK
+        varchar tipo_documento
+        varchar numero_documento UK
+        varchar nombres
+        varchar apellidos
+        date fecha_nacimiento
+        varchar genero
+        varchar telefono
+        text direccion
+        tinyint activo
+        varchar correo
+    }
+    configuracion_clinica {
+        bigint_unsigned id PK
+        varchar nombre
+        varchar nit
+        varchar direccion
+        varchar telefono
+        varchar correo
+        varchar prefijo_factura
+        bigint consecutivo_factura
+        varchar prefijo_formula
+        bigint consecutivo_formula
+        varchar prefijo_despacho
+        bigint consecutivo_despacho
+        decimal tope_descuento_secretaria
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+        tinyint unica UK
+    }
+    despacho {
+        bigint_unsigned id PK
+        bigint_unsigned formula_id FK
+        varchar numero UK
+        bigint_unsigned usuario_id FK
+        varchar estado
+        datetime fecha_inicio
+        datetime fecha_confirmacion
+        varchar observacion
+        varchar idempotency_key UK
+        datetime fecha_reversion
+        bigint_unsigned usuario_reversion_id FK
+        varchar motivo_reversion
+        int version
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+        bigint_unsigned formula_en_preparacion UK
+    }
+    despacho_detalle {
+        bigint_unsigned id PK
+        bigint_unsigned despacho_id FK
+        bigint_unsigned formula_detalle_id FK
+        bigint_unsigned medicamento_id FK
+        bigint_unsigned lote_id FK
+        int cantidad_entregada
+        decimal precio_venta_unitario
+        decimal porcentaje_iva
+        tinyint facturado
+        int version
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+    }
+    especializacion {
+        bigint_unsigned id PK
+        varchar nombre UK
+        text descripcion
+        varchar codigo_especializacion UK
+        tinyint activo
+    }
+    factura {
+        bigint_unsigned id PK
+        varchar numero UK
+        bigint_unsigned cita_id FK
+        bigint_unsigned atencion_id FK
+        bigint_unsigned cliente_id FK
+        int mascota_id FK
+        bigint_unsigned medico_id FK
+        varchar cliente_nombre
+        varchar cliente_documento
+        varchar mascota_nombre
+        varchar medico_nombre
+        varchar especialidad_nombre
+        datetime fecha_generacion
+        decimal subtotal
+        decimal total_descuento
+        decimal total_impuestos
+        decimal total
+        decimal total_pagado
+        decimal saldo
+        varchar estado
+        varchar observacion
+        bigint_unsigned usuario_id FK
+        datetime fecha_anulacion
+        bigint_unsigned usuario_anulacion_id FK
+        varchar motivo_anulacion
+        int version
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+        bigint_unsigned cita_vigente UK
+    }
+    factura_detalle {
+        bigint_unsigned id PK
+        bigint_unsigned factura_id FK
+        varchar tipo_item
+        bigint_unsigned servicio_id FK
+        bigint_unsigned tarifa_id FK
+        bigint_unsigned medicamento_id FK
+        bigint_unsigned despacho_detalle_id FK
+        varchar descripcion
+        int cantidad
+        decimal precio_unitario
+        decimal porcentaje_descuento
+        decimal valor_descuento
+        varchar motivo_descuento
+        decimal porcentaje_iva
+        decimal valor_iva
+        decimal subtotal
+        decimal total
+        tinyint vigente
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+        bigint_unsigned despacho_detalle_vigente UK
+    }
+    factura_historial_estado {
+        bigint_unsigned id PK
+        bigint_unsigned factura_id FK
+        varchar estado_anterior
+        varchar estado_nuevo
+        varchar motivo
+        bigint_unsigned usuario_id FK
+        datetime fecha
+    }
+    formula_historial_estado {
+        bigint_unsigned id PK
+        bigint_unsigned formula_id FK
+        varchar estado_despacho_anterior
+        varchar estado_despacho_nuevo
+        varchar estado_formula_anterior
+        varchar estado_formula_nuevo
+        varchar motivo
+        bigint_unsigned usuario_id FK
+        datetime fecha
+    }
+    formula_medica {
+        bigint_unsigned id PK
+        bigint_unsigned cita_id FK
+        bigint_unsigned medicamento_id FK
+        text dosis
+        text indicaciones
+        datetime fecha_creacion_registro
+        datetime fecha_actualizacion_registro
+        varchar frecuencia
+        varchar duracion
+        varchar numero UK
+        bigint_unsigned atencion_id FK
+        bigint_unsigned medico_id FK
+        int mascota_id FK
+        bigint_unsigned cliente_id FK
+        datetime fecha_generacion
+        text indicaciones_generales
+        varchar estado_formula
+        varchar estado_despacho
+        datetime fecha_confirmacion
+        varchar motivo_anulacion
+        int version
+    }
+    formula_medica_detalle {
+        bigint_unsigned id PK
+        bigint_unsigned formula_id FK
+        bigint_unsigned medicamento_id FK
+        decimal dosis
+        varchar unidad_dosis
+        int frecuencia_horas
+        int duracion_dias
+        varchar via_administracion
+        int cantidad_prescrita
+        int cantidad_despachada
+        text indicaciones
+        int version
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+    }
+    historia_medica {
+        bigint_unsigned id PK
+        int paciente_id FK
+        datetime fecha_creacion
+    }
+    horario_medico {
+        bigint_unsigned id PK
+        bigint_unsigned medico_id FK
+        tinyint dia_semana
+        time hora_inicio
+        time hora_fin
+        tinyint activo
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+    }
+    impuesto {
+        bigint_unsigned id PK
+        varchar nombre UK
+        decimal porcentaje
+        tinyint activo
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+    }
+    lote_medicamento {
+        bigint_unsigned id PK
+        bigint_unsigned medicamento_id FK
+        varchar numero_lote
+        decimal precio_compra
+        int cantidad_inicial
+        int cantidad_disponible
+        date fecha_compra
+        date fecha_ingreso
+        date fecha_vencimiento
+        tinyint activo
+        int version
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+    }
+    mascota {
+        int mascota_id PK
+        varchar nombre_mascota
+        int edad
+        int raza_id FK
+        datetime fecha_registro
+        datetime fecha_modificacion
+        bigint_unsigned cliente_id FK
+        tinyint activo
+    }
+    medicamento {
+        bigint_unsigned id PK
+        varchar nombre UK
+        text descripcion
+        varchar presentacion
+        date fecha_compra
+        date fecha_vence
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+        char codigo UK
+        varchar tipo_producto
+        tinyint requiere_invima
+        varchar registro_invima
+        varchar unidad_medida
+        decimal precio_venta
+        bigint_unsigned impuesto_id FK
+        int stock_minimo
+        date fecha_proximo_pedido
+        tinyint activo
+        int version
+    }
+    medico {
+        bigint_unsigned id PK
+        varchar tipo_documento
+        varchar numero_documento UK
+        varchar nombres
+        varchar apellidos
+        varchar telefono
+        varchar registro_profesional UK
+        bigint_unsigned especializacion_id FK
+        tinyint estado
+        bigint_unsigned usuario_id FK
+    }
+    menu {
+        int menu_id PK
+        varchar code UK
+        varchar title
+        longtext url
+        varchar icon
+        tinyint activo
+        datetime fecha_creacion
+        datetime fecha_modificacion
+    }
+    movimiento_inventario {
+        bigint_unsigned id PK
+        datetime fecha
+        varchar tipo
+        bigint_unsigned medicamento_id FK
+        bigint_unsigned lote_id FK
+        int cantidad
+        int saldo_lote_resultante
+        int saldo_producto_resultante
+        decimal costo_unitario
+        bigint_unsigned usuario_id FK
+        bigint_unsigned formula_id FK
+        bigint_unsigned despacho_id FK
+        bigint_unsigned despacho_detalle_id FK
+        bigint_unsigned carga_id FK
+        bigint_unsigned movimiento_revertido_id FK
+        varchar observacion
+    }
+    otp_token {
+        bigint_unsigned id PK
+        bigint_unsigned usuario_id FK
+        varchar codigo
+        datetime fecha_creacion
+        datetime fecha_expiracion
+        int intentos
+        tinyint usado
+    }
+    pago {
+        bigint_unsigned id PK
+        bigint_unsigned factura_id FK
+        datetime fecha
+        decimal valor
+        varchar medio_pago
+        varchar referencia
+        bigint_unsigned usuario_id FK
+        tinyint anulado
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+    }
+    perfil {
+        int perfil_id PK
+        varchar nombre
+        tinyint activo
+        datetime fecha_creacion
+        datetime fecha_modificacion
+        varchar codigo UK
+    }
+    perfil_menu {
+        int perfil_menu_id PK
+        int perfil_id FK
+        int menu_id FK
+    }
+    raza {
+        int raza_id PK
+        varchar nombre
+        varchar especie
+        datetime fecha_creacion
+        datetime fecha_modificacion
+    }
+    servicio {
+        bigint_unsigned id PK
+        varchar codigo UK
+        varchar nombre
+        text descripcion
+        varchar tipo_servicio
+        bigint_unsigned especializacion_id FK
+        int duracion_minutos
+        tinyint activo
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+    }
+    session {
+        int session_id PK
+        bigint_unsigned user_id
+        text token
+        datetime fecha_ini_sesion
+        datetime fecha_expiracion
+        varchar jti UK
+        tinyint activa
+        datetime fecha_cierre
+    }
+    tarifa {
+        bigint_unsigned id PK
+        bigint_unsigned servicio_id FK
+        decimal valor
+        bigint_unsigned impuesto_id FK
+        date vigente_desde
+        date vigente_hasta
+        tinyint activa
+        datetime fecha_creacion_registro
+        datetime fecha_modificacion_registro
+        bigint_unsigned servicio_vigente UK
+    }
+    tarifa_historial {
+        bigint_unsigned id PK
+        bigint_unsigned tarifa_id FK
+        bigint_unsigned servicio_id FK
+        decimal valor_anterior
+        decimal valor_nuevo
+        decimal porcentaje_iva_anterior
+        decimal porcentaje_iva_nuevo
+        varchar motivo
+        bigint_unsigned usuario_id FK
+        datetime fecha
+    }
+    usuario {
+        bigint_unsigned id PK
+        varchar username UK
+        text password_hash
+        varchar rol
+        datetime fecha_creacion
+        tinyint activo
+        varchar email
+        int perfil_id FK
+    }

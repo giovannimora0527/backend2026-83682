@@ -19,13 +19,12 @@ public interface MedicoRepository extends JpaRepository<Medico, Long> {
               AND NOT EXISTS (
                 SELECT c.id FROM Cita c
                 WHERE c.medico = m
-                  AND c.estado = :estado
-                  AND c.fechaHora BETWEEN :fechaInicio AND :fechaFin
+                  AND c.estado <> com.uniminuto.clinica.entity.enums.EstadoCita.CANCELADA
+                  AND c.fechaInicio < :fechaFin AND c.fechaFin > :fechaInicio
             )
             """)
     List<Medico> findDisponiblesPorFecha(@Param("fechaInicio") LocalDateTime fechaInicio,
-                                        @Param("fechaFin") LocalDateTime fechaFin,
-                                        @Param("estado") String estado);
+                                        @Param("fechaFin") LocalDateTime fechaFin);
 
     Optional<Medico> findByUsuarioId(Long usuarioId);
 

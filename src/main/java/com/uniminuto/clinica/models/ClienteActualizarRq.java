@@ -1,6 +1,7 @@
 package com.uniminuto.clinica.models;
 
 import com.fasterxml.jackson.annotation.JsonAnySetter;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
@@ -39,6 +40,10 @@ public class ClienteActualizarRq {
 
     @Size(max = 20, message = "El telefono admite hasta 20 caracteres.")
     private String telefono;
+
+    @Email(message = "El correo no es valido.")
+    @Size(max = 255, message = "El correo admite hasta 255 caracteres.")
+    private String correo;
 
     private String direccion;
 

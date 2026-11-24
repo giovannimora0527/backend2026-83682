@@ -124,7 +124,7 @@ las anotaciones JPA la declaran, pero no se incluyen migraciones que acrediten e
 
 Las credenciales se toman de variables de entorno. En `dev`, copia `.env.example` como `.env` y complétalo; en `prod`, define las variables en el entorno. `JWT_SECRET` debe ser Base64 de al menos 64 bytes aleatorios.
 
-Antes del primer arranque, respalda la base y ejecuta una vez `db/02_migracion_examen_final.sql`. Los detalles están en `docs/CAMBIOS.md`.
+Antes del primer arranque, respalda la base y ejecuta en orden `db/01_esquema_base.sql` (solo si la base está vacía), `db/02_migracion_examen_final.sql` y, para datos de prueba, `db/03_datos_iniciales.sql`. Los detalles están en `docs/CAMBIOS.md`.
 
 ## Ejecución local
 
