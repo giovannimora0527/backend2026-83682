@@ -1,187 +1,71 @@
 package com.uniminuto.clinica.catalogo;
 
-import com.uniminuto.clinica.comun.Db;
-import com.uniminuto.clinica.comun.Tiempo;
-import com.uniminuto.clinica.comun.Validar;
-import com.uniminuto.clinica.exception.BadRequestException;
-import com.uniminuto.clinica.exception.ConflictException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
-/**
- * Controlador REST del módulo: implementa {@link ClienteApi} (rutas, permisos y documentación Swagger)
- * y delega la lógica en la capa de servicio.
- */
+/** Controlador REST de clientes: implementa {@link ClienteApi} y delega en {@link ClienteService}. */
 @RestController
 public class ClienteApiController implements ClienteApi {
 
-    /** Consulta SQL base reutilizada por los métodos del controlador. */
-    static final String CONSULTA = """
-            SELECT c.cliente_id AS clienteId, c.usuario_id AS usuarioId, c.tipo_documento AS tipoDocumento,
-                   c.numero_documento AS numeroDocumento, c.nombres, c.apellidos,
-                   c.fecha_nacimiento AS fechaNacimiento, c.genero, c.telefono, c.direccion, c.activo
-            FROM cliente c
-            """;
-    /** Tipos de documento de identidad permitidos. */
-    private static final Set<String> TIPOS = Set.of("CC", "TI", "CE", "PA", "NIT", "PPT");
-
-    /** Dependencia inyectada por constructor: db. */
-    private final Db db;
-
-    /** Log central de operaciones sensibles. */
-    private final com.uniminuto.clinica.auditoria.AuditoriaService auditoria;
+    /** Reglas de negocio de clientes. */
+    private final ClienteService servicio;
 
     /**
-     * Crea el controlador con sus dependencias (inyección por constructor).
-     *
-     * @param db dependencia db.
-     * @param auditoria log de operaciones sensibles.
+     * @param servicio servicio de clientes.
      */
-    public ClienteApiController(Db db, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
-        this.db = db;
-        this.auditoria = auditoria;
+    public ClienteApiController(ClienteService servicio) {
+        this.servicio = servicio;
     }
 
     /** {@inheritDoc} */
     @Override
-    public ResponseEntity<List<Map<String, Object>>> listar() {
-        return ResponseEntity.ok(db.lista(CONSULTA + " ORDER BY c.activo DESC, c.apellidos, c.nombres"));
+    public ResponseEntity<List<ClienteDto>> listar() {
+        return ResponseEntity.ok(servicio.listar());
     }
 
     /** {@inheritDoc} */
     @Override
-    public ResponseEntity<Map<String, Object>> buscarPorDocumento(String documento) {
-        return ResponseEntity.ok(db.requerido(CONSULTA + " WHERE c.numero_documento = :d",
-                Db.p("d", documento == null ? "" : documento.trim()), "No existe un cliente con ese documento."));
+    public ResponseEntity<ClienteDto> buscarPorDocumento(String documento) {
+        return ResponseEntity.ok(servicio.buscarPorDocumento(documento));
     }
 
     /** {@inheritDoc} */
     @Override
-    public ResponseEntity<Map<String, Object>> consultar(long id) {
-        return ResponseEntity.ok(db.requerido(CONSULTA + " WHERE c.cliente_id = :id", Db.p("id", id),
-                "El cliente no existe."));
-    }
-
-    /**
-     * Mascotas activas de un cliente. Responde 404 si el cliente no existe.
-     *
-     * @param id identificador del cliente.
-     * @return mascotas con su raza y especie.
-     */
-    @Override
-    public ResponseEntity<List<Map<String, Object>>> mascotas(long id) {
-        consultar(id);
-        return ResponseEntity.ok(db.lista("""
-                SELECT m.mascota_id AS mascotaId, m.nombre_mascota AS nombreMascota, m.edad, r.nombre AS raza,
-                       r.especie, m.cliente_id AS clienteId
-                FROM mascota m JOIN raza r ON r.raza_id = m.raza_id
-                WHERE m.cliente_id = :id AND m.activo = 1 ORDER BY m.nombre_mascota
-                """, Db.p("id", id)));
+    public ResponseEntity<ClienteDto> consultar(long id) {
+        return ResponseEntity.ok(servicio.consultar(id));
     }
 
     /** {@inheritDoc} */
     @Override
-    @Transactional
-    public ResponseEntity<Map<String, Object>> crear(ClienteRq datos) {
-        Map<String, Object> p = validar(datos, null);
-        long id = db.insertar("""
-                INSERT INTO cliente (tipo_documento, numero_documento, nombres, apellidos, fecha_nacimiento,
-                                     genero, telefono, direccion, activo)
-                VALUES (:tipo, :doc, :nombres, :apellidos, :nacimiento, :genero, :telefono, :direccion, 1)
-                """, p);
-        return consultar(id);
+    public ResponseEntity<List<MascotaDeClienteDto>> mascotas(long id) {
+        return ResponseEntity.ok(servicio.mascotas(id));
     }
 
     /** {@inheritDoc} */
     @Override
-    @Transactional
-    public ResponseEntity<Map<String, Object>> actualizar(long id, ClienteRq datos) {
-        consultar(id);
-        Map<String, Object> p = validar(datos, id);
-        p.put("id", id);
-        db.ejecutar("""
-                UPDATE cliente SET tipo_documento = :tipo, numero_documento = :doc, nombres = :nombres,
-                       apellidos = :apellidos, fecha_nacimiento = :nacimiento, genero = :genero,
-                       telefono = :telefono, direccion = :direccion
-                WHERE cliente_id = :id
-                """, p);
-        return consultar(id);
+    public ResponseEntity<ClienteDto> crear(ClienteRq datos) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(servicio.crear(datos));
     }
 
     /** {@inheritDoc} */
     @Override
-    @Transactional
+    public ResponseEntity<ClienteDto> actualizar(long id, ClienteRq datos) {
+        return ResponseEntity.ok(servicio.actualizar(id, datos));
+    }
+
+    /** {@inheritDoc} */
+    @Override
     public ResponseEntity<Void> archivar(long id) {
-        consultar(id);
-        if (db.existe("""
-                SELECT 1 FROM cita WHERE cliente_id = :id AND estado IN ('pendiente', 'programada', 'confirmada') AND fecha_hora >= :ahora
-                """, Db.p("id", id, "ahora", Tiempo.ahora()))) {
-            throw new ConflictException("El cliente tiene citas futuras reservadas (pendientes, programadas o confirmadas). Cancélalas antes de archivarlo.");
-        }
-        db.ejecutar("UPDATE cliente SET activo = 0 WHERE cliente_id = :id", Db.p("id", id));
-        db.ejecutar("UPDATE mascota SET activo = 0, fecha_modificacion = :f WHERE cliente_id = :id",
-                Db.p("id", id, "f", Tiempo.ahora()));
-        auditoria.registrar("CLIENTE_ARCHIVADO", "cliente", id, "Cliente " + id + " archivado con sus mascotas");
+        servicio.archivar(id);
         return ResponseEntity.noContent().build();
     }
 
     /** {@inheritDoc} */
     @Override
-    @Transactional
-    public ResponseEntity<Map<String, Object>> reactivar(long id) {
-        Map<String, Object> c = db.requerido("SELECT activo FROM cliente WHERE cliente_id = :id FOR UPDATE",
-                Db.p("id", id), "El cliente no existe.");
-        if (Validar.bool(c, "activo")) {
-            throw new ConflictException("El cliente ya está activo.");
-        }
-        db.ejecutar("UPDATE cliente SET activo = 1 WHERE cliente_id = :id", Db.p("id", id));
-        return consultar(id);
-    }
-
-    /**
-     * Valida y normaliza los datos del cliente (documento único, correo y teléfono).
-     *
-     * @param d datos recibidos.
-     * @param id cliente que se actualiza, o null si es nuevo.
-     * @return parámetros listos para la sentencia SQL.
-     */
-    private Map<String, Object> validar(ClienteRq d, Long id) {
-        if (d == null) {
-            throw new BadRequestException("Los datos del cliente son obligatorios.");
-        }
-        String tipo = Validar.texto(d.tipoDocumento(), "tipo de documento", 10).toUpperCase();
-        if (!TIPOS.contains(tipo)) {
-            throw new BadRequestException("Tipo de documento no válido. Use: " + String.join(", ", TIPOS) + ".");
-        }
-        String documento = Validar.texto(d.numeroDocumento(), "número de documento", 20);
-        if (!documento.matches("[A-Za-z0-9-]{4,20}")) {
-            throw new BadRequestException("El número de documento solo admite letras, números y guiones (4 a 20).");
-        }
-        LocalDate nacimiento = Validar.fecha(d.fechaNacimiento(), "fecha de nacimiento", true);
-        if (nacimiento.isAfter(Tiempo.hoy()) || nacimiento.isBefore(LocalDate.of(1900, 1, 1))) {
-            throw new BadRequestException("La fecha de nacimiento no es válida.");
-        }
-        String genero = Validar.opcional(d.genero(), "género", 1);
-        if (genero != null && !Set.of("M", "F", "O").contains(genero.toUpperCase())) {
-            throw new BadRequestException("El género debe ser M, F u O.");
-        }
-        String telefono = Validar.opcional(d.telefono(), "teléfono", 20);
-        if (telefono != null && !telefono.matches("[0-9+ ()-]{7,20}")) {
-            throw new BadRequestException("El teléfono no es válido.");
-        }
-        if (db.existe("SELECT 1 FROM cliente WHERE numero_documento = :doc AND (:id IS NULL OR cliente_id <> :id)",
-                Db.p("doc", documento, "id", id))) {
-            throw new ConflictException("Ya existe un cliente con el número de documento " + documento + ".");
-        }
-        return Db.p("tipo", tipo, "doc", documento, "nombres", Validar.texto(d.nombres(), "nombres", 100),
-                "apellidos", Validar.texto(d.apellidos(), "apellidos", 100), "nacimiento", nacimiento,
-                "genero", genero == null ? null : genero.toUpperCase(), "telefono", telefono,
-                "direccion", Validar.opcional(d.direccion(), "dirección", 500));
+    public ResponseEntity<ClienteDto> reactivar(long id) {
+        return ResponseEntity.ok(servicio.reactivar(id));
     }
 }

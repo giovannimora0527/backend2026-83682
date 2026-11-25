@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Contrato REST del catálogo de razas.
@@ -37,7 +36,7 @@ public interface RazaApi {
     @Operation(summary = "Listar razas con el número de mascotas de cada una")
     @PreAuthorize("hasAuthority('MASCOTA_CONSULTAR')")
     @GetMapping("/listar")
-    ResponseEntity<List<Map<String, Object>>> listar();
+    ResponseEntity<List<RazaDto>> listar();
 
     /**
      * Registrar raza.
@@ -48,7 +47,7 @@ public interface RazaApi {
     @Operation(summary = "Registrar raza")
     @PreAuthorize("hasAuthority('RAZA_GESTIONAR')")
     @PostMapping("/guardar")
-    ResponseEntity<Map<String, Object>> guardar(@RequestBody RazaRq datos);
+    ResponseEntity<RazaDto> guardar(@RequestBody RazaRq datos);
 
     /**
      * Actualizar raza (no permite cambiar la especie si ya tiene mascotas).
@@ -60,7 +59,7 @@ public interface RazaApi {
     @Operation(summary = "Actualizar raza")
     @PreAuthorize("hasAuthority('RAZA_GESTIONAR')")
     @PutMapping("/actualizar/{id}")
-    ResponseEntity<Map<String, Object>> actualizar(@PathVariable int id, @RequestBody RazaRq datos);
+    ResponseEntity<RazaDto> actualizar(@PathVariable int id, @RequestBody RazaRq datos);
 
     /**
      * Eliminar una raza que no tenga mascotas registradas.

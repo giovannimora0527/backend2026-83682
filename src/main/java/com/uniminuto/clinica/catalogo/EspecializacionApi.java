@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Consulta de especialidades para listas desplegables. La administración (registro, edición,
@@ -26,5 +25,5 @@ public interface EspecializacionApi {
     @Operation(summary = "Listar especialidades")
     @PreAuthorize("hasAnyAuthority('TARIFA_CONSULTAR', 'MEDICO_CONSULTAR')")
     @GetMapping("/listar")
-    ResponseEntity<List<Map<String, Object>>> listar();
+    ResponseEntity<List<EspecializacionDto>> listar();
 }

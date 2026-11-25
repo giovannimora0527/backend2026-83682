@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.List;
-import java.util.Map;
 
 /** Mascotas (pacientes). */
 @Tag(name = "Mascotas", description = "Gestión de mascotas o pacientes")
@@ -32,7 +31,7 @@ public interface MascotaApi {
     @Operation(summary = "Listar mascotas con raza y propietario")
     @PreAuthorize("hasAuthority('MASCOTA_CONSULTAR')")
     @GetMapping({"/listar-detalle", "/listar"})
-    ResponseEntity<List<Map<String, Object>>> listar();
+    ResponseEntity<List<MascotaDto>> listar();
 
     /**
      * Consultar una mascota.
@@ -43,7 +42,7 @@ public interface MascotaApi {
     @Operation(summary = "Consultar una mascota")
     @PreAuthorize("hasAuthority('MASCOTA_CONSULTAR')")
     @GetMapping("/{id}")
-    ResponseEntity<Map<String, Object>> consultar(@PathVariable int id);
+    ResponseEntity<MascotaDto> consultar(@PathVariable int id);
 
     /**
      * Registrar mascota.
@@ -54,7 +53,7 @@ public interface MascotaApi {
     @Operation(summary = "Registrar mascota")
     @PreAuthorize("hasAuthority('MASCOTA_GESTIONAR')")
     @PostMapping("/crear")
-    ResponseEntity<Map<String, Object>> crear(@RequestBody MascotaRq datos);
+    ResponseEntity<MascotaDto> crear(@RequestBody MascotaRq datos);
 
     /**
      * Actualizar mascota.
@@ -66,7 +65,7 @@ public interface MascotaApi {
     @Operation(summary = "Actualizar mascota")
     @PreAuthorize("hasAuthority('MASCOTA_GESTIONAR')")
     @PutMapping("/actualizar/{id}")
-    ResponseEntity<Map<String, Object>> actualizar(@PathVariable int id, @RequestBody MascotaRq datos);
+    ResponseEntity<MascotaDto> actualizar(@PathVariable int id, @RequestBody MascotaRq datos);
 
     /** Nuevo estado de la mascota. */
     record EstadoRq(Boolean activo) {
@@ -83,5 +82,5 @@ public interface MascotaApi {
     @Operation(summary = "Activar o inactivar mascota")
     @PreAuthorize("hasAuthority('MASCOTA_GESTIONAR')")
     @PatchMapping("/{id}/estado")
-    ResponseEntity<Map<String, Object>> cambiarEstado(@PathVariable int id, @RequestBody EstadoRq datos);
+    ResponseEntity<MascotaDto> cambiarEstado(@PathVariable int id, @RequestBody EstadoRq datos);
 }

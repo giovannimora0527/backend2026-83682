@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Contrato REST del catálogo de médicos veterinarios.
@@ -38,7 +37,7 @@ public interface MedicoApi {
     @Operation(summary = "Listar médicos con su especialidad")
     @PreAuthorize("hasAnyAuthority('MEDICO_CONSULTAR', 'REPORTE_FINANCIERO')")
     @GetMapping("/listar")
-    ResponseEntity<List<Map<String, Object>>> listar();
+    ResponseEntity<List<MedicoDto>> listar();
 
     /**
      * Listar médicos activos (asignables a citas).
@@ -48,7 +47,7 @@ public interface MedicoApi {
     @Operation(summary = "Listar médicos activos (asignables a citas)")
     @PreAuthorize("hasAnyAuthority('MEDICO_CONSULTAR', 'REPORTE_FINANCIERO')")
     @GetMapping("/listar-disponibles")
-    ResponseEntity<List<Map<String, Object>>> disponibles();
+    ResponseEntity<List<MedicoDto>> disponibles();
 
     /**
      * Registrar médico.
@@ -59,7 +58,7 @@ public interface MedicoApi {
     @Operation(summary = "Registrar médico")
     @PreAuthorize("hasAuthority('MEDICO_GESTIONAR')")
     @PostMapping("/crear")
-    ResponseEntity<Map<String, Object>> crear(@RequestBody MedicoRq datos);
+    ResponseEntity<MedicoDto> crear(@RequestBody MedicoRq datos);
 
     /**
      * Actualizar médico.
@@ -71,7 +70,7 @@ public interface MedicoApi {
     @Operation(summary = "Actualizar médico")
     @PreAuthorize("hasAuthority('MEDICO_GESTIONAR')")
     @PutMapping("/actualizar/{id}")
-    ResponseEntity<Map<String, Object>> actualizar(@PathVariable long id, @RequestBody MedicoRq datos);
+    ResponseEntity<MedicoDto> actualizar(@PathVariable long id, @RequestBody MedicoRq datos);
 
     /** Nuevo estado del médico. */
     record EstadoRq(Boolean activo) {
@@ -88,5 +87,5 @@ public interface MedicoApi {
     @Operation(summary = "Activar o inactivar médico")
     @PreAuthorize("hasAuthority('MEDICO_GESTIONAR')")
     @PatchMapping("/{id}/estado")
-    ResponseEntity<Map<String, Object>> cambiarEstado(@PathVariable long id, @RequestBody EstadoRq datos);
+    ResponseEntity<MedicoDto> cambiarEstado(@PathVariable long id, @RequestBody EstadoRq datos);
 }

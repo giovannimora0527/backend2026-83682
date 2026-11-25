@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
-import java.util.Map;
 
 /** Propietarios de mascotas. */
 @Tag(name = "Clientes", description = "Gestión de propietarios de mascotas")
@@ -35,7 +34,7 @@ public interface ClienteApi {
     @Operation(summary = "Listar clientes (activos e inactivos)")
     @PreAuthorize("hasAuthority('CLIENTE_CONSULTAR')")
     @GetMapping({"/listar-todos", "/listar"})
-    ResponseEntity<List<Map<String, Object>>> listar();
+    ResponseEntity<List<ClienteDto>> listar();
 
     /**
      * Buscar cliente por número de documento.
@@ -46,7 +45,7 @@ public interface ClienteApi {
     @Operation(summary = "Buscar cliente por número de documento")
     @PreAuthorize("hasAuthority('CLIENTE_CONSULTAR')")
     @GetMapping("/buscar-por-documento")
-    ResponseEntity<Map<String, Object>> buscarPorDocumento(@RequestParam String documento);
+    ResponseEntity<ClienteDto> buscarPorDocumento(@RequestParam String documento);
 
     /**
      * Consultar cliente.
@@ -57,7 +56,7 @@ public interface ClienteApi {
     @Operation(summary = "Consultar cliente")
     @PreAuthorize("hasAuthority('CLIENTE_CONSULTAR')")
     @GetMapping("/{id}")
-    ResponseEntity<Map<String, Object>> consultar(@PathVariable long id);
+    ResponseEntity<ClienteDto> consultar(@PathVariable long id);
 
     /**
      * Listar las mascotas activas de un cliente (para combos dependientes cliente → mascota).
@@ -68,7 +67,7 @@ public interface ClienteApi {
     @Operation(summary = "Listar las mascotas activas de un cliente (para combos dependientes cliente → mascota)")
     @PreAuthorize("hasAuthority('CLIENTE_CONSULTAR')")
     @GetMapping("/{id}/mascotas")
-    ResponseEntity<List<Map<String, Object>>> mascotas(@PathVariable long id);
+    ResponseEntity<List<MascotaDeClienteDto>> mascotas(@PathVariable long id);
 
     /**
      * Registrar cliente.
@@ -79,7 +78,7 @@ public interface ClienteApi {
     @Operation(summary = "Registrar cliente")
     @PreAuthorize("hasAuthority('CLIENTE_GESTIONAR')")
     @PostMapping
-    ResponseEntity<Map<String, Object>> crear(@RequestBody ClienteRq datos);
+    ResponseEntity<ClienteDto> crear(@RequestBody ClienteRq datos);
 
     /**
      * Actualizar cliente.
@@ -91,7 +90,7 @@ public interface ClienteApi {
     @Operation(summary = "Actualizar cliente")
     @PreAuthorize("hasAuthority('CLIENTE_GESTIONAR')")
     @PutMapping("/{id}")
-    ResponseEntity<Map<String, Object>> actualizar(@PathVariable long id, @RequestBody ClienteRq datos);
+    ResponseEntity<ClienteDto> actualizar(@PathVariable long id, @RequestBody ClienteRq datos);
 
     /**
      * Archivar (inactivar) cliente.
@@ -114,5 +113,5 @@ public interface ClienteApi {
     @Operation(summary = "Reactivar cliente archivado")
     @PreAuthorize("hasAuthority('CLIENTE_GESTIONAR')")
     @PatchMapping("/{id}/reactivar")
-    ResponseEntity<Map<String, Object>> reactivar(@PathVariable long id);
+    ResponseEntity<ClienteDto> reactivar(@PathVariable long id);
 }

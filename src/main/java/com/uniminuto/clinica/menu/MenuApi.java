@@ -8,7 +8,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 import java.util.List;
-import java.util.Map;
 
 /** Contrato REST del menú lateral según el perfil del usuario. */
 @Tag(name = "Menú", description = "Opciones de menú según el perfil autenticado")
@@ -23,7 +22,7 @@ public interface MenuApi {
     @Operation(summary = "Menús del perfil del usuario autenticado")
     @PreAuthorize("isAuthenticated()")
     @GetMapping("/propio")
-    ResponseEntity<List<Map<String, Object>>> propio();
+    ResponseEntity<List<MenuDto>> propio();
 
     /**
      * Todos los menús activos (administración).
@@ -33,5 +32,5 @@ public interface MenuApi {
     @Operation(summary = "Todos los menús activos (administración)")
     @PreAuthorize("hasAuthority('USUARIO_GESTIONAR')")
     @GetMapping("/listar-activos")
-    ResponseEntity<List<Map<String, Object>>> activos();
+    ResponseEntity<List<MenuDto>> activos();
 }
