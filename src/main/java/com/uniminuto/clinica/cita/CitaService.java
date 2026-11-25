@@ -54,7 +54,8 @@ public class CitaService {
     private static final String EVENTO = """
             SELECT c.id, c.estado, c.fecha_hora AS inicio, c.fecha_fin AS fin, c.motivo,
                    CONCAT(md.nombres, ' ', md.apellidos) AS medico, m.nombre_mascota AS mascota,
-                   c.mascota_id AS mascotaId, CONCAT(cl.nombres, ' ', cl.apellidos) AS propietario,
+                   c.mascota_id AS mascotaId, c.cliente_id AS clienteId, c.medico_id AS medicoId,
+                   CONCAT(cl.nombres, ' ', cl.apellidos) AS propietario,
                    cl.numero_documento AS documento, cl.telefono, r.especie, r.nombre AS raza, m.edad
             FROM cita c
             JOIN medico md ON md.id = c.medico_id
@@ -200,7 +201,8 @@ public class CitaService {
      */
     @Transactional
     public Map<String, Object> crear(CitaApi.CitaRq d) {
-        Datos datos = validarDatos(d);
+        Datos datos = validarDatos(conMedicoPropio(d));
+        verificarMedicoPropio(datos.medico, SesionActual.obtener());
         if (!RESERVADAS.contains(datos.estado)) {
             throw new BadRequestException("Una cita nueva solo puede quedar pendiente, programada o confirmada.");
         }
@@ -230,8 +232,10 @@ public class CitaService {
         if (Set.of("cancelada", "finalizada").contains(estadoActual)) {
             throw new ConflictException("La cita está " + estadoActual + " y ya no puede modificarse.");
         }
-        Datos datos = validarDatos(d);
+        Datos datos = validarDatos(conMedicoPropio(d));
         SesionUsuario s = SesionActual.obtener();
+        verificarAcceso(actual, s);
+        verificarMedicoPropio(datos.medico, s);
         if ("atendida".equals(datos.estado) && !s.esAdmin() && !"atendida".equals(estadoActual)) {
             throw new ForbiddenException("Solo el médico (al finalizar la atención) o el administrador marcan una cita como atendida.");
         }
@@ -734,7 +738,33 @@ public class CitaService {
      * @param cita fila de la cita.
      * @param s sesión actual.
      */
-    private void verificarAcceso(Map<String, Object> cita, SesionUsuario s) {
+    /**
+     * Si quien agenda es un médico y no indica médico, la cita queda a su propio nombre.
+     *
+     * @param d datos recibidos.
+     * @return datos con el médico completado cuando corresponde.
+     */
+    private CitaApi.CitaRq conMedicoPropio(CitaApi.CitaRq d) {
+        if (d != null && d.medicoId() == null && SesionActual.obtener().es(Perfiles.MEDICO)) {
+            return new CitaApi.CitaRq(d.clienteId(), d.mascotaId(), SesionActual.medicoId(), d.fechaHora(), d.fechaFin(),
+                    d.estado(), d.motivo());
+        }
+        return d;
+    }
+
+    /**
+     * Un médico solo registra o edita citas asignadas a sí mismo.
+     *
+     * @param medico médico de la cita.
+     * @param s sesión actual.
+     */
+    private void verificarMedicoPropio(long medico, SesionUsuario s) {
+        if (s.es(Perfiles.MEDICO) && medico != SesionActual.medicoId()) {
+            throw new ForbiddenException("Como médico solo puedes agendar o editar citas a tu propio nombre.");
+        }
+    }
+
+        private void verificarAcceso(Map<String, Object> cita, SesionUsuario s) {
         if (s.es(Perfiles.MEDICO) && Validar.largo(cita, "medico_id") != SesionActual.medicoId()) {
             throw new ForbiddenException("Solo puedes gestionar tus propias citas.");
         }

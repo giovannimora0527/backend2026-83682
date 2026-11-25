@@ -50,6 +50,8 @@ public class FacturacionService {
     /** Consulta de la atención que origina la factura. */
     private static final String ORIGEN = """
             SELECT a.id, a.cita_id AS cita, CONCAT(cl.nombres, ' ', cl.apellidos) AS propietario,
+                   (SELECT COUNT(*) FROM formula_clinica fc WHERE fc.atencion_id = a.id AND fc.estado = 'CONFIRMADA'
+                      AND fc.estado_despacho IN ('PENDIENTE_DESPACHO', 'EN_PREPARACION')) AS formulasSinDespachar,
                    m.nombre_mascota AS mascota, CONCAT(md.nombres, ' ', md.apellidos) AS veterinario,
                    e.nombre AS especialidad, a.fecha_finalizacion AS finalizada
             FROM atencion_medica a
@@ -131,6 +133,11 @@ public class FacturacionService {
         Map<String, Object> origen = origen(atencionId);
         if (db.existe("SELECT 1 FROM factura WHERE atencion_id = :a AND estado <> 'ANULADA'", Db.p("a", atencionId))) {
             throw new ConflictException("La atención ya tiene una factura vigente.");
+        }
+        long sinDespachar = formulasSinDespachar(atencionId);
+        if (sinDespachar > 0) {
+            throw new ConflictException("La atención tiene " + sinDespachar + " fórmula(s) que despacho aún no ha "
+                    + "procesado. Solo se facturan medicamentos entregados: espera la dispensación o que despacho la cancele.");
         }
         BigDecimal descuento = descuento(rq.descuento(), rq.motivo());
         Liquidador.Resultado r = Liquidador.liquidar(conceptos(atencionId), descuento);
@@ -461,6 +468,20 @@ public class FacturacionService {
         i.put("otros", otros);
         i.put("total", total);
         return i;
+    }
+
+    /**
+     * Fórmulas confirmadas de la atención que despacho todavía no ha procesado (pendientes o en preparación).
+     * Mientras existan, no se factura: los medicamentos facturados deben corresponder a lo efectivamente entregado.
+     *
+     * @param atencionId identificador de la atención.
+     * @return número de fórmulas sin despachar.
+     */
+    long formulasSinDespachar(long atencionId) {
+        return db.contar("""
+                SELECT COUNT(*) FROM formula_clinica WHERE atencion_id = :a AND estado = 'CONFIRMADA'
+                  AND estado_despacho IN ('PENDIENTE_DESPACHO', 'EN_PREPARACION')
+                """, Db.p("a", atencionId));
     }
 
     /**

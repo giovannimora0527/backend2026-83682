@@ -113,8 +113,9 @@ public interface CitaApi {
      * @param datos datos enviados en el cuerpo de la solicitud.
      * @return respuesta HTTP con el resultado en formato JSON.
      */
-    @Operation(summary = "Registrar cita", description = "Valida horario, ausencias, médico activo y superposiciones.")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @Operation(summary = "Registrar cita", description = "Valida horario, ausencias, médico activo y superposiciones. "
+            + "El médico solo puede registrar citas a su propio nombre.")
+    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
     @PostMapping("/crear")
     ResponseEntity<Map<String, Object>> crear(@RequestBody CitaRq datos);
 
@@ -125,8 +126,8 @@ public interface CitaApi {
      * @param datos datos enviados en el cuerpo de la solicitud.
      * @return respuesta HTTP con el resultado en formato JSON.
      */
-    @Operation(summary = "Editar cita existente")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @Operation(summary = "Editar cita existente", description = "El médico solo puede editar sus propias citas.")
+    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
     @PutMapping("/actualizar/{id}")
     ResponseEntity<Map<String, Object>> actualizar(@PathVariable long id, @RequestBody CitaRq datos);
 
