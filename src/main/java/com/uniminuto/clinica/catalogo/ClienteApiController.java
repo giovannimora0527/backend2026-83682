@@ -34,13 +34,18 @@ public class ClienteApiController implements ClienteApi {
     /** Dependencia inyectada por constructor: db. */
     private final Db db;
 
+    /** Log central de operaciones sensibles. */
+    private final com.uniminuto.clinica.auditoria.AuditoriaService auditoria;
+
     /**
      * Crea el controlador con sus dependencias (inyección por constructor).
      *
      * @param db dependencia db.
+     * @param auditoria log de operaciones sensibles.
      */
-    public ClienteApiController(Db db) {
+    public ClienteApiController(Db db, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
         this.db = db;
+        this.auditoria = auditoria;
     }
 
     /** {@inheritDoc} */
@@ -122,6 +127,7 @@ public class ClienteApiController implements ClienteApi {
         db.ejecutar("UPDATE cliente SET activo = 0 WHERE cliente_id = :id", Db.p("id", id));
         db.ejecutar("UPDATE mascota SET activo = 0, fecha_modificacion = :f WHERE cliente_id = :id",
                 Db.p("id", id, "f", Tiempo.ahora()));
+        auditoria.registrar("CLIENTE_ARCHIVADO", "cliente", id, "Cliente " + id + " archivado con sus mascotas");
         return ResponseEntity.noContent().build();
     }
 

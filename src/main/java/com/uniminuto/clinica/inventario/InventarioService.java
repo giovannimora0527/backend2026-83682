@@ -48,11 +48,16 @@ public class InventarioService {
     /** Acceso a datos. */
     private final Db db;
 
+    /** Log central de operaciones sensibles. */
+    private final com.uniminuto.clinica.auditoria.AuditoriaService auditoria;
+
     /**
      * @param db acceso a datos.
+     * @param auditoria log de operaciones sensibles.
      */
-    public InventarioService(Db db) {
+    public InventarioService(Db db, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
         this.db = db;
+        this.auditoria = auditoria;
     }
 
     // ------------------------------------------------------------------ Consultas
@@ -174,6 +179,7 @@ public class InventarioService {
                 VALUES (:codigo, :nombre, :descripcion, :presentacion, :tipo, :invima, :compra, :venta, :iva, :minimo,
                        :fcompra, :fingreso, :fpedido, :fvence, :activo, :ahora)
                 """, p.parametros());
+        auditoria.registrar("PRODUCTO_CREADO", "medicamento", null, "Producto " + datos.codigo() + " · " + datos.nombre());
         return ficha(id);
     }
 
@@ -196,6 +202,7 @@ public class InventarioService {
                        activo = :activo, fecha_modificacion_registro = :ahora
                 WHERE id = :id
                 """, params);
+        auditoria.registrar("PRODUCTO_ACTUALIZADO", "medicamento", id, "Producto " + datos.codigo() + " · " + datos.nombre() + " (datos o precios)");
         return ficha(id);
     }
 
@@ -238,6 +245,7 @@ public class InventarioService {
                 """, Db.p("m", producto, "n", numero, "c", costo, "i", ingreso, "v", vence, "q", cantidad));
         mover(lote, "ENTRADA", cantidad, "Ingreso de lote", Validar.opcional(l.referencia(), "referencia", 255),
                 null, null, null);
+        auditoria.registrar("LOTE_REGISTRADO", "medicamento", producto, "Lote " + l.numero() + " del producto " + producto);
         return Map.of("id", lote, "numero", numero, "cantidad", cantidad);
     }
 
@@ -274,6 +282,7 @@ public class InventarioService {
         };
         long id = mover(lote, tipo, delta, Validar.texto(mv.motivo(), "motivo", 255),
                 Validar.opcional(mv.referencia(), "referencia", 255), null, null, null);
+        auditoria.registrar("AJUSTE_INVENTARIO", "medicamento_lote", lote, "Movimiento " + mv.tipo() + " de " + mv.cantidad() + " unidades en el lote " + lote + " del producto " + producto + ". Motivo: " + mv.motivo());
         return Map.of("id", id);
     }
 

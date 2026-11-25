@@ -51,14 +51,19 @@ public class ImportacionService {
     /** Transacción independiente por fila importada. */
     private final TransactionTemplate porFila;
 
+    /** Log central de operaciones sensibles. */
+    private final com.uniminuto.clinica.auditoria.AuditoriaService auditoria;
+
     /**
      * @param db acceso a datos.
      * @param inventario servicio de inventario.
      * @param tm administrador de transacciones.
+     * @param auditoria log de operaciones sensibles.
      */
-    public ImportacionService(Db db, InventarioService inventario, PlatformTransactionManager tm) {
+    public ImportacionService(Db db, InventarioService inventario, PlatformTransactionManager tm, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
         this.db = db;
         this.inventario = inventario;
+        this.auditoria = auditoria;
         this.porFila = new TransactionTemplate(tm);
         this.porFila.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -161,6 +166,7 @@ public class ImportacionService {
         }
         db.ejecutar("UPDATE importacion_inventario SET importados = :i, rechazados = :r WHERE id = :id",
                 Db.p("i", importados, "r", rechazados, "id", id));
+        auditoria.registrar("IMPORTACION_CONFIRMADA", "importacion_inventario", id, "Carga masiva " + id + " confirmada");
         return detalle(id);
     }
 

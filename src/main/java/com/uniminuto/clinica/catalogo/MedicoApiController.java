@@ -53,11 +53,16 @@ public class MedicoApiController implements MedicoApi {
     /** Acceso a datos. */
     private final Db db;
 
+    /** Log central de operaciones sensibles. */
+    private final com.uniminuto.clinica.auditoria.AuditoriaService auditoria;
+
     /**
      * @param db acceso a datos.
+     * @param auditoria log de operaciones sensibles.
      */
-    public MedicoApiController(Db db) {
+    public MedicoApiController(Db db, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
         this.db = db;
+        this.auditoria = auditoria;
     }
 
     /** {@inheritDoc} */
@@ -121,6 +126,7 @@ public class MedicoApiController implements MedicoApi {
             verificarSinCitasFuturas(id);
         }
         db.ejecutar("UPDATE medico SET activo = :a WHERE id = :id", Db.p("a", datos.activo(), "id", id));
+        auditoria.registrar(datos.activo() ? "VETERINARIO_ACTIVADO" : "VETERINARIO_INACTIVADO", "medico", id, "Veterinario " + id + (datos.activo() ? " activado" : " inactivado"));
         return ResponseEntity.ok(consultar(id));
     }
 

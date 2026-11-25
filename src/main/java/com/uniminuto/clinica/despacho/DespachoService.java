@@ -60,13 +60,18 @@ public class DespachoService {
     /** Movimientos de inventario. */
     private final InventarioService inventario;
 
+    /** Log central de operaciones sensibles. */
+    private final com.uniminuto.clinica.auditoria.AuditoriaService auditoria;
+
     /**
      * @param db acceso a datos.
      * @param inventario servicio de inventario.
+     * @param auditoria log de operaciones sensibles.
      */
-    public DespachoService(Db db, InventarioService inventario) {
+    public DespachoService(Db db, InventarioService inventario, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
         this.db = db;
         this.inventario = inventario;
+        this.auditoria = auditoria;
     }
 
     // ------------------------------------------------------------------ Consultas
@@ -363,6 +368,7 @@ public class DespachoService {
                 Db.p("e", nuevo, "p", faltantes.isEmpty() ? null : String.join("\n", faltantes), "id", despacho));
         db.ejecutar("UPDATE despacho_preparacion SET estado = 'CONFIRMADA' WHERE id = :id", Db.p("id", planId));
         cambiarEstado(formulaId, estado, nuevo, "Entrega #" + despacho + " confirmada");
+        auditoria.registrar("DESPACHO_CONFIRMADO", "despacho_preparacion", planId, "Entrega confirmada del plan de despacho " + planId + " (descuento de inventario)");
         return entrega(despacho);
     }
 
@@ -396,6 +402,7 @@ public class DespachoService {
         db.ejecutar("UPDATE despacho_preparacion SET estado = 'DESCARTADA' WHERE formula_id = :f AND estado = 'VIGENTE'",
                 Db.p("f", formulaId));
         cambiarEstado(formulaId, estado, nuevo, motivo);
+        auditoria.registrar("DESPACHO_" + String.valueOf(accion).toUpperCase(), "formula_clinica", formulaId, "Fórmula " + formulaId + ": " + accion + ". Motivo: " + motivoRq);
         return detalle(formulaId);
     }
 
@@ -441,6 +448,7 @@ public class DespachoService {
             cambiarEstado(formulaId, estado, entregado == 0 ? "PENDIENTE_DESPACHO" : "DESPACHO_PARCIAL",
                     "Reversión de la entrega #" + despachoId + ": " + motivo);
         }
+        auditoria.registrar("DESPACHO_REVERTIDO", "despacho", despachoId, "Reversión de la entrega " + despachoId + ". Motivo: " + motivoRq);
         return entrega(despachoId);
     }
 

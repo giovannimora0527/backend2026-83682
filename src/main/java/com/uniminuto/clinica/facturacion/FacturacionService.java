@@ -74,11 +74,16 @@ public class FacturacionService {
     /** Acceso a datos. */
     private final Db db;
 
+    /** Log central de operaciones sensibles. */
+    private final com.uniminuto.clinica.auditoria.AuditoriaService auditoria;
+
     /**
      * @param db acceso a datos.
+     * @param auditoria log de operaciones sensibles.
      */
-    public FacturacionService(Db db) {
+    public FacturacionService(Db db, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
         this.db = db;
+        this.auditoria = auditoria;
     }
 
     // ------------------------------------------------------------------ Emisión
@@ -181,6 +186,7 @@ public class FacturacionService {
                     "total", l.total()));
         }
         historial(id, null, "PENDIENTE_PAGO", "Factura emitida");
+        auditoria.registrar("FACTURA_EMITIDA", "atencion", atencionId, "Factura emitida para la atención " + atencionId + (rq.descuento() == null || rq.descuento().isBlank() ? "" : " con descuento " + rq.descuento() + " · " + rq.motivo()));
         return detalle(id);
     }
 
@@ -302,6 +308,7 @@ public class FacturacionService {
         if (!nuevo.equals(estado)) {
             historial(id, estado, nuevo, "Pago de " + importe.toPlainString() + " (" + metodo + ")");
         }
+        auditoria.registrar("PAGO_REGISTRADO", "factura", id, "Pago de " + rq.importe() + " (" + rq.metodo() + ") a la factura " + id);
         return detalle(id);
     }
 
@@ -326,6 +333,7 @@ public class FacturacionService {
         }
         db.ejecutar("UPDATE factura SET estado = 'ANULADA' WHERE id = :id", Db.p("id", id));
         historial(id, estado, "ANULADA", motivo);
+        auditoria.registrar("FACTURA_ANULADA", "factura", id, "Factura " + id + " anulada. Motivo: " + motivoRq);
         return detalle(id);
     }
 

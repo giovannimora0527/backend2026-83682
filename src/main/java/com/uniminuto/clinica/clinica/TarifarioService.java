@@ -30,11 +30,16 @@ public class TarifarioService {
     /** Acceso a datos. */
     private final Db db;
 
+    /** Log central de operaciones sensibles. */
+    private final com.uniminuto.clinica.auditoria.AuditoriaService auditoria;
+
     /**
      * @param db acceso a datos.
+     * @param auditoria log de operaciones sensibles.
      */
-    public TarifarioService(Db db) {
+    public TarifarioService(Db db, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
         this.db = db;
+        this.auditoria = auditoria;
     }
 
     /**
@@ -76,6 +81,7 @@ public class TarifarioService {
             db.ejecutar("UPDATE especializacion SET codigo_especializacion = :c, nombre = :n, descripcion = :d, "
                     + "activo = :a WHERE id = :id", p);
         }
+        auditoria.registrar("ESPECIALIDAD_GUARDADA", "especializacion", id, "Especialidad " + d.nombre() + (id == null ? " creada" : " actualizada") + (Boolean.FALSE.equals(d.activo()) ? " (inactiva)" : ""));
         return db.uno(ESPECIALIDAD + " WHERE id = :id", Db.p("id", id));
     }
 
@@ -161,6 +167,7 @@ public class TarifarioService {
                 VALUES (:s, :v, :iva, :imp, :d, :h, :u, :ahora)
                 """, Db.p("s", servicio, "v", valor, "iva", iva, "imp", impuesto, "d", desde, "h", hasta,
                 "u", SesionActual.usuarioId(), "ahora", Tiempo.ahora()));
+        auditoria.registrar("TARIFA_REGISTRADA", "servicio_clinico", servicio, "Nueva vigencia del servicio " + servicio + ": valor " + t.valor() + ", IVA " + t.iva() + "%, otros " + t.impuesto() + "% desde " + t.desde());
         return tarifas(servicio).stream().filter(x -> Validar.largo(x, "id") == id).findFirst().orElseThrow();
     }
 

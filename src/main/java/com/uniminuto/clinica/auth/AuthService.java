@@ -58,6 +58,9 @@ public class AuthService {
     /** Intentos permitidos por código. */
     private final int intentos;
 
+    /** Log central de operaciones sensibles. */
+    private final com.uniminuto.clinica.auditoria.AuditoriaService auditoria;
+
     /**
      * @param db acceso a datos.
      * @param jwt servicio de tokens.
@@ -66,11 +69,13 @@ public class AuthService {
      * @param otpHabilitado si se exige el código por correo.
      * @param minutos vigencia del código.
      * @param intentos intentos permitidos.
+     * @param auditoria log de operaciones sensibles.
      */
     public AuthService(Db db, JwtServicio jwt, CorreoService correo, @Value("${clinica.jwt.horas}") int horas,
                        @Value("${clinica.otp.habilitado:true}") boolean otpHabilitado,
-                       @Value("${clinica.otp.minutos:5}") int minutos, @Value("${clinica.otp.intentos:5}") int intentos) {
+                       @Value("${clinica.otp.minutos:5}") int minutos, @Value("${clinica.otp.intentos:5}") int intentos, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
         this.db = db;
+        this.auditoria = auditoria;
         this.jwt = jwt;
         this.correo = correo;
         this.horas = horas;
@@ -96,6 +101,8 @@ public class AuthService {
         Map<String, Object> usuario = usuario("u.username = :valor", datos.username().trim());
         String hash = usuario == null ? null : Validar.cadena(usuario, "password_hash");
         if (usuario == null || !ClaveUtil.verificar(datos.password(), hash)) {
+            auditoria.registrarSinSesion(usuario == null ? null : Validar.largo(usuario, "id"), datos.username().trim(), null,
+                    "LOGIN_FALLIDO", usuario == null ? "Usuario inexistente" : "Contraseña incorrecta");
             throw new ClinicaException(HttpStatus.UNAUTHORIZED, "Usuario o contraseña incorrectos.");
         }
         verificarActivo(usuario);
@@ -209,6 +216,7 @@ public class AuthService {
     public void logout() {
         db.ejecutar("UPDATE session SET activo = 0 WHERE session_id = :id",
                 Db.p("id", SesionActual.obtener().sesionId()));
+        auditoria.registrar("LOGOUT", "usuario", SesionActual.usuarioId(), "Cierre de sesión");
     }
 
     // ------------------------------------------------------------------ Utilidades
@@ -288,6 +296,7 @@ public class AuthService {
                 INSERT INTO session (user_id, token, fecha_ini_sesion, fecha_expiracion, activo)
                 VALUES (:usuario, :token, :inicio, :expira, 1)
                 """, Db.p("usuario", usuarioId, "token", ClaveUtil.sha256(token), "inicio", inicio, "expira", expira));
+        auditoria.registrarSinSesion(usuarioId, Validar.cadena(usuario, "username"), perfil, "LOGIN", "Inicio de sesión exitoso (contraseña y código verificados)");
         return new AuthApi.LoginRs(token, "Bearer", usuarioId, Validar.cadena(usuario, "username"),
                 Validar.largo(usuario, "perfil_id"), perfil,
                 com.uniminuto.clinica.seguridad.FiltroAutenticacion.permisos(db, Validar.largo(usuario, "perfil_id")));
