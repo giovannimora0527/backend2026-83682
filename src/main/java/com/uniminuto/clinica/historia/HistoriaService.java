@@ -519,7 +519,7 @@ public class HistoriaService {
      */
     private long medicoValido(Long medicoId) {
         SesionUsuario s = SesionActual.obtener();
-        if (s.es(Perfiles.MEDICO)) {
+        if (s.es(Perfiles.VETERINARIO)) {
             long propio = SesionActual.medicoId();
             if (medicoId != null && medicoId != propio) {
                 throw new ForbiddenException("Solo puedes registrar información clínica a tu nombre.");
@@ -540,7 +540,7 @@ public class HistoriaService {
      */
     private void verificarPropiedad(long medicoFormula) {
         SesionUsuario s = SesionActual.obtener();
-        if (s.es(Perfiles.MEDICO) && medicoFormula != SesionActual.medicoId()) {
+        if (s.es(Perfiles.VETERINARIO) && medicoFormula != SesionActual.medicoId()) {
             throw new ForbiddenException("Solo puedes modificar tus propias fórmulas.");
         }
     }
@@ -548,7 +548,7 @@ public class HistoriaService {
     /** @return el médico del usuario si su perfil es MEDICO (para filtrar sus registros), o null. */
     private Long medicoRestringido() {
         SesionUsuario s = SesionActual.obtener();
-        return s.es(Perfiles.MEDICO) ? SesionActual.medicoId() : null;
+        return s.es(Perfiles.VETERINARIO) ? SesionActual.medicoId() : null;
     }
 
     /**

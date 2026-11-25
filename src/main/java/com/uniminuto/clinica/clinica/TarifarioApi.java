@@ -1,8 +1,7 @@
 package com.uniminuto.clinica.clinica;
 
-import com.uniminuto.clinica.seguridad.Perfiles;
-import com.uniminuto.clinica.seguridad.Permitido;
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,7 +20,6 @@ import java.util.Map;
  * Permite cambiar valores de consultas sin modificar el código fuente.
  */
 @Tag(name = "Tarifario", description = "Especialidades, servicios, tarifas, IVA e impuestos (con historial)")
-@Permitido(Perfiles.ADMINISTRADOR)
 @RequestMapping("/tarifario")
 public interface TarifarioApi {
 
@@ -43,7 +41,7 @@ public interface TarifarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Listar especialidades")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('TARIFA_CONSULTAR')")
     @GetMapping("/especialidades")
     ResponseEntity<List<Map<String, Object>>> especialidades();
 
@@ -54,6 +52,7 @@ public interface TarifarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Registrar especialidad")
+    @PreAuthorize("hasAuthority('TARIFA_GESTIONAR')")
     @PostMapping("/especialidades")
     ResponseEntity<Map<String, Object>> crearEspecialidad(@RequestBody EspecialidadRq datos);
 
@@ -65,6 +64,7 @@ public interface TarifarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Editar, activar o inactivar especialidad")
+    @PreAuthorize("hasAuthority('TARIFA_GESTIONAR')")
     @PutMapping("/especialidades/{id}")
     ResponseEntity<Map<String, Object>> actualizarEspecialidad(@PathVariable long id, @RequestBody EspecialidadRq datos);
 
@@ -75,7 +75,7 @@ public interface TarifarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Servicios de una especialidad")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('TARIFA_CONSULTAR')")
     @GetMapping("/especialidades/{id}/servicios")
     ResponseEntity<List<Map<String, Object>>> servicios(@PathVariable long id);
 
@@ -87,6 +87,7 @@ public interface TarifarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Agregar servicio o procedimiento a una especialidad")
+    @PreAuthorize("hasAuthority('TARIFA_GESTIONAR')")
     @PostMapping("/especialidades/{id}/servicios")
     ResponseEntity<Map<String, Object>> agregarServicio(@PathVariable long id, @RequestBody ServicioRq datos);
 
@@ -97,7 +98,7 @@ public interface TarifarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Historial de tarifas de un servicio (log de tarifas)")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('TARIFA_CONSULTAR')")
     @GetMapping("/servicios/{id}/tarifas")
     ResponseEntity<List<Map<String, Object>>> tarifas(@PathVariable long id);
 
@@ -110,6 +111,7 @@ public interface TarifarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Registrar nueva vigencia de tarifa", description = "Cierra la vigencia anterior; no la borra.")
+    @PreAuthorize("hasAuthority('TARIFA_GESTIONAR')")
     @PostMapping("/servicios/{id}/tarifas")
     ResponseEntity<Map<String, Object>> nuevaTarifa(@PathVariable long id, @RequestBody TarifaRq datos);
 }

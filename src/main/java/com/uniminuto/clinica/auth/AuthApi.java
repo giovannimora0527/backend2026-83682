@@ -1,6 +1,7 @@
 package com.uniminuto.clinica.auth;
 
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -45,7 +46,8 @@ public interface AuthApi {
     }
 
     /** Sesión iniciada que el frontend guarda en localStorage. */
-    record LoginRs(String token, String tokenType, long usuarioId, String username, long perfilId, String perfil) {
+    record LoginRs(String token, String tokenType, long usuarioId, String username, long perfilId, String perfil,
+                   java.util.Set<String> permisos) {
     }
 
     /**
@@ -128,6 +130,7 @@ public interface AuthApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Validar la sesión actual")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/validar")
     ResponseEntity<LoginRs> validar();
 
@@ -137,6 +140,7 @@ public interface AuthApi {
      * @return respuesta sin contenido (204).
      */
     @Operation(summary = "Cerrar la sesión actual (revoca el token)")
+    @PreAuthorize("isAuthenticated()")
     @PostMapping("/logout")
     ResponseEntity<Void> logout();
 }

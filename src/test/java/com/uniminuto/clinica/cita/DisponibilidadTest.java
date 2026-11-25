@@ -40,8 +40,8 @@ class DisponibilidadTest {
 
     @Test
     void transicionesDeEstadoPermitidas() {
-        SesionUsuario recepcion = new SesionUsuario(1, 3, "recepcion", 2, "RECEPCION", null);
-        SesionUsuario admin = new SesionUsuario(1, 2, "admin", 1, "ADMINISTRADOR", null);
+        SesionUsuario recepcion = new SesionUsuario(1, 3, "recepcion", 2, "SECRETARIA", null, java.util.Set.of("CITA_GESTIONAR"));
+        SesionUsuario admin = new SesionUsuario(1, 2, "admin", 1, "ADMINISTRADOR", null, java.util.Set.of("CITA_GESTIONAR"));
         assertDoesNotThrow(() -> CitaService.validarTransicion("pendiente", "confirmada", recepcion));
         assertDoesNotThrow(() -> CitaService.validarTransicion("confirmada", "cancelada", recepcion));
         assertDoesNotThrow(() -> CitaService.validarTransicion("atendida", "finalizada", recepcion));

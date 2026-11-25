@@ -1,8 +1,7 @@
 package com.uniminuto.clinica.catalogo;
 
-import com.uniminuto.clinica.seguridad.Perfiles;
-import com.uniminuto.clinica.seguridad.Permitido;
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -23,7 +22,6 @@ import java.util.Map;
  * tiene mascotas registradas, ni eliminar una raza en uso (se conserva la integridad de las mascotas).</p>
  */
 @Tag(name = "Razas", description = "Catálogo de razas y especies")
-@Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
 @RequestMapping("/raza")
 public interface RazaApi {
 
@@ -37,6 +35,7 @@ public interface RazaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Listar razas con el número de mascotas de cada una")
+    @PreAuthorize("hasAuthority('MASCOTA_CONSULTAR')")
     @GetMapping("/listar")
     ResponseEntity<List<Map<String, Object>>> listar();
 
@@ -47,7 +46,7 @@ public interface RazaApi {
      * @return respuesta HTTP con la raza creada.
      */
     @Operation(summary = "Registrar raza")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('RAZA_GESTIONAR')")
     @PostMapping("/guardar")
     ResponseEntity<Map<String, Object>> guardar(@RequestBody RazaRq datos);
 
@@ -59,7 +58,7 @@ public interface RazaApi {
      * @return respuesta HTTP con la raza actualizada.
      */
     @Operation(summary = "Actualizar raza")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('RAZA_GESTIONAR')")
     @PutMapping("/actualizar/{id}")
     ResponseEntity<Map<String, Object>> actualizar(@PathVariable int id, @RequestBody RazaRq datos);
 
@@ -70,7 +69,7 @@ public interface RazaApi {
      * @return respuesta HTTP 204 sin contenido.
      */
     @Operation(summary = "Eliminar raza sin mascotas asociadas")
-    @Permitido(Perfiles.ADMINISTRADOR)
+    @PreAuthorize("hasAuthority('RAZA_ELIMINAR')")
     @DeleteMapping("/eliminar/{id}")
     ResponseEntity<Void> eliminar(@PathVariable int id);
 }

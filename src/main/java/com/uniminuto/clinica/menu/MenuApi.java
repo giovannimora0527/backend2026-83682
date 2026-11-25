@@ -1,8 +1,7 @@
 package com.uniminuto.clinica.menu;
 
-import com.uniminuto.clinica.seguridad.Perfiles;
-import com.uniminuto.clinica.seguridad.Permitido;
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,6 +21,7 @@ public interface MenuApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Menús del perfil del usuario autenticado")
+    @PreAuthorize("isAuthenticated()")
     @GetMapping("/propio")
     ResponseEntity<List<Map<String, Object>>> propio();
 
@@ -31,7 +31,7 @@ public interface MenuApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Todos los menús activos (administración)")
-    @Permitido(Perfiles.ADMINISTRADOR)
+    @PreAuthorize("hasAuthority('USUARIO_GESTIONAR')")
     @GetMapping("/listar-activos")
     ResponseEntity<List<Map<String, Object>>> activos();
 }

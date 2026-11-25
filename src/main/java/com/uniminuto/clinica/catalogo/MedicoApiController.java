@@ -174,7 +174,7 @@ public class MedicoApiController implements MedicoApi {
             Map<String, Object> u = db.requerido("""
                     SELECT p.nombre FROM usuario u JOIN perfil p ON p.perfil_id = u.rol WHERE u.id = :id
                     """, Db.p("id", d.usuarioId()), "El usuario asociado no existe.");
-            if (!Perfiles.MEDICO.equals(Perfiles.codigo(Validar.cadena(u, "nombre")))) {
+            if (!Perfiles.VETERINARIO.equals(Perfiles.codigo(Validar.cadena(u, "nombre")))) {
                 throw new BadRequestException("El usuario asociado debe tener perfil Médico.");
             }
             if (db.existe("SELECT 1 FROM medico WHERE usuario_id = :u AND (:id IS NULL OR id <> :id)",

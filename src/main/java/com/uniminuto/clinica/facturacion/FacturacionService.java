@@ -314,8 +314,8 @@ public class FacturacionService {
      */
     @Transactional
     public Map<String, Object> anular(long id, String motivoRq) {
-        if (!SesionActual.obtener().esAdmin()) {
-            throw new ForbiddenException("Solo el administrador puede anular facturas.");
+        if (!SesionActual.obtener().tiene("FACTURA_ANULAR")) {
+            throw new ForbiddenException("Tu perfil no tiene permiso para anular facturas.");
         }
         String motivo = Validar.texto(motivoRq, "motivo de anulación", 255);
         Map<String, Object> f = db.requerido("SELECT estado FROM factura WHERE id = :id FOR UPDATE", Db.p("id", id),
@@ -496,12 +496,12 @@ public class FacturacionService {
         return o;
     }
 
-    /** Los descuentos solo se aplican si están autorizados: los registra el ADMINISTRADOR con motivo. */
+    /** Los descuentos solo se aplican si están autorizados: requieren el permiso DESCUENTO_AUTORIZAR y un motivo. */
     private BigDecimal descuento(String valor, String motivo) {
         BigDecimal d = valor == null || valor.isBlank() ? BigDecimal.ZERO : importe(valor);
         if (d.signum() > 0) {
-            if (!SesionActual.obtener().esAdmin()) {
-                throw new ForbiddenException("Solo el administrador puede autorizar descuentos.");
+            if (!SesionActual.obtener().tiene("DESCUENTO_AUTORIZAR")) {
+                throw new ForbiddenException("Tu perfil no tiene permiso para autorizar descuentos.");
             }
             Validar.texto(motivo, "motivo del descuento", 255);
         }

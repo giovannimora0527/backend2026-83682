@@ -1,8 +1,7 @@
 package com.uniminuto.clinica.catalogo;
 
-import com.uniminuto.clinica.seguridad.Perfiles;
-import com.uniminuto.clinica.seguridad.Permitido;
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -20,7 +19,6 @@ import java.util.Map;
 
 /** Propietarios de mascotas. */
 @Tag(name = "Clientes", description = "Gestión de propietarios de mascotas")
-@Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
 @RequestMapping("/cliente")
 public interface ClienteApi {
 
@@ -35,6 +33,7 @@ public interface ClienteApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Listar clientes (activos e inactivos)")
+    @PreAuthorize("hasAuthority('CLIENTE_CONSULTAR')")
     @GetMapping({"/listar-todos", "/listar"})
     ResponseEntity<List<Map<String, Object>>> listar();
 
@@ -45,6 +44,7 @@ public interface ClienteApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Buscar cliente por número de documento")
+    @PreAuthorize("hasAuthority('CLIENTE_CONSULTAR')")
     @GetMapping("/buscar-por-documento")
     ResponseEntity<Map<String, Object>> buscarPorDocumento(@RequestParam String documento);
 
@@ -55,6 +55,7 @@ public interface ClienteApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Consultar cliente")
+    @PreAuthorize("hasAuthority('CLIENTE_CONSULTAR')")
     @GetMapping("/{id}")
     ResponseEntity<Map<String, Object>> consultar(@PathVariable long id);
 
@@ -65,6 +66,7 @@ public interface ClienteApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Listar las mascotas activas de un cliente (para combos dependientes cliente → mascota)")
+    @PreAuthorize("hasAuthority('CLIENTE_CONSULTAR')")
     @GetMapping("/{id}/mascotas")
     ResponseEntity<List<Map<String, Object>>> mascotas(@PathVariable long id);
 
@@ -75,7 +77,7 @@ public interface ClienteApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Registrar cliente")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('CLIENTE_GESTIONAR')")
     @PostMapping
     ResponseEntity<Map<String, Object>> crear(@RequestBody ClienteRq datos);
 
@@ -87,7 +89,7 @@ public interface ClienteApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Actualizar cliente")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('CLIENTE_GESTIONAR')")
     @PutMapping("/{id}")
     ResponseEntity<Map<String, Object>> actualizar(@PathVariable long id, @RequestBody ClienteRq datos);
 
@@ -99,7 +101,7 @@ public interface ClienteApi {
      * @return respuesta sin contenido (204).
      */
     @Operation(summary = "Archivar (inactivar) cliente", description = "No elimina el registro; conserva su historial.")
-    @Permitido(Perfiles.ADMINISTRADOR)
+    @PreAuthorize("hasAuthority('CLIENTE_ARCHIVAR')")
     @DeleteMapping("/{id}")
     ResponseEntity<Void> archivar(@PathVariable long id);
 
@@ -110,7 +112,7 @@ public interface ClienteApi {
      * @return respuesta HTTP con el cliente reactivado.
      */
     @Operation(summary = "Reactivar cliente archivado")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('CLIENTE_GESTIONAR')")
     @PatchMapping("/{id}/reactivar")
     ResponseEntity<Map<String, Object>> reactivar(@PathVariable long id);
 }

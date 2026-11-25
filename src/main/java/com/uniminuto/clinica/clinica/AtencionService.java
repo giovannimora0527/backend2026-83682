@@ -551,7 +551,7 @@ public class AtencionService {
                 WHERE f.id = :id
                 """, Db.p("id", formulaId), "La fórmula no existe.");
         SesionUsuario s = SesionActual.obtener();
-        if (s.es(Perfiles.MEDICO) && Validar.largo(f, "medico_id") != SesionActual.medicoId()) {
+        if (s.es(Perfiles.VETERINARIO) && Validar.largo(f, "medico_id") != SesionActual.medicoId()) {
             throw new ForbiddenException("Solo puedes descargar tus propias fórmulas.");
         }
         if (!"CONFIRMADA".equals(f.get("estado"))) {
@@ -620,7 +620,7 @@ public class AtencionService {
     public byte[] prefactura(long citaId) {
         Map<String, Object> cita = cita(citaId);
         SesionUsuario s = SesionActual.obtener();
-        if (s.es(Perfiles.MEDICO) && Validar.largo(cita, "medico_id") != SesionActual.medicoId()) {
+        if (s.es(Perfiles.VETERINARIO) && Validar.largo(cita, "medico_id") != SesionActual.medicoId()) {
             throw new ForbiddenException("Solo puedes consultar la prefactura de tus citas.");
         }
         Map<String, Object> atencion = atencionDeCita(citaId);
@@ -791,7 +791,7 @@ public class AtencionService {
      */
     private void verificarLectura(Map<String, Object> cita) {
         SesionUsuario s = SesionActual.obtener();
-        if (s.es(Perfiles.MEDICO)) {
+        if (s.es(Perfiles.VETERINARIO)) {
             verificarMedico(cita);
         }
     }

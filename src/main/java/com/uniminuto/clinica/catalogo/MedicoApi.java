@@ -1,8 +1,7 @@
 package com.uniminuto.clinica.catalogo;
 
-import com.uniminuto.clinica.seguridad.Perfiles;
-import com.uniminuto.clinica.seguridad.Permitido;
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,7 +22,6 @@ import java.util.Map;
  * Médico y sin otro médico, y no se puede inactivar a un médico con citas futuras reservadas.</p>
  */
 @Tag(name = "Médicos", description = "Médicos veterinarios")
-@Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
 @RequestMapping("/medico")
 public interface MedicoApi {
 
@@ -38,6 +36,7 @@ public interface MedicoApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Listar médicos con su especialidad")
+    @PreAuthorize("hasAnyAuthority('MEDICO_CONSULTAR', 'REPORTE_FINANCIERO')")
     @GetMapping("/listar")
     ResponseEntity<List<Map<String, Object>>> listar();
 
@@ -47,6 +46,7 @@ public interface MedicoApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Listar médicos activos (asignables a citas)")
+    @PreAuthorize("hasAnyAuthority('MEDICO_CONSULTAR', 'REPORTE_FINANCIERO')")
     @GetMapping("/listar-disponibles")
     ResponseEntity<List<Map<String, Object>>> disponibles();
 
@@ -57,7 +57,7 @@ public interface MedicoApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Registrar médico")
-    @Permitido(Perfiles.ADMINISTRADOR)
+    @PreAuthorize("hasAuthority('MEDICO_GESTIONAR')")
     @PostMapping("/crear")
     ResponseEntity<Map<String, Object>> crear(@RequestBody MedicoRq datos);
 
@@ -69,7 +69,7 @@ public interface MedicoApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Actualizar médico")
-    @Permitido(Perfiles.ADMINISTRADOR)
+    @PreAuthorize("hasAuthority('MEDICO_GESTIONAR')")
     @PutMapping("/actualizar/{id}")
     ResponseEntity<Map<String, Object>> actualizar(@PathVariable long id, @RequestBody MedicoRq datos);
 
@@ -86,7 +86,7 @@ public interface MedicoApi {
      * @return respuesta HTTP con el médico actualizado.
      */
     @Operation(summary = "Activar o inactivar médico")
-    @Permitido(Perfiles.ADMINISTRADOR)
+    @PreAuthorize("hasAuthority('MEDICO_GESTIONAR')")
     @PatchMapping("/{id}/estado")
     ResponseEntity<Map<String, Object>> cambiarEstado(@PathVariable long id, @RequestBody EstadoRq datos);
 }

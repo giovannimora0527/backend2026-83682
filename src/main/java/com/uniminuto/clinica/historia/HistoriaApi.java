@@ -1,8 +1,7 @@
 package com.uniminuto.clinica.historia;
 
-import com.uniminuto.clinica.seguridad.Perfiles;
-import com.uniminuto.clinica.seguridad.Permitido;
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,7 +20,6 @@ import java.util.Map;
  * ADMINISTRADOR y MEDICO gestionan; RECEPCION solo consulta fórmulas.
  */
 @Tag(name = "Historia clínica", description = "Historias clínicas por consulta, anotaciones y fórmulas médicas")
-@Permitido({Perfiles.ADMINISTRADOR, Perfiles.MEDICO})
 public interface HistoriaApi {
 
     /**
@@ -91,6 +89,7 @@ public interface HistoriaApi {
      * @return historias de la más reciente a la más antigua.
      */
     @Operation(summary = "Listar historias clínicas (filtro por rango de fechas, mascota y cliente; más recientes primero)")
+    @PreAuthorize("hasAuthority('HISTORIA_CONSULTAR')")
     @GetMapping({"/historia-medica/listar-todos", "/historia-medica/listar"})
     ResponseEntity<List<Map<String, Object>>> historias(@RequestParam(required = false) String fechaInicio,
                                                         @RequestParam(required = false) String fechaFin,
@@ -102,6 +101,7 @@ public interface HistoriaApi {
      * @return historias de la mascota.
      */
     @Operation(summary = "Historias clínicas de una mascota")
+    @PreAuthorize("hasAuthority('HISTORIA_CONSULTAR')")
     @GetMapping("/historia-medica/listar-por-paciente/{pacienteId}")
     ResponseEntity<List<Map<String, Object>>> historiasPorPaciente(@PathVariable int pacienteId);
 
@@ -110,6 +110,7 @@ public interface HistoriaApi {
      * @return detalle con anotaciones y fórmulas.
      */
     @Operation(summary = "Consultar el detalle de una historia clínica con sus anotaciones y fórmulas")
+    @PreAuthorize("hasAuthority('HISTORIA_CONSULTAR')")
     @GetMapping("/historia-medica/{id:\\d+}")
     ResponseEntity<Map<String, Object>> historia(@PathVariable long id);
 
@@ -118,6 +119,7 @@ public interface HistoriaApi {
      * @return historia creada.
      */
     @Operation(summary = "Crear historia clínica para una cita atendida")
+    @PreAuthorize("hasAuthority('HISTORIA_GESTIONAR')")
     @PostMapping({"/historia-medica/crear", "/historia-medica"})
     ResponseEntity<Map<String, Object>> crearHistoria(@RequestBody HistoriaRq datos);
 
@@ -127,6 +129,7 @@ public interface HistoriaApi {
      * @return historia actualizada.
      */
     @Operation(summary = "Actualizar historia clínica (no cambia mascota ni cita)")
+    @PreAuthorize("hasAuthority('HISTORIA_GESTIONAR')")
     @PutMapping("/historia-medica/actualizar/{id}")
     ResponseEntity<Map<String, Object>> actualizarHistoria(@PathVariable long id, @RequestBody HistoriaRq datos);
 
@@ -135,6 +138,7 @@ public interface HistoriaApi {
      * @return anotaciones de la historia.
      */
     @Operation(summary = "Consultar las anotaciones de una historia clínica (más recientes primero)")
+    @PreAuthorize("hasAuthority('HISTORIA_CONSULTAR')")
     @GetMapping("/historia-medica/{id}/anotaciones")
     ResponseEntity<List<Map<String, Object>>> anotacionesDeHistoria(@PathVariable long id);
 
@@ -147,6 +151,7 @@ public interface HistoriaApi {
      * @return anotaciones.
      */
     @Operation(summary = "Listar anotaciones (filtro por fechas e historia; más recientes primero)")
+    @PreAuthorize("hasAuthority('HISTORIA_CONSULTAR')")
     @GetMapping({"/anotacion-historia/listar-todos", "/anotacion-historia/listar"})
     ResponseEntity<List<Map<String, Object>>> anotaciones(@RequestParam(required = false) String fechaInicio,
                                                           @RequestParam(required = false) String fechaFin,
@@ -157,6 +162,7 @@ public interface HistoriaApi {
      * @return anotación.
      */
     @Operation(summary = "Consultar una anotación")
+    @PreAuthorize("hasAuthority('HISTORIA_CONSULTAR')")
     @GetMapping("/anotacion-historia/{id:\\d+}")
     ResponseEntity<Map<String, Object>> anotacion(@PathVariable long id);
 
@@ -165,6 +171,7 @@ public interface HistoriaApi {
      * @return anotación creada.
      */
     @Operation(summary = "Crear anotación en una historia clínica")
+    @PreAuthorize("hasAuthority('HISTORIA_GESTIONAR')")
     @PostMapping({"/anotacion-historia/crear", "/anotacion-historia"})
     ResponseEntity<Map<String, Object>> crearAnotacion(@RequestBody AnotacionRq datos);
 
@@ -174,6 +181,7 @@ public interface HistoriaApi {
      * @return anotación actualizada.
      */
     @Operation(summary = "Actualizar una anotación")
+    @PreAuthorize("hasAuthority('HISTORIA_GESTIONAR')")
     @PutMapping("/anotacion-historia/actualizar/{id}")
     ResponseEntity<Map<String, Object>> actualizarAnotacion(@PathVariable long id, @RequestBody AnotacionRq datos);
 
@@ -183,7 +191,7 @@ public interface HistoriaApi {
      * @return fórmulas ordenadas por fecha de creación descendente.
      */
     @Operation(summary = "Listar fórmulas médicas ordenadas por fecha de creación (más recientes primero)")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.MEDICO, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('FORMULA_CONSULTAR')")
     @GetMapping({"/formula-medica/listar-todos", "/formula-medica/listar"})
     ResponseEntity<List<Map<String, Object>>> formulas();
 
@@ -192,7 +200,7 @@ public interface HistoriaApi {
      * @return detalle completo.
      */
     @Operation(summary = "Consultar una fórmula médica")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.MEDICO, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('FORMULA_CONSULTAR')")
     @GetMapping("/formula-medica/consultar/{id}")
     ResponseEntity<Map<String, Object>> formula(@PathVariable long id);
 
@@ -201,6 +209,7 @@ public interface HistoriaApi {
      * @return fórmula creada.
      */
     @Operation(summary = "Crear fórmula médica (valida mascota, cliente, cita, veterinario y fechas)")
+    @PreAuthorize("hasAuthority('FORMULA_GESTIONAR')")
     @PostMapping("/formula-medica/crear")
     ResponseEntity<Map<String, Object>> crearFormula(@RequestBody FormulaRq datos);
 
@@ -210,6 +219,7 @@ public interface HistoriaApi {
      * @return fórmula actualizada.
      */
     @Operation(summary = "Editar fórmula médica activa (no cambia cita ni mascota)")
+    @PreAuthorize("hasAuthority('FORMULA_GESTIONAR')")
     @PutMapping("/formula-medica/actualizar/{id}")
     ResponseEntity<Map<String, Object>> actualizarFormula(@PathVariable long id, @RequestBody FormulaRq datos);
 
@@ -219,6 +229,7 @@ public interface HistoriaApi {
      * @return fórmula actualizada.
      */
     @Operation(summary = "Activar o inactivar una fórmula (no hay eliminación física)")
+    @PreAuthorize("hasAuthority('FORMULA_GESTIONAR')")
     @PatchMapping("/formula-medica/{id}/estado")
     ResponseEntity<Map<String, Object>> estadoFormula(@PathVariable long id, @RequestBody EstadoRq datos);
 }

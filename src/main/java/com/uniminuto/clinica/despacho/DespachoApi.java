@@ -1,8 +1,7 @@
 package com.uniminuto.clinica.despacho;
 
-import com.uniminuto.clinica.seguridad.Perfiles;
-import com.uniminuto.clinica.seguridad.Permitido;
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -19,7 +18,6 @@ import java.util.Map;
  * Requerimiento 5: operado exclusivamente por el perfil DESPACHO_MEDICO (validado en el backend).
  */
 @Tag(name = "Despacho", description = "Dispensación de fórmulas médicas con lotes FEFO y trazabilidad")
-@Permitido(Perfiles.DESPACHO_MEDICO)
 @RequestMapping("/despacho")
 public interface DespachoApi {
 
@@ -49,6 +47,7 @@ public interface DespachoApi {
      */
     @Operation(summary = "Fórmulas confirmadas para despacho",
             description = "Filtros: número, propietario (nombre o documento), mascota, fecha de generación y estado. 50 por página.")
+    @PreAuthorize("hasAuthority('DESPACHO_CONSULTAR')")
     @GetMapping("/formulas")
     ResponseEntity<List<Map<String, Object>>> formulas(@RequestParam(required = false) String id,
                                                        @RequestParam(required = false) String propietario,
@@ -71,6 +70,7 @@ public interface DespachoApi {
      * @param id identificador de la fórmula.
      * @return detalle de la fórmula.
      */
+    @PreAuthorize("hasAuthority('DESPACHO_CONSULTAR')")
     @GetMapping("/formulas/{id}")
     ResponseEntity<Map<String, Object>> detalle(@PathVariable long id);
 
@@ -91,6 +91,7 @@ public interface DespachoApi {
      * @param datos selección de lotes.
      * @return plan de preparación.
      */
+    @PreAuthorize("hasAuthority('DESPACHO_OPERAR')")
     @PostMapping("/formulas/{id}/preparar")
     ResponseEntity<Map<String, Object>> preparar(@PathVariable long id, @RequestBody PrepararRq datos);
 
@@ -102,6 +103,7 @@ public interface DespachoApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Cancelar el despacho de una fórmula (procedimiento autorizado con motivo)")
+    @PreAuthorize("hasAuthority('DESPACHO_OPERAR')")
     @PostMapping("/formulas/{id}/cancelar")
     ResponseEntity<Map<String, Object>> cancelar(@PathVariable long id, @RequestBody MotivoRq datos);
 
@@ -113,6 +115,7 @@ public interface DespachoApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Marcar la fórmula como pendiente por disponibilidad")
+    @PreAuthorize("hasAuthority('DESPACHO_OPERAR')")
     @PostMapping("/formulas/{id}/disponibilidad")
     ResponseEntity<Map<String, Object>> disponibilidad(@PathVariable long id, @RequestBody MotivoRq datos);
 
@@ -126,6 +129,7 @@ public interface DespachoApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Historial de despachos (log de despacho de fórmulas)")
+    @PreAuthorize("hasAuthority('DESPACHO_CONSULTAR')")
     @GetMapping("/entregas")
     ResponseEntity<List<Map<String, Object>>> entregas(@RequestParam(required = false) String desde,
                                                        @RequestParam(required = false) String hasta,
@@ -147,6 +151,7 @@ public interface DespachoApi {
      * @param preparacion identificador del plan de preparación.
      * @return entrega registrada.
      */
+    @PreAuthorize("hasAuthority('DESPACHO_OPERAR')")
     @PostMapping("/entregas/{preparacion}/confirmar")
     ResponseEntity<Map<String, Object>> confirmar(@PathVariable long preparacion);
 
@@ -158,6 +163,7 @@ public interface DespachoApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Revertir una entrega confirmada (devuelve unidades a sus lotes con movimientos trazables)")
+    @PreAuthorize("hasAuthority('DESPACHO_OPERAR')")
     @PostMapping("/entregas/{id}/revertir")
     ResponseEntity<Map<String, Object>> revertir(@PathVariable long id, @RequestBody MotivoRq datos);
 
@@ -168,6 +174,7 @@ public interface DespachoApi {
      * @return archivo generado (PDF o Excel) para descargar.
      */
     @Operation(summary = "Comprobante de despacho en PDF")
+    @PreAuthorize("hasAuthority('DESPACHO_CONSULTAR')")
     @GetMapping("/entregas/{id}/pdf")
     ResponseEntity<byte[]> pdf(@PathVariable long id);
 }

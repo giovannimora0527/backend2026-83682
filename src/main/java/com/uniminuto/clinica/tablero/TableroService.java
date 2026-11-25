@@ -2,7 +2,6 @@ package com.uniminuto.clinica.tablero;
 
 import com.uniminuto.clinica.comun.Db;
 import com.uniminuto.clinica.comun.Tiempo;
-import com.uniminuto.clinica.seguridad.Perfiles;
 import com.uniminuto.clinica.seguridad.SesionActual;
 import com.uniminuto.clinica.seguridad.SesionUsuario;
 import org.springframework.stereotype.Service;
@@ -14,12 +13,12 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Calcula los pendientes de cada perfil para conectar el flujo de trabajo de la clínica:
+ * Calcula los pendientes de cada usuario según sus permisos, para conectar el flujo de trabajo de la clínica:
  * <ol>
- *   <li>Recepción agenda y confirma citas.</li>
- *   <li>El médico atiende, formula y finaliza la atención.</li>
+ *   <li>La secretaria agenda y confirma citas.</li>
+ *   <li>El veterinario atiende, formula y finaliza la atención.</li>
  *   <li>Despacho entrega los medicamentos de las fórmulas confirmadas.</li>
- *   <li>Recepción factura las atenciones listas y registra los pagos.</li>
+ *   <li>El contador factura las atenciones listas y registra los pagos.</li>
  *   <li>El administrador supervisa todo y el inventario.</li>
  * </ol>
  */
@@ -47,27 +46,30 @@ public class TableroService {
     public List<Map<String, Object>> pendientes() {
         SesionUsuario s = SesionActual.obtener();
         List<Map<String, Object>> r = new ArrayList<>();
-        if (s.es(Perfiles.RECEPCION, Perfiles.ADMINISTRADOR)) {
-            recepcion(r);
+        if (s.tiene("CITA_GESTIONAR") && !s.tiene("AGENDA_PROPIA")) {
+            citas(r);
         }
-        if (s.es(Perfiles.MEDICO)) {
-            medico(r, SesionActual.medicoId());
+        if (s.tieneAlguno("FACTURA_EMITIR", "FACTURA_CONSULTAR")) {
+            facturacion(r);
         }
-        if (s.es(Perfiles.DESPACHO_MEDICO, Perfiles.ADMINISTRADOR)) {
-            despacho(r, s.es(Perfiles.ADMINISTRADOR));
+        if (s.tiene("AGENDA_PROPIA") && s.medicoId() != null) {
+            medico(r, s.medicoId());
         }
-        if (s.es(Perfiles.ADMINISTRADOR, Perfiles.DESPACHO_MEDICO)) {
+        if (s.tieneAlguno("DESPACHO_OPERAR", "DESPACHO_CONSULTAR")) {
+            despacho(r, !s.tiene("DESPACHO_OPERAR"));
+        }
+        if (s.tieneAlguno("INVENTARIO_GESTIONAR", "DESPACHO_OPERAR")) {
             inventario(r);
         }
         return r;
     }
 
     /**
-     * Pendientes de recepción: agenda del día, citas por confirmar, atenciones por facturar y cobros.
+     * Pendientes de agenda (secretaria y administración): citas de hoy y por confirmar.
      *
      * @param r lista donde se agregan las tarjetas.
      */
-    private void recepcion(List<Map<String, Object>> r) {
+    private void citas(List<Map<String, Object>> r) {
         LocalDate hoy = Tiempo.hoy();
         r.add(tarjeta("citas-hoy", "Citas de hoy", "Citas reservadas para hoy en todos los médicos.",
                 db.contar("SELECT COUNT(*) FROM cita WHERE estado IN " + RESERVADAS
@@ -76,6 +78,15 @@ public class TableroService {
         r.add(tarjeta("por-confirmar", "Citas por confirmar", "Citas futuras pendientes o programadas: confirma con el propietario.",
                 db.contar("SELECT COUNT(*) FROM cita WHERE estado IN ('pendiente', 'programada') AND fecha_hora >= :a",
                         Db.p("a", Tiempo.ahora())), "/inicio/citas", "aviso"));
+    }
+
+    /**
+     * Pendientes de facturación (contador, administración; la secretaria los consulta): atenciones listas,
+     * atenciones esperando despacho y facturas por cobrar.
+     *
+     * @param r lista donde se agregan las tarjetas.
+     */
+    private void facturacion(List<Map<String, Object>> r) {
         r.add(tarjeta("por-facturar", "Atenciones por facturar",
                 "El médico finalizó la atención y despacho ya procesó las fórmulas: lista para facturar.",
                 db.contar("""

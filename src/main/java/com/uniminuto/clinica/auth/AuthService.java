@@ -202,7 +202,7 @@ public class AuthService {
      */
     public AuthApi.LoginRs validar() {
         SesionUsuario s = SesionActual.obtener();
-        return new AuthApi.LoginRs(null, "Bearer", s.usuarioId(), s.username(), s.perfilId(), s.perfil());
+        return new AuthApi.LoginRs(null, "Bearer", s.usuarioId(), s.username(), s.perfilId(), s.perfil(), s.permisos());
     }
 
     /** Cierra la sesión actual (el token deja de ser válido). */
@@ -289,7 +289,8 @@ public class AuthService {
                 VALUES (:usuario, :token, :inicio, :expira, 1)
                 """, Db.p("usuario", usuarioId, "token", ClaveUtil.sha256(token), "inicio", inicio, "expira", expira));
         return new AuthApi.LoginRs(token, "Bearer", usuarioId, Validar.cadena(usuario, "username"),
-                Validar.largo(usuario, "perfil_id"), perfil);
+                Validar.largo(usuario, "perfil_id"), perfil,
+                com.uniminuto.clinica.seguridad.FiltroAutenticacion.permisos(db, Validar.largo(usuario, "perfil_id")));
     }
 
     /**

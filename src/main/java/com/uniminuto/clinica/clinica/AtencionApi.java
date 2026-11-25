@@ -1,8 +1,7 @@
 package com.uniminuto.clinica.clinica;
 
-import com.uniminuto.clinica.seguridad.Perfiles;
-import com.uniminuto.clinica.seguridad.Permitido;
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -48,7 +47,7 @@ public interface AtencionApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Datos de la atención: mascota, antecedentes, servicios, catálogo con tarifas y fórmulas")
-    @Permitido({Perfiles.MEDICO, Perfiles.ADMINISTRADOR})
+    @PreAuthorize("hasAuthority('ATENCION_CONSULTAR')")
     @GetMapping("/citas/{id}")
     ResponseEntity<Map<String, Object>> consultar(@PathVariable long id);
 
@@ -59,7 +58,7 @@ public interface AtencionApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Abrir la atención de una cita asignada (crea la historia clínica si no existe)")
-    @Permitido(Perfiles.MEDICO)
+    @PreAuthorize("hasAuthority('ATENCION_GESTIONAR')")
     @PostMapping("/citas/{id}/abrir")
     ResponseEntity<Map<String, Object>> abrir(@PathVariable long id);
 
@@ -80,7 +79,7 @@ public interface AtencionApi {
      * @param datos datos de la atención con su versión.
      * @return atención actualizada.
      */
-    @Permitido(Perfiles.MEDICO)
+    @PreAuthorize("hasAuthority('ATENCION_GESTIONAR')")
     @PutMapping("/citas/{id}")
     ResponseEntity<Map<String, Object>> guardar(@PathVariable long id, @RequestBody AtencionRq datos);
 
@@ -92,7 +91,7 @@ public interface AtencionApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Finalizar la atención (congela tarifas, marca la cita atendida y actualiza la historia)")
-    @Permitido(Perfiles.MEDICO)
+    @PreAuthorize("hasAuthority('ATENCION_GESTIONAR')")
     @PostMapping("/citas/{id}/finalizar")
     ResponseEntity<Map<String, Object>> finalizar(@PathVariable long id, @RequestParam Integer version);
 
@@ -103,7 +102,7 @@ public interface AtencionApi {
      * @return archivo generado (PDF o Excel) para descargar.
      */
     @Operation(summary = "Prefactura PDF con servicios prestados y medicamentos formulados")
-    @Permitido({Perfiles.MEDICO, Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('PREFACTURA_GENERAR')")
     @GetMapping("/citas/{id}/prefactura")
     ResponseEntity<byte[]> prefactura(@PathVariable long id);
 
@@ -113,7 +112,7 @@ public interface AtencionApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Fórmulas del médico autenticado")
-    @Permitido(Perfiles.MEDICO)
+    @PreAuthorize("hasAuthority('FORMULA_GESTIONAR')")
     @GetMapping("/formulas")
     ResponseEntity<List<Map<String, Object>>> formulas();
 
@@ -125,7 +124,7 @@ public interface AtencionApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Crear fórmula en borrador para la cita")
-    @Permitido(Perfiles.MEDICO)
+    @PreAuthorize("hasAuthority('FORMULA_GESTIONAR')")
     @PostMapping("/citas/{id}/formulas")
     ResponseEntity<Map<String, Object>> crearFormula(@PathVariable long id, @RequestBody FormulaRq datos);
 
@@ -138,7 +137,7 @@ public interface AtencionApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Editar fórmula en borrador")
-    @Permitido(Perfiles.MEDICO)
+    @PreAuthorize("hasAuthority('FORMULA_GESTIONAR')")
     @PutMapping("/citas/{id}/formulas/{formula}")
     ResponseEntity<Map<String, Object>> actualizarFormula(@PathVariable long id, @PathVariable long formula,
                                                          @RequestBody FormulaRq datos);
@@ -151,7 +150,7 @@ public interface AtencionApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Confirmar fórmula (valida existencias; queda pendiente de despacho, no descuenta inventario)")
-    @Permitido(Perfiles.MEDICO)
+    @PreAuthorize("hasAuthority('FORMULA_GESTIONAR')")
     @PostMapping("/formulas/{id}/confirmar")
     ResponseEntity<Map<String, Object>> confirmar(@PathVariable long id, @RequestParam Integer revision);
 
@@ -163,7 +162,7 @@ public interface AtencionApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Anular fórmula en borrador")
-    @Permitido(Perfiles.MEDICO)
+    @PreAuthorize("hasAuthority('FORMULA_GESTIONAR')")
     @PostMapping("/formulas/{id}/anular")
     ResponseEntity<Map<String, Object>> anular(@PathVariable long id, @RequestParam Integer revision);
 
@@ -174,7 +173,7 @@ public interface AtencionApi {
      * @return archivo generado (PDF o Excel) para descargar.
      */
     @Operation(summary = "Imprimir fórmula médica confirmada (PDF)")
-    @Permitido({Perfiles.MEDICO, Perfiles.ADMINISTRADOR, Perfiles.DESPACHO_MEDICO})
+    @PreAuthorize("hasAnyAuthority('FORMULA_CONSULTAR', 'DESPACHO_CONSULTAR')")
     @GetMapping("/formulas/{id}/pdf")
     ResponseEntity<byte[]> formulaPdf(@PathVariable long id);
 
@@ -185,7 +184,7 @@ public interface AtencionApi {
      * @return archivo generado (PDF o Excel) para descargar.
      */
     @Operation(summary = "Imprimir fórmula heredada de la versión anterior (PDF)")
-    @Permitido({Perfiles.MEDICO, Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('FORMULA_CONSULTAR')")
     @GetMapping("/formulas/legadas/{id}/pdf")
     ResponseEntity<byte[]> formulaLegadaPdf(@PathVariable long id);
 }

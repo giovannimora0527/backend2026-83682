@@ -141,6 +141,24 @@ public class ReportesService {
     // ------------------------------------------------------------------ Ejecución
 
     /**
+     * Permisos que habilitan cada tipo de reporte (matriz RBAC): financieros, inventario, citas, gestión médica
+     * y despacho. El veterinario solo ve su propia actividad (los filtros se restringen a su médico).
+     *
+     * @param tipo tipo de reporte en mayúsculas.
+     * @return permisos aceptados (cualquiera de ellos).
+     */
+    static String[] permisosDelTipo(String tipo) {
+        return switch (tipo) {
+            case "FINANCIERO", "FACTURAS", "PAGOS", "POR_MEDICO", "POR_ESPECIALIDAD", "CONCEPTOS" -> new String[]{"REPORTE_FINANCIERO"};
+            case "EXISTENCIAS", "LOTES", "MOVIMIENTOS" -> new String[]{"REPORTE_INVENTARIO"};
+            case "DISPENSACIONES" -> new String[]{"REPORTE_INVENTARIO", "REPORTE_DESPACHO"};
+            case "CITAS", "CITAS_OPERATIVAS" -> new String[]{"REPORTE_CITAS"};
+            case "CONSULTAS", "ATENCIONES" -> new String[]{"REPORTE_MEDICO"};
+            default -> new String[]{"REPORTE_FINANCIERO", "REPORTE_INVENTARIO", "REPORTE_CITAS", "REPORTE_MEDICO"};
+        };
+    }
+
+    /**
      * Valida permisos y filtros y ejecuta el reporte.
      *
      * @param tipoRq tipo de reporte.
@@ -150,7 +168,7 @@ public class ReportesService {
     Reporte ejecutar(String tipoRq, Map<String, String> p) {
         String tipo = tipoRq == null ? "" : tipoRq.trim().toUpperCase();
         SesionUsuario s = SesionActual.obtener();
-        if (!s.esAdmin() && !(OPERATIVOS.contains(tipo) && s.es(Perfiles.RECEPCION, Perfiles.MEDICO))) {
+        if (!s.tieneAlguno(permisosDelTipo(tipo))) {
             throw new ForbiddenException("Tu perfil no tiene acceso a este reporte.");
         }
         Filtros f = new Filtros(p, s, tipo);
@@ -211,7 +229,7 @@ public class ReportesService {
             propietario = Validar.id(p.get("propietario"), "propietario");
             especialidad = Validar.id(p.get("especialidad"), "especialidad");
             Long med = Validar.id(p.get("medico"), "médico");
-            if (s.es(Perfiles.MEDICO)) {
+            if (s.es(Perfiles.VETERINARIO)) {
                 med = SesionActual.medicoId();
             }
             medico = med;

@@ -7,6 +7,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -94,6 +95,17 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ErrorResponse> manejarRuta(NoResourceFoundException ex) {
         return respuesta(HttpStatus.NOT_FOUND, "El recurso solicitado no existe.");
+    }
+
+    /**
+     * Operación sin el permiso requerido por {@code @PreAuthorize} → 403.
+     *
+     * @param ex excepción de autorización.
+     * @return respuesta 403.
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> manejarAcceso(AccessDeniedException ex) {
+        return respuesta(HttpStatus.FORBIDDEN, "Tu perfil no tiene permiso para esta operación.");
     }
 
     /**

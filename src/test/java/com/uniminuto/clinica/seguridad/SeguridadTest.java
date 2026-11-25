@@ -39,8 +39,9 @@ class SeguridadTest {
     @Test
     void normalizaNombresDePerfil() {
         assertEquals("ADMINISTRADOR", Perfiles.codigo("Administrador"));
-        assertEquals("MEDICO", Perfiles.codigo(" Médico "));
-        assertEquals("DESPACHO_MEDICO", Perfiles.codigo("Despacho médico"));
-        assertEquals("RECEPCION", Perfiles.codigo("Recepción"));
+        assertEquals(Perfiles.VETERINARIO, Perfiles.codigo(" Veterinario "));
+        assertEquals(Perfiles.DESPACHO_MEDICO, Perfiles.codigo("Despacho médico"));
+        assertEquals(Perfiles.SECRETARIA, Perfiles.codigo("Secretaría"));
+        assertEquals(Perfiles.CONTADOR, Perfiles.codigo("Contador"));
     }
 }

@@ -1,8 +1,7 @@
 package com.uniminuto.clinica.cita;
 
-import com.uniminuto.clinica.seguridad.Perfiles;
-import com.uniminuto.clinica.seguridad.Permitido;
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -55,7 +54,7 @@ public interface CitaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Listar citas", description = "El médico solo recibe sus propias citas.")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
+    @PreAuthorize("hasAuthority('CITA_CONSULTAR')")
     @GetMapping("/listar")
     ResponseEntity<List<Map<String, Object>>> listar();
 
@@ -67,7 +66,7 @@ public interface CitaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Filtrar citas entre una fecha inicial y una final (de la más reciente a la más antigua)")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
+    @PreAuthorize("hasAuthority('CITA_CONSULTAR')")
     @GetMapping("/listar-rango")
     ResponseEntity<List<Map<String, Object>>> listarRango(@RequestParam(required = false) String fechaInicio,
                                                           @RequestParam(required = false) String fechaFin);
@@ -79,7 +78,7 @@ public interface CitaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Citas de una mascota (para combos dependientes mascota → cita)")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
+    @PreAuthorize("hasAuthority('CITA_CONSULTAR')")
     @GetMapping("/por-mascota/{mascotaId}")
     ResponseEntity<List<Map<String, Object>>> porMascota(@PathVariable int mascotaId);
 
@@ -90,7 +89,7 @@ public interface CitaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Consultar una cita")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
+    @PreAuthorize("hasAuthority('CITA_CONSULTAR')")
     @GetMapping("/{id:\\d+}")
     ResponseEntity<Map<String, Object>> consultar(@PathVariable long id);
 
@@ -102,7 +101,7 @@ public interface CitaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Reactivar una cita cancelada (operación explícita; vuelve a pendiente)")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('CITA_REACTIVAR')")
     @PostMapping("/{id}/reactivar")
     ResponseEntity<Map<String, Object>> reactivar(@PathVariable long id, @RequestBody(required = false) CambioRq horario);
 
@@ -115,7 +114,7 @@ public interface CitaApi {
      */
     @Operation(summary = "Registrar cita", description = "Valida horario, ausencias, médico activo y superposiciones. "
             + "El médico solo puede registrar citas a su propio nombre.")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
+    @PreAuthorize("hasAuthority('CITA_GESTIONAR')")
     @PostMapping("/crear")
     ResponseEntity<Map<String, Object>> crear(@RequestBody CitaRq datos);
 
@@ -127,7 +126,7 @@ public interface CitaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Editar cita existente", description = "El médico solo puede editar sus propias citas.")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
+    @PreAuthorize("hasAuthority('CITA_GESTIONAR')")
     @PutMapping("/actualizar/{id}")
     ResponseEntity<Map<String, Object>> actualizar(@PathVariable long id, @RequestBody CitaRq datos);
 
@@ -139,7 +138,7 @@ public interface CitaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Historial de citas de una mascota (paginado de a 10)")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
+    @PreAuthorize("hasAuthority('CITA_CONSULTAR')")
     @GetMapping("/mascotas/{id}/historial")
     ResponseEntity<Map<String, Object>> historialMascota(@PathVariable int id,
                                                         @RequestParam(required = false) Integer pagina);
@@ -156,7 +155,7 @@ public interface CitaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Calendario del médico autenticado", description = "Rango de fechas (día, semana o mes) y estado opcional.")
-    @Permitido(Perfiles.MEDICO)
+    @PreAuthorize("hasAuthority('AGENDA_PROPIA')")
     @GetMapping("/agenda/mia")
     ResponseEntity<List<Map<String, Object>>> agendaPropia(@RequestParam String desde, @RequestParam String hasta,
                                                            @RequestParam(required = false) String estado);
@@ -170,7 +169,7 @@ public interface CitaApi {
      * @return archivo generado (PDF o Excel) para descargar.
      */
     @Operation(summary = "Exportar citas del médico autenticado a Excel (.xlsx)")
-    @Permitido(Perfiles.MEDICO)
+    @PreAuthorize("hasAuthority('AGENDA_PROPIA')")
     @GetMapping("/agenda/mia/excel")
     ResponseEntity<byte[]> excelPropio(@RequestParam String desde, @RequestParam String hasta,
                                        @RequestParam(required = false) String estado);
@@ -181,7 +180,7 @@ public interface CitaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Horario y ausencias del médico autenticado")
-    @Permitido(Perfiles.MEDICO)
+    @PreAuthorize("hasAuthority('AGENDA_PROPIA')")
     @GetMapping("/agenda/mia/configuracion")
     ResponseEntity<Map<String, Object>> configuracionPropia();
 
@@ -192,7 +191,7 @@ public interface CitaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Guardar horario semanal propio")
-    @Permitido(Perfiles.MEDICO)
+    @PreAuthorize("hasAuthority('AGENDA_PROPIA')")
     @PutMapping("/agenda/mia/horarios")
     ResponseEntity<Map<String, Object>> horariosPropios(@RequestBody List<Franja> franjas);
 
@@ -203,7 +202,7 @@ public interface CitaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Registrar ausencia propia")
-    @Permitido(Perfiles.MEDICO)
+    @PreAuthorize("hasAuthority('AGENDA_PROPIA')")
     @PostMapping("/agenda/mia/ausencias")
     ResponseEntity<Map<String, Object>> ausenciaPropia(@RequestBody AusenciaRq ausencia);
 
@@ -214,7 +213,7 @@ public interface CitaApi {
      * @return respuesta HTTP con la configuración actualizada.
      */
     @Operation(summary = "Eliminar ausencia propia vigente o futura")
-    @Permitido(Perfiles.MEDICO)
+    @PreAuthorize("hasAuthority('AGENDA_PROPIA')")
     @DeleteMapping("/agenda/mia/ausencias/{id}")
     ResponseEntity<Map<String, Object>> eliminarAusenciaPropia(@PathVariable long id);
 
@@ -226,7 +225,7 @@ public interface CitaApi {
      * @return respuesta HTTP con las ausencias.
      */
     @Operation(summary = "Ausencias del médico autenticado en un rango de fechas")
-    @Permitido(Perfiles.MEDICO)
+    @PreAuthorize("hasAuthority('AGENDA_PROPIA')")
     @GetMapping("/agenda/mia/ausencias")
     ResponseEntity<List<Map<String, Object>>> ausenciasPropias(@RequestParam String desde, @RequestParam String hasta);
 
@@ -240,7 +239,7 @@ public interface CitaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Franjas libres de un médico en una fecha")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
+    @PreAuthorize("hasAuthority('AGENDA_CONSULTAR')")
     @GetMapping("/agenda/medicos/{medico}/disponibilidad")
     ResponseEntity<Map<String, Object>> disponibilidad(@PathVariable long medico, @RequestParam String fecha);
 
@@ -251,7 +250,7 @@ public interface CitaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Horario y ausencias de un médico")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('AGENDA_CONSULTAR')")
     @GetMapping("/agenda/medicos/{medico}/configuracion")
     ResponseEntity<Map<String, Object>> configuracion(@PathVariable long medico);
 
@@ -263,7 +262,7 @@ public interface CitaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Guardar horario semanal de un médico")
-    @Permitido(Perfiles.ADMINISTRADOR)
+    @PreAuthorize("hasAuthority('AGENDA_CONFIGURAR')")
     @PutMapping("/agenda/medicos/{medico}/horarios")
     ResponseEntity<Map<String, Object>> horarios(@PathVariable long medico, @RequestBody List<Franja> franjas);
 
@@ -275,7 +274,7 @@ public interface CitaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Registrar ausencia de un médico")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('AUSENCIA_GESTIONAR')")
     @PostMapping("/agenda/medicos/{medico}/ausencias")
     ResponseEntity<Map<String, Object>> ausencia(@PathVariable long medico, @RequestBody AusenciaRq ausencia);
 
@@ -287,7 +286,7 @@ public interface CitaApi {
      * @return respuesta HTTP con la configuración actualizada.
      */
     @Operation(summary = "Eliminar ausencia vigente o futura de un médico")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('AUSENCIA_GESTIONAR')")
     @DeleteMapping("/agenda/medicos/{medico}/ausencias/{id}")
     ResponseEntity<Map<String, Object>> eliminarAusencia(@PathVariable long medico, @PathVariable long id);
 
@@ -299,7 +298,7 @@ public interface CitaApi {
      * @return respuesta sin contenido (204).
      */
     @Operation(summary = "Activar o inactivar un médico")
-    @Permitido(Perfiles.ADMINISTRADOR)
+    @PreAuthorize("hasAuthority('AGENDA_CONFIGURAR')")
     @PutMapping("/agenda/medicos/{medico}/actividad")
     ResponseEntity<Void> actividad(@PathVariable long medico, @RequestBody ActividadRq datos);
 
@@ -312,7 +311,7 @@ public interface CitaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Cambiar estado o reprogramar una cita", description = "Queda registrado en el historial.")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
+    @PreAuthorize("hasAuthority('CITA_GESTIONAR')")
     @PutMapping("/agenda/{id}/cambio")
     ResponseEntity<Map<String, Object>> cambiar(@PathVariable long id, @RequestBody CambioRq cambio);
 
@@ -323,7 +322,7 @@ public interface CitaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Historial de cambios de una cita")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
+    @PreAuthorize("hasAuthority('CITA_CONSULTAR')")
     @GetMapping("/agenda/{id}/historial")
     ResponseEntity<List<Map<String, Object>>> historial(@PathVariable long id);
 }

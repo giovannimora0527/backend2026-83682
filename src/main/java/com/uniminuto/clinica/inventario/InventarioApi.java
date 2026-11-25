@@ -1,8 +1,7 @@
 package com.uniminuto.clinica.inventario;
 
-import com.uniminuto.clinica.seguridad.Perfiles;
-import com.uniminuto.clinica.seguridad.Permitido;
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -49,7 +48,7 @@ public interface InventarioApi {
      *
      * @return productos.
      */
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.MEDICO, Perfiles.DESPACHO_MEDICO})
+    @PreAuthorize("hasAuthority('INVENTARIO_CONSULTAR')")
     @GetMapping("/productos")
     ResponseEntity<List<Map<String, Object>>> listar();
 
@@ -60,7 +59,7 @@ public interface InventarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Consultar un producto")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.MEDICO, Perfiles.DESPACHO_MEDICO})
+    @PreAuthorize("hasAuthority('INVENTARIO_CONSULTAR')")
     @GetMapping("/productos/{id}")
     ResponseEntity<Map<String, Object>> consultar(@PathVariable long id);
 
@@ -72,7 +71,7 @@ public interface InventarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Registrar producto", description = "Código de 8 caracteres; INVIMA obligatorio para MEDICAMENTO.")
-    @Permitido(Perfiles.ADMINISTRADOR)
+    @PreAuthorize("hasAuthority('INVENTARIO_GESTIONAR')")
     @PostMapping("/productos")
     ResponseEntity<Map<String, Object>> crear(@RequestBody ProductoRq producto);
 
@@ -84,7 +83,7 @@ public interface InventarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Editar producto (no modifica existencias)")
-    @Permitido(Perfiles.ADMINISTRADOR)
+    @PreAuthorize("hasAuthority('INVENTARIO_GESTIONAR')")
     @PutMapping("/productos/{id}")
     ResponseEntity<Map<String, Object>> actualizar(@PathVariable long id, @RequestBody ProductoRq producto);
 
@@ -95,7 +94,7 @@ public interface InventarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Lotes de un producto ordenados por vencimiento (FEFO)")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.MEDICO, Perfiles.DESPACHO_MEDICO})
+    @PreAuthorize("hasAuthority('INVENTARIO_CONSULTAR')")
     @GetMapping("/productos/{id}/lotes")
     ResponseEntity<List<Map<String, Object>>> lotes(@PathVariable long id);
 
@@ -107,7 +106,7 @@ public interface InventarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Registrar lote con su entrada inicial")
-    @Permitido(Perfiles.ADMINISTRADOR)
+    @PreAuthorize("hasAuthority('INVENTARIO_GESTIONAR')")
     @PostMapping("/productos/{id}/lotes")
     ResponseEntity<Map<String, Object>> registrarLote(@PathVariable long id, @RequestBody LoteRq lote);
 
@@ -118,7 +117,7 @@ public interface InventarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Historial de entradas y salidas (kardex) de un producto")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.DESPACHO_MEDICO})
+    @PreAuthorize("hasAuthority('INVENTARIO_MOVIMIENTOS')")
     @GetMapping("/productos/{id}/movimientos")
     ResponseEntity<List<Map<String, Object>>> movimientos(@PathVariable long id);
 
@@ -131,7 +130,7 @@ public interface InventarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Registrar movimiento manual (ENTRADA, SALIDA o AJUSTE con signo)")
-    @Permitido(Perfiles.ADMINISTRADOR)
+    @PreAuthorize("hasAuthority('INVENTARIO_AJUSTAR')")
     @PostMapping("/productos/{id}/lotes/{lote}/movimientos")
     ResponseEntity<Map<String, Object>> registrarMovimiento(@PathVariable long id, @PathVariable long lote,
                                                            @RequestBody MovimientoRq movimiento);
@@ -143,7 +142,7 @@ public interface InventarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Carga masiva: vista previa y validación de un archivo CSV o XLSX")
-    @Permitido(Perfiles.ADMINISTRADOR)
+    @PreAuthorize("hasAuthority('INVENTARIO_IMPORTAR')")
     @PostMapping(value = "/importaciones", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     ResponseEntity<Map<String, Object>> previsualizar(@RequestPart("archivo") MultipartFile archivo);
 
@@ -154,7 +153,7 @@ public interface InventarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Carga masiva: confirmar la importación de los registros válidos")
-    @Permitido(Perfiles.ADMINISTRADOR)
+    @PreAuthorize("hasAuthority('INVENTARIO_IMPORTAR')")
     @PostMapping("/importaciones/{id}/confirmar")
     ResponseEntity<Map<String, Object>> confirmar(@PathVariable long id);
 
@@ -164,7 +163,7 @@ public interface InventarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Historial de cargas masivas (log de cargue)")
-    @Permitido(Perfiles.ADMINISTRADOR)
+    @PreAuthorize("hasAuthority('INVENTARIO_IMPORTAR')")
     @GetMapping("/importaciones")
     ResponseEntity<List<Map<String, Object>>> historial();
 
@@ -175,7 +174,7 @@ public interface InventarioApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Detalle de una carga masiva con errores por fila")
-    @Permitido(Perfiles.ADMINISTRADOR)
+    @PreAuthorize("hasAuthority('INVENTARIO_IMPORTAR')")
     @GetMapping("/importaciones/{id}")
     ResponseEntity<Map<String, Object>> detalle(@PathVariable long id);
 }

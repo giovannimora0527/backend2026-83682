@@ -113,7 +113,7 @@ public class CitaService {
             throw new BadRequestException("La fecha final no puede ser anterior a la fecha inicial.");
         }
         SesionUsuario s = SesionActual.obtener();
-        Long medico = s.es(Perfiles.MEDICO) ? SesionActual.medicoId() : null;
+        Long medico = s.es(Perfiles.VETERINARIO) ? SesionActual.medicoId() : null;
         return db.lista(CITA_DETALLE + """
                 WHERE (:medico IS NULL OR c.medico_id = :medico)
                   AND (:desde IS NULL OR c.fecha_hora >= :desde)
@@ -132,7 +132,7 @@ public class CitaService {
     public List<Map<String, Object>> porMascota(int mascotaId) {
         db.requerido("SELECT mascota_id FROM mascota WHERE mascota_id = :m", Db.p("m", mascotaId), "La mascota no existe.");
         SesionUsuario s = SesionActual.obtener();
-        Long medico = s.es(Perfiles.MEDICO) ? SesionActual.medicoId() : null;
+        Long medico = s.es(Perfiles.VETERINARIO) ? SesionActual.medicoId() : null;
         return db.lista(CITA_DETALLE + """
                 WHERE c.mascota_id = :m AND (:medico IS NULL OR c.medico_id = :medico)
                 ORDER BY c.fecha_hora DESC
@@ -148,7 +148,7 @@ public class CitaService {
     public Map<String, Object> detalle(long id) {
         Map<String, Object> cita = db.requerido(CITA_DETALLE + " WHERE c.id = :id", Db.p("id", id), "La cita no existe.");
         SesionUsuario s = SesionActual.obtener();
-        if (s.es(Perfiles.MEDICO) && Validar.largo(cita, "medicoId") != SesionActual.medicoId()) {
+        if (s.es(Perfiles.VETERINARIO) && Validar.largo(cita, "medicoId") != SesionActual.medicoId()) {
             throw new ForbiddenException("Solo puedes consultar tus propias citas.");
         }
         return cita;
@@ -711,7 +711,7 @@ public class CitaService {
             case "confirmada" -> Set.of("pendiente", "programada", "cancelada").contains(nuevo)
                     || ("atendida".equals(nuevo) && s.esAdmin());
             // Una cita cancelada solo vuelve a estar activa con la operación explícita "reactivar".
-            case "atendida" -> "finalizada".equals(nuevo) && s.es(Perfiles.ADMINISTRADOR, Perfiles.MEDICO, Perfiles.RECEPCION);
+            case "atendida" -> "finalizada".equals(nuevo) && s.es(Perfiles.ADMINISTRADOR, Perfiles.VETERINARIO, Perfiles.SECRETARIA);
             default -> false;
         };
         if (!valida) {
@@ -745,7 +745,7 @@ public class CitaService {
      * @return datos con el médico completado cuando corresponde.
      */
     private CitaApi.CitaRq conMedicoPropio(CitaApi.CitaRq d) {
-        if (d != null && d.medicoId() == null && SesionActual.obtener().es(Perfiles.MEDICO)) {
+        if (d != null && d.medicoId() == null && SesionActual.obtener().es(Perfiles.VETERINARIO)) {
             return new CitaApi.CitaRq(d.clienteId(), d.mascotaId(), SesionActual.medicoId(), d.fechaHora(), d.fechaFin(),
                     d.estado(), d.motivo());
         }
@@ -759,13 +759,13 @@ public class CitaService {
      * @param s sesión actual.
      */
     private void verificarMedicoPropio(long medico, SesionUsuario s) {
-        if (s.es(Perfiles.MEDICO) && medico != SesionActual.medicoId()) {
+        if (s.es(Perfiles.VETERINARIO) && medico != SesionActual.medicoId()) {
             throw new ForbiddenException("Como médico solo puedes agendar o editar citas a tu propio nombre.");
         }
     }
 
         private void verificarAcceso(Map<String, Object> cita, SesionUsuario s) {
-        if (s.es(Perfiles.MEDICO) && Validar.largo(cita, "medico_id") != SesionActual.medicoId()) {
+        if (s.es(Perfiles.VETERINARIO) && Validar.largo(cita, "medico_id") != SesionActual.medicoId()) {
             throw new ForbiddenException("Solo puedes gestionar tus propias citas.");
         }
     }

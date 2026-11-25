@@ -11,12 +11,14 @@ public final class Perfiles {
 
     /** Perfil con acceso a todos los módulos administrativos. */
     public static final String ADMINISTRADOR = "ADMINISTRADOR";
-    /** Perfil de recepción: clientes, mascotas, citas y facturación. */
-    public static final String RECEPCION = "RECEPCION";
-    /** Perfil del médico veterinario: agenda propia, atención, fórmulas e historias. */
-    public static final String MEDICO = "MEDICO";
-    /** Perfil de despacho: consulta de inventario y dispensación de fórmulas. */
+    /** Secretaria: clientes, mascotas, programación de citas y consulta administrativa. */
+    public static final String SECRETARIA = "SECRETARIA";
+    /** Veterinario: agenda propia, atención médica, historias clínicas y fórmulas. */
+    public static final String VETERINARIO = "VETERINARIO";
+    /** Despacho médico: consulta de inventario y dispensación de fórmulas. */
     public static final String DESPACHO_MEDICO = "DESPACHO_MEDICO";
+    /** Contador: facturación, pagos e informes financieros. */
+    public static final String CONTADOR = "CONTADOR";
 
     /** Clase de constantes: no se instancia. */
     private Perfiles() {

@@ -1,8 +1,7 @@
 package com.uniminuto.clinica.catalogo;
 
-import com.uniminuto.clinica.seguridad.Perfiles;
-import com.uniminuto.clinica.seguridad.Permitido;
 import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.security.access.prepost.PreAuthorize;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -18,7 +17,6 @@ import java.util.Map;
 
 /** Mascotas (pacientes). */
 @Tag(name = "Mascotas", description = "Gestión de mascotas o pacientes")
-@Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION, Perfiles.MEDICO})
 @RequestMapping("/mascota")
 public interface MascotaApi {
 
@@ -32,6 +30,7 @@ public interface MascotaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Listar mascotas con raza y propietario")
+    @PreAuthorize("hasAuthority('MASCOTA_CONSULTAR')")
     @GetMapping({"/listar-detalle", "/listar"})
     ResponseEntity<List<Map<String, Object>>> listar();
 
@@ -42,6 +41,7 @@ public interface MascotaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Consultar una mascota")
+    @PreAuthorize("hasAuthority('MASCOTA_CONSULTAR')")
     @GetMapping("/{id}")
     ResponseEntity<Map<String, Object>> consultar(@PathVariable int id);
 
@@ -52,7 +52,7 @@ public interface MascotaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Registrar mascota")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('MASCOTA_GESTIONAR')")
     @PostMapping("/crear")
     ResponseEntity<Map<String, Object>> crear(@RequestBody MascotaRq datos);
 
@@ -64,7 +64,7 @@ public interface MascotaApi {
      * @return respuesta HTTP con el resultado en formato JSON.
      */
     @Operation(summary = "Actualizar mascota")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('MASCOTA_GESTIONAR')")
     @PutMapping("/actualizar/{id}")
     ResponseEntity<Map<String, Object>> actualizar(@PathVariable int id, @RequestBody MascotaRq datos);
 
@@ -81,7 +81,7 @@ public interface MascotaApi {
      * @return respuesta HTTP con la mascota actualizada.
      */
     @Operation(summary = "Activar o inactivar mascota")
-    @Permitido({Perfiles.ADMINISTRADOR, Perfiles.RECEPCION})
+    @PreAuthorize("hasAuthority('MASCOTA_GESTIONAR')")
     @PatchMapping("/{id}/estado")
     ResponseEntity<Map<String, Object>> cambiarEstado(@PathVariable int id, @RequestBody EstadoRq datos);
 }
