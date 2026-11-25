@@ -48,13 +48,18 @@ public class AtencionService {
     private final Db db;
     /** Consulta de tarifas vigentes. */
     private final TarifarioService tarifario;
+    /** Enlace entre la fórmula de la atención y la prescripción en la historia clínica. */
+    private final com.uniminuto.clinica.historia.FormulaIntegracionService integracion;
 
     /**
      * @param db acceso a datos.
      * @param tarifario servicio de tarifas.
+     * @param integracion enlace con la historia clínica.
      */
-    public AtencionService(Db db, TarifarioService tarifario) {
+    public AtencionService(Db db, TarifarioService tarifario,
+                           com.uniminuto.clinica.historia.FormulaIntegracionService integracion) {
         this.db = db;
+        this.integracion = integracion;
         this.tarifario = tarifario;
     }
 
@@ -290,6 +295,8 @@ public class AtencionService {
                 VALUES (:h, :m, :c, :f, :d, :o, :dx)
                 """, Db.p("h", atencion.get("historia_id"), "m", atencion.get("medico_id"), "c", citaId, "f", ahora,
                 "d", resumen, "o", atencion.get("observaciones"), "dx", atencion.get("diagnostico")));
+        // Prescripciones registradas en la historia antes de atender: ahora generan su orden de despacho.
+        integracion.generarPendientesDeCita(citaId);
         return consultar(citaId);
     }
 
@@ -393,6 +400,8 @@ public class AtencionService {
                 INSERT INTO despacho_estado_historial (formula_id, estado_anterior, estado_nuevo, usuario_id, fecha, motivo)
                 VALUES (:f, 'BORRADOR', 'PENDIENTE_DESPACHO', :u, :ahora, 'Fórmula confirmada por el médico')
                 """, Db.p("f", formulaId, "u", SesionActual.usuarioId(), "ahora", ahora));
+        // La fórmula confirmada queda también en la historia clínica (Gestión de Fórmulas e historia de la mascota).
+        integracion.registrarEnHistoria(formulaId);
         return formula(formulaId);
     }
 

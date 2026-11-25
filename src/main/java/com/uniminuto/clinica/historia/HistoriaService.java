@@ -75,8 +75,12 @@ public class HistoriaService {
                    f.fecha_emision AS fechaEmision, c.fecha_hora AS fechaCita, f.activo,
                    IF(f.activo = 1, 'Activa', 'Inactiva') AS estado,
                    f.fecha_creacion_registro AS fechaCreacionRegistro,
-                   f.fecha_actualizacion_registro AS fechaActualizacionRegistro
+                   f.fecha_actualizacion_registro AS fechaActualizacionRegistro,
+                   f.formula_clinica_id AS ordenDespachoId, fc.estado_despacho AS estadoDespacho,
+                   (SELECT d.cantidad FROM formula_clinica_detalle d WHERE d.formula_id = fc.id
+                      AND d.medicamento_id = f.medicamento_id) AS cantidadDespacho
             FROM formula_medica f
+            LEFT JOIN formula_clinica fc ON fc.id = f.formula_clinica_id
             JOIN mascota m ON m.mascota_id = f.mascota_id
             JOIN cliente cl ON cl.cliente_id = m.cliente_id
             JOIN medico md ON md.id = f.medico_id
@@ -86,12 +90,16 @@ public class HistoriaService {
 
     /** Acceso a datos. */
     private final Db db;
+    /** Enlace entre la prescripción de la historia clínica y la orden de despacho. */
+    private final FormulaIntegracionService integracion;
 
     /**
      * @param db acceso a datos con SQL parametrizado.
+     * @param integracion enlace prescripción ↔ orden de despacho.
      */
-    public HistoriaService(Db db) {
+    public HistoriaService(Db db, FormulaIntegracionService integracion) {
         this.db = db;
+        this.integracion = integracion;
     }
 
     // ================================================================== HISTORIAS CLÍNICAS
@@ -356,6 +364,8 @@ public class HistoriaService {
                        duracion, indicaciones, fecha_emision, fecha_creacion_registro, activo)
                 VALUES (:cita, :mascota, :medico, :historia, :med, :dosis, :frecuencia, :duracion, :ind, :emision, :ahora, 1)
                 """, v.parametros());
+        // La prescripción genera su orden de dispensación: llega a despacho, descuenta inventario al entregar y se factura.
+        integracion.generarOrden(id);
         return formula(id);
     }
 
@@ -374,6 +384,7 @@ public class HistoriaService {
             throw new ConflictException("La fórmula está inactiva y ya no puede modificarse.");
         }
         verificarPropiedad(Validar.largo(actual, "medico_id"));
+        integracion.verificarModificable(actual);
         Datos v = validarFormula(d, actual);
         Map<String, Object> p = v.parametros();
         p.put("id", id);
@@ -383,6 +394,7 @@ public class HistoriaService {
                        fecha_actualizacion_registro = :ahora
                 WHERE id = :id
                 """, p);
+        integracion.sincronizarEdicion(id, Validar.largo(actual, "medicamento_id"));
         return formula(id);
     }
 
@@ -397,11 +409,13 @@ public class HistoriaService {
     @Transactional
     public Map<String, Object> cambiarEstadoFormula(long id, Boolean activo) {
         Validar.requerido(activo, "activo");
-        Map<String, Object> actual = db.requerido("SELECT medico_id FROM formula_medica WHERE id = :id FOR UPDATE",
+        Map<String, Object> actual = db.requerido("SELECT * FROM formula_medica WHERE id = :id FOR UPDATE",
                 Db.p("id", id), "La fórmula no existe.");
         verificarPropiedad(Validar.largo(actual, "medico_id"));
+        integracion.verificarModificable(actual);
         db.ejecutar("UPDATE formula_medica SET activo = :a, fecha_actualizacion_registro = :ahora WHERE id = :id",
                 Db.p("a", activo, "ahora", Tiempo.ahora(), "id", id));
+        integracion.sincronizarEstado(id, activo);
         return formula(id);
     }
 
