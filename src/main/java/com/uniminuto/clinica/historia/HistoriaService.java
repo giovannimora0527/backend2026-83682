@@ -57,48 +57,20 @@ public class HistoriaService {
             LEFT JOIN cita c ON c.id = h.cita_id
             """;
 
-    /** Consulta base de anotaciones con el nombre del veterinario. */
-    private static final String ANOTACION = """
-            SELECT a.id, a.historia_id AS historiaId, a.medico_id AS medicoId,
-                   CONCAT(md.nombres, ' ', md.apellidos) AS veterinario, a.cita_id AS citaId, a.fecha,
-                   a.descripcion, a.observacion, a.diagnostico, a.fecha_modificacion AS fechaModificacion
-            FROM anotacion_historia a JOIN medico md ON md.id = a.medico_id
-            """;
 
-    /** Consulta base de fórmulas con los nombres de mascota, cliente, veterinario y medicamento. */
-    private static final String FORMULA = """
-            SELECT f.id, f.cita_id AS citaId, f.mascota_id AS mascotaId, m.nombre_mascota AS mascota,
-                   m.cliente_id AS clienteId, CONCAT(cl.nombres, ' ', cl.apellidos) AS cliente,
-                   f.medico_id AS medicoId, CONCAT(md.nombres, ' ', md.apellidos) AS veterinario,
-                   f.historia_id AS historiaId, f.medicamento_id AS medicamentoId, me.nombre AS medicamento,
-                   me.presentacion, f.dosis, f.frecuencia, f.duracion AS duracionTratamiento, f.indicaciones,
-                   f.fecha_emision AS fechaEmision, c.fecha_hora AS fechaCita, f.activo,
-                   IF(f.activo = 1, 'Activa', 'Inactiva') AS estado,
-                   f.fecha_creacion_registro AS fechaCreacionRegistro,
-                   f.fecha_actualizacion_registro AS fechaActualizacionRegistro,
-                   f.formula_clinica_id AS ordenDespachoId, fc.estado_despacho AS estadoDespacho,
-                   (SELECT d.cantidad FROM formula_clinica_detalle d WHERE d.formula_id = fc.id
-                      AND d.medicamento_id = f.medicamento_id) AS cantidadDespacho
-            FROM formula_medica f
-            LEFT JOIN formula_clinica fc ON fc.id = f.formula_clinica_id
-            JOIN mascota m ON m.mascota_id = f.mascota_id
-            JOIN cliente cl ON cl.cliente_id = m.cliente_id
-            JOIN medico md ON md.id = f.medico_id
-            JOIN medicamento me ON me.id = f.medicamento_id
-            JOIN cita c ON c.id = f.cita_id
-            """;
 
-    /** Acceso a datos. */
-    private final Db db;
     /** Enlace entre la prescripción de la historia clínica y la orden de despacho. */
     private final FormulaIntegracionService integracion;
 
+    /** Acceso a datos del módulo (SQL). */
+    private final HistoriaRepository repositorio;
+
     /**
-     * @param db acceso a datos con SQL parametrizado.
+     * @param repositorio acceso a datos del módulo.
      * @param integracion enlace prescripción ↔ orden de despacho.
      */
-    public HistoriaService(Db db, FormulaIntegracionService integracion) {
-        this.db = db;
+    public HistoriaService(HistoriaRepository repositorio, FormulaIntegracionService integracion) {
+        this.repositorio = repositorio;
         this.integracion = integracion;
     }
 
@@ -119,12 +91,7 @@ public class HistoriaService {
         if (desde != null && hasta != null && hasta.isBefore(desde)) {
             throw new BadRequestException("La fecha final no puede ser anterior a la fecha inicial.");
         }
-        return db.lista(HISTORIA + """
-                WHERE (:desde IS NULL OR h.fecha >= :desde) AND (:hasta IS NULL OR h.fecha < :hasta)
-                  AND (:mascota IS NULL OR h.paciente_id = :mascota) AND (:cliente IS NULL OR m.cliente_id = :cliente)
-                  AND (:medico IS NULL OR h.medico_id = :medico)
-                ORDER BY h.fecha DESC, h.id DESC
-                """, Db.p("desde", desde == null ? null : desde.atStartOfDay(),
+        return repositorio.listarAnotacionHistoria(Db.p("desde", desde == null ? null : desde.atStartOfDay(),
                 "hasta", hasta == null ? null : hasta.plusDays(1).atStartOfDay(), "mascota", mascotaId,
                 "cliente", clienteId, "medico", medicoRestringido()));
     }
@@ -136,11 +103,9 @@ public class HistoriaService {
      * @return historia; 404 si no existe.
      */
     public Map<String, Object> detalleHistoria(long id) {
-        Map<String, Object> historia = new LinkedHashMap<>(db.requerido(HISTORIA + " WHERE h.id = :id",
-                Db.p("id", id), "La historia clínica no existe."));
+        Map<String, Object> historia = new LinkedHashMap<>(repositorio.obtenerAnotacionHistoria(Db.p("id", id), "La historia clínica no existe."));
         historia.put("listaAnotaciones", anotacionesDeHistoria(id));
-        historia.put("formulas", db.lista(FORMULA + " WHERE f.historia_id = :id ORDER BY f.fecha_creacion_registro DESC",
-                Db.p("id", id)));
+        historia.put("formulas", repositorio.listarFormulaClinicaDetalle(Db.p("id", id)));
         return historia;
     }
 
@@ -159,8 +124,7 @@ public class HistoriaService {
         Validar.requerido(d.mascotaId(), "mascota");
         Validar.requerido(d.citaId(), "cita");
         Map<String, Object> mascota = validarClienteMascota(d.clienteId(), d.mascotaId());
-        Map<String, Object> cita = db.requerido("SELECT * FROM cita WHERE id = :id FOR UPDATE", Db.p("id", d.citaId()),
-                "La cita no existe.");
+        Map<String, Object> cita = repositorio.obtenerCita(Db.p("id", d.citaId()), "La cita no existe.");
         if (Validar.numero(cita, "mascota_id") != d.mascotaId()) {
             throw new BadRequestException("La cita seleccionada pertenece a otra mascota.");
         }
@@ -168,7 +132,7 @@ public class HistoriaService {
             throw new ConflictException("Solo una cita atendida o finalizada puede generar una historia clínica (estado actual: "
                     + cita.get("estado") + ").");
         }
-        if (db.existe("SELECT 1 FROM historia_medica WHERE cita_id = :c", Db.p("c", d.citaId()))) {
+        if (repositorio.existeHistoriaMedica(Db.p("c", d.citaId()))) {
             throw new ConflictException("La cita ya tiene una historia clínica registrada.");
         }
         long medico = medicoValido(d.medicoId() == null ? Validar.largo(cita, "medico_id") : d.medicoId());
@@ -177,16 +141,11 @@ public class HistoriaService {
         if (fecha.isAfter(Tiempo.ahora())) {
             throw new BadRequestException("La fecha de la consulta no puede ser futura.");
         }
-        long id = db.insertar("""
-                INSERT INTO historia_medica (paciente_id, cita_id, medico_id, fecha, motivo, diagnostico, observaciones,
-                                             activo, fecha_creacion)
-                VALUES (:m, :c, :medico, :fecha, :motivo, :dx, :obs, 1, :ahora)
-                """, Db.p("m", mascota.get("mascota_id"), "c", d.citaId(), "medico", medico, "fecha", fecha,
+        long id = repositorio.insertarHistoriaMedica(Db.p("m", mascota.get("mascota_id"), "c", d.citaId(), "medico", medico, "fecha", fecha,
                 "motivo", Validar.texto(d.motivo(), "motivo de consulta", 4000),
                 "dx", Validar.opcional(d.diagnostico(), "diagnóstico", 4000),
                 "obs", Validar.opcional(d.observaciones(), "observaciones", 4000), "ahora", Tiempo.ahora()));
-        db.ejecutar("UPDATE formula_medica SET historia_id = :h WHERE cita_id = :c AND historia_id IS NULL",
-                Db.p("h", id, "c", d.citaId()));
+        repositorio.actualizarFormulaMedica(Db.p("h", id, "c", d.citaId()));
         return detalleHistoria(id);
     }
 
@@ -200,8 +159,7 @@ public class HistoriaService {
      */
     @Transactional
     public Map<String, Object> actualizarHistoria(long id, HistoriaApi.HistoriaRq d) {
-        Map<String, Object> actual = db.requerido("SELECT * FROM historia_medica WHERE id = :id FOR UPDATE",
-                Db.p("id", id), "La historia clínica no existe.");
+        Map<String, Object> actual = repositorio.obtenerHistoriaMedica(Db.p("id", id), "La historia clínica no existe.");
         if (d == null) {
             throw new BadRequestException("Los datos de la historia clínica son obligatorios.");
         }
@@ -215,11 +173,7 @@ public class HistoriaService {
         if (fecha.isAfter(Tiempo.ahora())) {
             throw new BadRequestException("La fecha de la consulta no puede ser futura.");
         }
-        db.ejecutar("""
-                UPDATE historia_medica SET medico_id = :medico, fecha = :fecha, motivo = :motivo, diagnostico = :dx,
-                       observaciones = :obs, activo = :activo, fecha_modificacion = :ahora
-                WHERE id = :id
-                """, Db.p("medico", medico, "fecha", fecha, "motivo", Validar.texto(d.motivo(), "motivo de consulta", 4000),
+        repositorio.actualizarHistoriaMedica(Db.p("medico", medico, "fecha", fecha, "motivo", Validar.texto(d.motivo(), "motivo de consulta", 4000),
                 "dx", Validar.opcional(d.diagnostico(), "diagnóstico", 4000),
                 "obs", Validar.opcional(d.observaciones(), "observaciones", 4000),
                 "activo", d.activo() == null ? Validar.bool(actual, "activo") : d.activo(), "ahora", Tiempo.ahora(),
@@ -240,11 +194,7 @@ public class HistoriaService {
     public List<Map<String, Object>> listarAnotaciones(String fechaInicio, String fechaFin, Long historiaId) {
         LocalDate desde = Validar.fecha(fechaInicio, "fecha inicial", false);
         LocalDate hasta = Validar.fecha(fechaFin, "fecha final", false);
-        return db.lista(ANOTACION + """
-                WHERE (:desde IS NULL OR a.fecha >= :desde) AND (:hasta IS NULL OR a.fecha < :hasta)
-                  AND (:historia IS NULL OR a.historia_id = :historia)
-                ORDER BY a.fecha DESC, a.id DESC
-                """, Db.p("desde", desde == null ? null : desde.atStartOfDay(),
+        return repositorio.listarAnotacionHistoriaEnListarAnotaciones(Db.p("desde", desde == null ? null : desde.atStartOfDay(),
                 "hasta", hasta == null ? null : hasta.plusDays(1).atStartOfDay(), "historia", historiaId));
     }
 
@@ -255,8 +205,8 @@ public class HistoriaService {
      * @return anotaciones.
      */
     public List<Map<String, Object>> anotacionesDeHistoria(long historiaId) {
-        db.requerido("SELECT id FROM historia_medica WHERE id = :id", Db.p("id", historiaId), "La historia clínica no existe.");
-        return db.lista(ANOTACION + " WHERE a.historia_id = :h ORDER BY a.fecha DESC, a.id DESC", Db.p("h", historiaId));
+        repositorio.obtenerHistoriaMedicaEnAnotacionesDeHistoria(Db.p("id", historiaId), "La historia clínica no existe.");
+        return repositorio.listarAnotacionHistoriaEnAnotacionesDeHistoria(Db.p("h", historiaId));
     }
 
     /**
@@ -266,7 +216,7 @@ public class HistoriaService {
      * @return anotación; 404 si no existe.
      */
     public Map<String, Object> anotacion(long id) {
-        return db.requerido(ANOTACION + " WHERE a.id = :id", Db.p("id", id), "La anotación no existe.");
+        return repositorio.obtenerAnotacionHistoriaEnAnotacion(Db.p("id", id), "La anotación no existe.");
     }
 
     /**
@@ -281,8 +231,7 @@ public class HistoriaService {
             throw new BadRequestException("Los datos de la anotación son obligatorios.");
         }
         Validar.requerido(d.historiaId(), "historia clínica");
-        Map<String, Object> historia = db.requerido("SELECT * FROM historia_medica WHERE id = :id", Db.p("id", d.historiaId()),
-                "La historia clínica no existe.");
+        Map<String, Object> historia = repositorio.obtenerHistoriaMedicaEnCrearAnotacion(Db.p("id", d.historiaId()), "La historia clínica no existe.");
         if (!Validar.bool(historia, "activo")) {
             throw new ConflictException("La historia clínica está inactiva y no admite nuevas anotaciones.");
         }
@@ -291,10 +240,7 @@ public class HistoriaService {
         if (fecha.isAfter(Tiempo.ahora())) {
             throw new BadRequestException("La fecha de la anotación no puede ser futura.");
         }
-        long id = db.insertar("""
-                INSERT INTO anotacion_historia (historia_id, medico_id, cita_id, fecha, descripcion, observacion, diagnostico)
-                VALUES (:h, :m, :c, :f, :d, :o, :dx)
-                """, Db.p("h", d.historiaId(), "m", medico, "c", historia.get("cita_id"), "f", fecha,
+        long id = repositorio.insertarAnotacionHistoria(Db.p("h", d.historiaId(), "m", medico, "c", historia.get("cita_id"), "f", fecha,
                 "d", Validar.texto(d.descripcion(), "descripción", 4000),
                 "o", Validar.opcional(d.observacion(), "observación", 4000),
                 "dx", Validar.opcional(d.diagnostico(), "diagnóstico o evolución", 4000)));
@@ -310,8 +256,7 @@ public class HistoriaService {
      */
     @Transactional
     public Map<String, Object> actualizarAnotacion(long id, HistoriaApi.AnotacionRq d) {
-        Map<String, Object> actual = db.requerido("SELECT * FROM anotacion_historia WHERE id = :id FOR UPDATE",
-                Db.p("id", id), "La anotación no existe.");
+        Map<String, Object> actual = repositorio.obtenerAnotacionHistoriaEnActualizarAnotacion(Db.p("id", id), "La anotación no existe.");
         if (d == null) {
             throw new BadRequestException("Los datos de la anotación son obligatorios.");
         }
@@ -319,10 +264,7 @@ public class HistoriaService {
             throw new ConflictException("No se puede mover una anotación a otra historia clínica.");
         }
         long medico = medicoValido(d.medicoId() == null ? Validar.largo(actual, "medico_id") : d.medicoId());
-        db.ejecutar("""
-                UPDATE anotacion_historia SET medico_id = :m, descripcion = :d, observacion = :o, diagnostico = :dx,
-                       fecha_modificacion = :ahora WHERE id = :id
-                """, Db.p("m", medico, "d", Validar.texto(d.descripcion(), "descripción", 4000),
+        repositorio.actualizarAnotacionHistoria(Db.p("m", medico, "d", Validar.texto(d.descripcion(), "descripción", 4000),
                 "o", Validar.opcional(d.observacion(), "observación", 4000),
                 "dx", Validar.opcional(d.diagnostico(), "diagnóstico o evolución", 4000), "ahora", Tiempo.ahora(), "id", id));
         return anotacion(id);
@@ -336,8 +278,7 @@ public class HistoriaService {
      * @return fórmulas con datos resumidos de mascota, cliente, veterinario y medicamento.
      */
     public List<Map<String, Object>> listarFormulas() {
-        return db.lista(FORMULA + " WHERE (:medico IS NULL OR f.medico_id = :medico) "
-                + "ORDER BY f.fecha_creacion_registro DESC, f.id DESC", Db.p("medico", medicoRestringido()));
+        return repositorio.listarFormulaClinicaDetalleEnListarFormulas(Db.p("medico", medicoRestringido()));
     }
 
     /**
@@ -347,7 +288,7 @@ public class HistoriaService {
      * @return fórmula; 404 si no existe.
      */
     public Map<String, Object> formula(long id) {
-        return db.requerido(FORMULA + " WHERE f.id = :id", Db.p("id", id), "La fórmula no existe.");
+        return repositorio.obtenerFormulaClinicaDetalle(Db.p("id", id), "La fórmula no existe.");
     }
 
     /**
@@ -359,11 +300,7 @@ public class HistoriaService {
     @Transactional
     public Map<String, Object> crearFormula(HistoriaApi.FormulaRq d) {
         Datos v = validarFormula(d, null);
-        long id = db.insertar("""
-                INSERT INTO formula_medica (cita_id, mascota_id, medico_id, historia_id, medicamento_id, dosis, frecuencia,
-                       duracion, indicaciones, fecha_emision, fecha_creacion_registro, activo)
-                VALUES (:cita, :mascota, :medico, :historia, :med, :dosis, :frecuencia, :duracion, :ind, :emision, :ahora, 1)
-                """, v.parametros());
+        long id = repositorio.insertarFormulaMedica(v.parametros());
         // La prescripción genera su orden de dispensación: llega a despacho, descuenta inventario al entregar y se factura.
         integracion.generarOrden(id);
         return formula(id);
@@ -378,8 +315,7 @@ public class HistoriaService {
      */
     @Transactional
     public Map<String, Object> actualizarFormula(long id, HistoriaApi.FormulaRq d) {
-        Map<String, Object> actual = db.requerido("SELECT * FROM formula_medica WHERE id = :id FOR UPDATE",
-                Db.p("id", id), "La fórmula no existe.");
+        Map<String, Object> actual = repositorio.obtenerFormulaMedica(Db.p("id", id), "La fórmula no existe.");
         if (!Validar.bool(actual, "activo")) {
             throw new ConflictException("La fórmula está inactiva y ya no puede modificarse.");
         }
@@ -388,12 +324,7 @@ public class HistoriaService {
         Datos v = validarFormula(d, actual);
         Map<String, Object> p = v.parametros();
         p.put("id", id);
-        db.ejecutar("""
-                UPDATE formula_medica SET medico_id = :medico, historia_id = :historia, medicamento_id = :med, dosis = :dosis,
-                       frecuencia = :frecuencia, duracion = :duracion, indicaciones = :ind, fecha_emision = :emision,
-                       fecha_actualizacion_registro = :ahora
-                WHERE id = :id
-                """, p);
+        repositorio.actualizarFormulaMedicaEnActualizarFormula(p);
         integracion.sincronizarEdicion(id, Validar.largo(actual, "medicamento_id"));
         return formula(id);
     }
@@ -409,12 +340,10 @@ public class HistoriaService {
     @Transactional
     public Map<String, Object> cambiarEstadoFormula(long id, Boolean activo) {
         Validar.requerido(activo, "activo");
-        Map<String, Object> actual = db.requerido("SELECT * FROM formula_medica WHERE id = :id FOR UPDATE",
-                Db.p("id", id), "La fórmula no existe.");
+        Map<String, Object> actual = repositorio.obtenerFormulaMedica(Db.p("id", id), "La fórmula no existe.");
         verificarPropiedad(Validar.largo(actual, "medico_id"));
         integracion.verificarModificable(actual);
-        db.ejecutar("UPDATE formula_medica SET activo = :a, fecha_actualizacion_registro = :ahora WHERE id = :id",
-                Db.p("a", activo, "ahora", Tiempo.ahora(), "id", id));
+        repositorio.actualizarFormulaMedicaEnCambiarEstadoFormula(Db.p("a", activo, "ahora", Tiempo.ahora(), "id", id));
         integracion.sincronizarEstado(id, activo);
         return formula(id);
     }
@@ -449,16 +378,14 @@ public class HistoriaService {
         if (actual != null && d.citaId() != null && d.citaId() != citaId) {
             throw new ConflictException("No se puede cambiar la cita de una fórmula registrada.");
         }
-        Map<String, Object> cita = db.requerido("SELECT * FROM cita WHERE id = :id", Db.p("id", citaId), "La cita no existe.");
+        Map<String, Object> cita = repositorio.obtenerCitaEnValidarFormula(Db.p("id", citaId), "La cita no existe.");
         int mascotaCita = Validar.numero(cita, "mascota_id");
         Integer mascotaId = d.mascotaId() == null ? Integer.valueOf(mascotaCita) : d.mascotaId();
-        Map<String, Object> mascota = db.requerido("SELECT mascota_id, cliente_id, activo FROM mascota WHERE mascota_id = :m",
-                Db.p("m", mascotaId), "La mascota no existe.");
+        Map<String, Object> mascota = repositorio.obtenerMascota(Db.p("m", mascotaId), "La mascota no existe.");
         if (d.clienteId() != null && d.clienteId() != Validar.largo(mascota, "cliente_id")) {
             throw new BadRequestException("La mascota seleccionada no pertenece al cliente indicado.");
         }
-        db.requerido("SELECT cliente_id FROM cliente WHERE cliente_id = :c", Db.p("c", mascota.get("cliente_id")),
-                "La mascota no pertenece a un cliente registrado.");
+        repositorio.obtenerCliente(Db.p("c", mascota.get("cliente_id")), "La mascota no pertenece a un cliente registrado.");
         if (mascotaCita != mascotaId) {
             throw new BadRequestException("La fórmula no puede asociarse a una consulta de otra mascota.");
         }
@@ -467,8 +394,7 @@ public class HistoriaService {
         }
         long medico = medicoValido(d.medicoId() == null ? Validar.largo(cita, "medico_id") : d.medicoId());
         Validar.requerido(d.medicamentoId(), "medicamento");
-        Map<String, Object> med = db.requerido("SELECT activo FROM medicamento WHERE id = :id", Db.p("id", d.medicamentoId()),
-                "El medicamento no existe.");
+        Map<String, Object> med = repositorio.obtenerMedicamento(Db.p("id", d.medicamentoId()), "El medicamento no existe.");
         if (!Validar.bool(med, "activo")) {
             throw new BadRequestException("El medicamento está inactivo.");
         }
@@ -488,7 +414,7 @@ public class HistoriaService {
         if (!contieneCantidadPositiva(duracion)) {
             throw new BadRequestException("La duración debe indicar un número válido mayor que cero (por ejemplo: 7 días).");
         }
-        Long historia = db.valor("SELECT id FROM historia_medica WHERE cita_id = :c", Db.p("c", citaId), Long.class);
+        Long historia = repositorio.valorHistoriaMedica(Db.p("c", citaId), Long.class);
         return new Datos(citaId, mascotaId, medico, historia, d.medicamentoId(), dosis,
                 Validar.texto(d.frecuencia(), "frecuencia", 100), duracion,
                 Validar.opcional(d.indicaciones(), "indicaciones", 2000), emision);
@@ -502,9 +428,8 @@ public class HistoriaService {
      * @return fila de la mascota.
      */
     private Map<String, Object> validarClienteMascota(Long clienteId, Integer mascotaId) {
-        db.requerido("SELECT cliente_id FROM cliente WHERE cliente_id = :c", Db.p("c", clienteId), "El cliente no existe.");
-        Map<String, Object> mascota = db.requerido("SELECT mascota_id, cliente_id FROM mascota WHERE mascota_id = :m",
-                Db.p("m", mascotaId), "La mascota no existe.");
+        repositorio.obtenerCliente(Db.p("c", clienteId), "El cliente no existe.");
+        Map<String, Object> mascota = repositorio.obtenerMascotaEnValidarClienteMascota(Db.p("m", mascotaId), "La mascota no existe.");
         if (Validar.largo(mascota, "cliente_id") != clienteId) {
             throw new BadRequestException("La mascota seleccionada no pertenece al cliente indicado.");
         }
@@ -529,7 +454,7 @@ public class HistoriaService {
         if (medicoId == null) {
             throw new BadRequestException("El campo veterinario es obligatorio.");
         }
-        db.requerido("SELECT id FROM medico WHERE id = :id", Db.p("id", medicoId), "El veterinario no existe.");
+        repositorio.obtenerMedico(Db.p("id", medicoId), "El veterinario no existe.");
         return medicoId;
     }
 

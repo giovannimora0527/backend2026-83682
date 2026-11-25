@@ -44,8 +44,6 @@ public class ImportacionService {
             "precioCompra", "precioVenta", "stockMinimo", "fechaCompra", "fechaIngreso", "fechaProximoPedido",
             "fechaVence", "activo", "numeroLote", "cantidad");
 
-    /** Acceso a datos. */
-    private final Db db;
     /** Validación y registro de productos. */
     private final InventarioService inventario;
     /** Transacción independiente por fila importada. */
@@ -54,14 +52,17 @@ public class ImportacionService {
     /** Log central de operaciones sensibles. */
     private final com.uniminuto.clinica.auditoria.AuditoriaService auditoria;
 
+    /** Acceso a datos del módulo (SQL). */
+    private final ImportacionRepository repositorio;
+
     /**
-     * @param db acceso a datos.
+     * @param repositorio acceso a datos del módulo.
      * @param inventario servicio de inventario.
      * @param tm administrador de transacciones.
      * @param auditoria log de operaciones sensibles.
      */
-    public ImportacionService(Db db, InventarioService inventario, PlatformTransactionManager tm, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
-        this.db = db;
+    public ImportacionService(ImportacionRepository repositorio, InventarioService inventario, PlatformTransactionManager tm, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
+        this.repositorio = repositorio;
         this.inventario = inventario;
         this.auditoria = auditoria;
         this.porFila = new TransactionTemplate(tm);
@@ -88,9 +89,7 @@ public class ImportacionService {
         String nombre = archivo.getOriginalFilename() == null ? "archivo" : archivo.getOriginalFilename();
         List<LectorArchivo.Fila> filas = LectorArchivo.leer(nombre, contenido, COLUMNAS);
 
-        long id = db.insertar("""
-                INSERT INTO importacion_inventario (usuario_id, archivo, fecha, total) VALUES (:u, :a, :f, :t)
-                """, Db.p("u", SesionActual.usuarioId(), "a", nombre.length() > 255 ? nombre.substring(0, 255) : nombre,
+        long id = repositorio.insertarImportacionInventario(Db.p("u", SesionActual.usuarioId(), "a", nombre.length() > 255 ? nombre.substring(0, 255) : nombre,
                 "f", Tiempo.ahora(), "t", filas.size()));
         Set<String> codigos = new HashSet<>();
         Set<String> nombres = new HashSet<>();
@@ -128,31 +127,26 @@ public class ImportacionService {
             }
             guardarFila(id, fila.numero(), v, producto, lote, cantidad, errores);
         }
-        db.ejecutar("UPDATE importacion_inventario SET validos = :v, rechazados = :r WHERE id = :id",
-                Db.p("v", filas.size() - rechazados, "r", rechazados, "id", id));
+        repositorio.actualizarImportacionInventario(Db.p("v", filas.size() - rechazados, "r", rechazados, "id", id));
         return detalle(id);
     }
 
     /** Confirma la importación de las filas válidas; no admite confirmar dos veces la misma carga. */
     public Map<String, Object> confirmar(long id) {
         Map<String, Object> carga = porFila.execute(estado -> {
-            Map<String, Object> c = db.requerido("SELECT * FROM importacion_inventario WHERE id = :id FOR UPDATE",
-                    Db.p("id", id), "La importación no existe.");
+            Map<String, Object> c = repositorio.obtenerImportacionInventario(Db.p("id", id), "La importación no existe.");
             if (c.get("fecha_confirmacion") != null) {
                 throw new ConflictException("La importación ya fue confirmada.");
             }
             if (Validar.largo(c, "usuario_id") != SesionActual.usuarioId()) {
                 throw new ForbiddenException("Solo el usuario que cargó el archivo puede confirmarlo.");
             }
-            db.ejecutar("UPDATE importacion_inventario SET fecha_confirmacion = :f WHERE id = :id",
-                    Db.p("f", Tiempo.ahora(), "id", id));
+            repositorio.actualizarImportacionInventarioEnConfirmar(Db.p("f", Tiempo.ahora(), "id", id));
             return c;
         });
         int importados = 0;
         int rechazados = Validar.numero(carga, "rechazados");
-        for (Map<String, Object> fila : db.lista("""
-                SELECT * FROM importacion_inventario_fila WHERE importacion_id = :id AND errores IS NULL ORDER BY numero_fila
-                """, Db.p("id", id))) {
+        for (Map<String, Object> fila : repositorio.listarImportacionInventarioFila(Db.p("id", id))) {
             try {
                 porFila.executeWithoutResult(estado -> importarFila(id, fila));
                 importados++;
@@ -160,12 +154,10 @@ public class ImportacionService {
                 rechazados++;
                 String mensaje = e instanceof com.uniminuto.clinica.exception.ClinicaException
                         ? e.getMessage() : "Error al importar: registro duplicado o inválido.";
-                db.ejecutar("UPDATE importacion_inventario_fila SET errores = :e WHERE id = :fila",
-                        Db.p("e", mensaje, "fila", fila.get("id")));
+                repositorio.actualizarImportacionInventarioFila(Db.p("e", mensaje, "fila", fila.get("id")));
             }
         }
-        db.ejecutar("UPDATE importacion_inventario SET importados = :i, rechazados = :r WHERE id = :id",
-                Db.p("i", importados, "r", rechazados, "id", id));
+        repositorio.actualizarImportacionInventarioEnConfirmar2(Db.p("i", importados, "r", rechazados, "id", id));
         auditoria.registrar("IMPORTACION_CONFIRMADA", "importacion_inventario", id, "Carga masiva " + id + " confirmada");
         return detalle(id);
     }
@@ -188,37 +180,22 @@ public class ImportacionService {
         if (p == null) {
             throw new ConflictException(String.join(" · ", errores));
         }
-        long medicamento = db.insertar("""
-                INSERT INTO medicamento (codigo, nombre, descripcion, presentacion, tipo, invima, precio_compra,
-                       precio_venta, iva_porcentaje, stock_minimo, fecha_compra, fecha_ingreso, fecha_proximo_pedido,
-                       fecha_vence, activo, fecha_creacion_registro)
-                VALUES (:codigo, :nombre, :descripcion, :presentacion, :tipo, :invima, :compra, :venta, :iva, :minimo,
-                       :fcompra, :fingreso, :fpedido, :fvence, :activo, :ahora)
-                """, p.parametros());
+        long medicamento = repositorio.insertarMedicamento(p.parametros());
         Integer cantidad = (Integer) f.get("cantidad");
         if (cantidad != null && cantidad > 0) {
-            long lote = db.insertar("""
-                    INSERT INTO medicamento_lote (medicamento_id, numero, costo, fecha_ingreso, fecha_vence, cantidad_inicial, cantidad)
-                    VALUES (:m, :n, :c, :i, :v, :q, 0)
-                    """, Db.p("m", medicamento, "n", f.get("numero_lote"), "c", p.compra(), "i", p.fingreso(),
+            long lote = repositorio.insertarMedicamentoLote(Db.p("m", medicamento, "n", f.get("numero_lote"), "c", p.compra(), "i", p.fingreso(),
                     "v", p.fvence(), "q", cantidad));
             inventario.mover(lote, "ENTRADA", cantidad, "Carga masiva de inventario", "Importación " + importacion,
                     null, null, importacion);
         }
-        db.ejecutar("UPDATE importacion_inventario_fila SET medicamento_id = :m WHERE id = :id",
-                Db.p("m", medicamento, "id", f.get("id")));
+        repositorio.actualizarImportacionInventarioFilaEnImportarFila(Db.p("m", medicamento, "id", f.get("id")));
     }
 
     /**
      * @return importaciones realizadas.
      */
     public List<Map<String, Object>> historial() {
-        return db.lista("""
-                SELECT i.id, i.usuario_id AS usuarioId, u.username AS usuario, i.archivo, i.fecha,
-                       i.fecha_confirmacion AS fechaConfirmacion, i.total, i.importados, i.rechazados
-                FROM importacion_inventario i JOIN usuario u ON u.id = i.usuario_id
-                ORDER BY i.fecha DESC, i.id DESC LIMIT 100
-                """);
+        return repositorio.listarImportacionInventario();
     }
 
     /**
@@ -226,15 +203,9 @@ public class ImportacionService {
      * @return importación con sus filas.
      */
     public Map<String, Object> detalle(long id) {
-        Map<String, Object> resumen = db.requerido("""
-                SELECT i.id, i.usuario_id AS usuarioId, u.username AS usuario, i.archivo, i.fecha,
-                       i.fecha_confirmacion AS fechaConfirmacion, i.total, i.importados, i.rechazados
-                FROM importacion_inventario i JOIN usuario u ON u.id = i.usuario_id WHERE i.id = :id
-                """, Db.p("id", id), "La importación no existe.");
+        Map<String, Object> resumen = repositorio.obtenerImportacionInventarioEnDetalle(Db.p("id", id), "La importación no existe.");
         List<Map<String, Object>> filas = new ArrayList<>();
-        for (Map<String, Object> f : db.lista("""
-                SELECT * FROM importacion_inventario_fila WHERE importacion_id = :id ORDER BY numero_fila
-                """, Db.p("id", id))) {
+        for (Map<String, Object> f : repositorio.listarImportacionInventarioFilaEnDetalle(Db.p("id", id))) {
             Map<String, Object> producto = new LinkedHashMap<>();
             producto.put("codigo", f.get("codigo"));
             producto.put("nombre", f.get("nombre"));
@@ -291,13 +262,7 @@ public class ImportacionService {
      */
     private void guardarFila(long importacion, int numero, Map<String, String> v, ProductoRq p, String lote,
                              Integer cantidad, List<String> errores) {
-        db.insertar("""
-                INSERT INTO importacion_inventario_fila (importacion_id, numero_fila, codigo, nombre, descripcion,
-                       presentacion, tipo, invima, precio_compra, precio_venta, stock_minimo, fecha_compra, fecha_ingreso,
-                       fecha_proximo_pedido, fecha_vence, activo, numero_lote, cantidad, errores)
-                VALUES (:imp, :num, :codigo, :nombre, :descripcion, :presentacion, :tipo, :invima, :compra, :venta,
-                       :minimo, :fcompra, :fingreso, :fpedido, :fvence, :activo, :lote, :cantidad, :errores)
-                """, Db.p("imp", importacion, "num", numero, "codigo", corto(v.get("codigo").toUpperCase(Locale.ROOT), 50),
+        repositorio.insertarImportacionInventarioFila(Db.p("imp", importacion, "num", numero, "codigo", corto(v.get("codigo").toUpperCase(Locale.ROOT), 50),
                 "nombre", corto(v.get("nombre"), 255), "descripcion", vacio(v.get("descripcion")),
                 "presentacion", corto(v.get("presentacion"), 255), "tipo", corto(v.get("tipo").toUpperCase(Locale.ROOT), 30),
                 "invima", corto(v.get("invima"), 100), "compra", acotar(p.precioCompra()), "venta", acotar(p.precioVenta()),

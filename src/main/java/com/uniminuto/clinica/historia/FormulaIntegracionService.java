@@ -32,14 +32,15 @@ public class FormulaIntegracionService {
     /** Primer número de un texto (admite decimales y fracciones como 1/2). */
     private static final Pattern NUMERO = Pattern.compile("(\\d+)\\s*/\\s*(\\d+)|(\\d+(?:[.,]\\d+)?)");
 
-    /** Acceso a datos. */
-    private final Db db;
+
+    /** Acceso a datos del módulo (SQL). */
+    private final FormulaIntegracionRepository repositorio;
 
     /**
-     * @param db acceso a datos.
+     * @param repositorio acceso a datos del módulo.
      */
-    public FormulaIntegracionService(Db db) {
-        this.db = db;
+    public FormulaIntegracionService(FormulaIntegracionRepository repositorio) {
+        this.repositorio = repositorio;
     }
 
     /**
@@ -49,8 +50,7 @@ public class FormulaIntegracionService {
      * @param prescripcionId identificador en {@code formula_medica}.
      */
     public void generarOrden(long prescripcionId) {
-        Map<String, Object> p = db.requerido("SELECT * FROM formula_medica WHERE id = :id FOR UPDATE",
-                Db.p("id", prescripcionId), "La fórmula no existe.");
+        Map<String, Object> p = repositorio.obtenerFormulaMedica(Db.p("id", prescripcionId), "La fórmula no existe.");
         if (p.get("formula_clinica_id") != null || !Validar.bool(p, "activo")) {
             return;
         }
@@ -62,17 +62,10 @@ public class FormulaIntegracionService {
         int cantidad = calcularCantidad(Validar.cadena(p, "dosis"), Validar.cadena(p, "frecuencia"), Validar.cadena(p, "duracion"));
         verificarExistencias(Validar.largo(p, "medicamento_id"), cantidad);
         LocalDateTime ahora = Tiempo.ahora();
-        long orden = db.insertar("""
-                INSERT INTO formula_clinica (cita_id, atencion_id, medico_id, mascota_id, estado, estado_despacho, revision,
-                                             fecha_creacion, fecha_confirmacion)
-                VALUES (:c, :a, :m, :pet, 'CONFIRMADA', 'PENDIENTE_DESPACHO', 1, :ahora, :ahora)
-                """, Db.p("c", citaId, "a", atencion, "m", p.get("medico_id"), "pet", p.get("mascota_id"), "ahora", ahora));
+        long orden = repositorio.insertarFormulaClinica(Db.p("c", citaId, "a", atencion, "m", p.get("medico_id"), "pet", p.get("mascota_id"), "ahora", ahora));
         insertarLinea(orden, p, cantidad);
-        db.insertar("""
-                INSERT INTO despacho_estado_historial (formula_id, estado_anterior, estado_nuevo, usuario_id, fecha, motivo)
-                VALUES (:f, 'BORRADOR', 'PENDIENTE_DESPACHO', :u, :ahora, 'Prescripción registrada en la historia clínica')
-                """, Db.p("f", orden, "u", SesionActual.usuarioId(), "ahora", ahora));
-        db.ejecutar("UPDATE formula_medica SET formula_clinica_id = :o WHERE id = :id", Db.p("o", orden, "id", prescripcionId));
+        repositorio.insertarDespachoEstadoHistorial(Db.p("f", orden, "u", SesionActual.usuarioId(), "ahora", ahora));
+        repositorio.actualizarFormulaMedica(Db.p("o", orden, "id", prescripcionId));
     }
 
     /**
@@ -81,9 +74,7 @@ public class FormulaIntegracionService {
      * @param citaId identificador de la cita.
      */
     public void generarPendientesDeCita(long citaId) {
-        for (Map<String, Object> p : db.lista("""
-                SELECT id FROM formula_medica WHERE cita_id = :c AND activo = 1 AND formula_clinica_id IS NULL
-                """, Db.p("c", citaId))) {
+        for (Map<String, Object> p : repositorio.listarFormulaMedica(Db.p("c", citaId))) {
             generarOrden(Validar.largo(p, "id"));
         }
     }
@@ -94,16 +85,10 @@ public class FormulaIntegracionService {
      * @param ordenId identificador en {@code formula_clinica}.
      */
     public void registrarEnHistoria(long ordenId) {
-        Map<String, Object> f = db.requerido("""
-                SELECT f.*, a.historia_id FROM formula_clinica f JOIN atencion_medica a ON a.id = f.atencion_id WHERE f.id = :id
-                """, Db.p("id", ordenId), "La fórmula no existe.");
+        Map<String, Object> f = repositorio.obtenerFormulaClinica(Db.p("id", ordenId), "La fórmula no existe.");
         LocalDateTime ahora = Tiempo.ahora();
-        for (Map<String, Object> l : db.lista("SELECT * FROM formula_clinica_detalle WHERE formula_id = :f", Db.p("f", ordenId))) {
-            db.insertar("""
-                    INSERT INTO formula_medica (cita_id, mascota_id, medico_id, historia_id, medicamento_id, dosis, frecuencia,
-                           duracion, indicaciones, fecha_emision, fecha_creacion_registro, activo, formula_clinica_id)
-                    VALUES (:c, :m, :medico, :h, :med, :dosis, :frec, :dur, :ind, :emision, :ahora, 1, :o)
-                    """, Db.p("c", f.get("cita_id"), "m", f.get("mascota_id"), "medico", f.get("medico_id"),
+        for (Map<String, Object> l : repositorio.listarFormulaClinicaDetalle(Db.p("f", ordenId))) {
+            repositorio.insertarFormulaMedica(Db.p("c", f.get("cita_id"), "m", f.get("mascota_id"), "medico", f.get("medico_id"),
                     "h", f.get("historia_id"), "med", l.get("medicamento_id"), "dosis", l.get("dosis"),
                     "frec", l.get("frecuencia"), "dur", l.get("duracion"), "ind", l.get("indicaciones"),
                     "emision", ahora.toLocalDate(), "ahora", ahora, "o", ordenId));
@@ -131,8 +116,7 @@ public class FormulaIntegracionService {
      * @param medicamentoAnterior medicamento antes de la edición.
      */
     public void sincronizarEdicion(long prescripcionId, long medicamentoAnterior) {
-        Map<String, Object> p = db.requerido("SELECT * FROM formula_medica WHERE id = :id", Db.p("id", prescripcionId),
-                "La fórmula no existe.");
+        Map<String, Object> p = repositorio.obtenerFormulaMedicaEnSincronizarEdicion(Db.p("id", prescripcionId), "La fórmula no existe.");
         Map<String, Object> orden = orden(p);
         if (orden == null || "ANULADA".equals(orden.get("estado"))) {
             return;
@@ -140,10 +124,9 @@ public class FormulaIntegracionService {
         int cantidad = calcularCantidad(Validar.cadena(p, "dosis"), Validar.cadena(p, "frecuencia"), Validar.cadena(p, "duracion"));
         verificarExistencias(Validar.largo(p, "medicamento_id"), cantidad);
         long ordenId = Validar.largo(orden, "id");
-        db.ejecutar("DELETE FROM formula_clinica_detalle WHERE formula_id = :o AND medicamento_id = :m",
-                Db.p("o", ordenId, "m", medicamentoAnterior));
+        repositorio.eliminarFormulaClinicaDetalle(Db.p("o", ordenId, "m", medicamentoAnterior));
         insertarLinea(ordenId, p, cantidad);
-        db.ejecutar("UPDATE formula_clinica SET revision = revision + 1 WHERE id = :o", Db.p("o", ordenId));
+        repositorio.actualizarFormulaClinica(Db.p("o", ordenId));
     }
 
     /**
@@ -153,12 +136,11 @@ public class FormulaIntegracionService {
      * @param activo nuevo estado.
      */
     public void sincronizarEstado(long prescripcionId, boolean activo) {
-        Map<String, Object> p = db.requerido("SELECT * FROM formula_medica WHERE id = :id", Db.p("id", prescripcionId),
-                "La fórmula no existe.");
+        Map<String, Object> p = repositorio.obtenerFormulaMedicaEnSincronizarEstado(Db.p("id", prescripcionId), "La fórmula no existe.");
         Map<String, Object> orden = orden(p);
         if (activo) {
             if (orden == null || "ANULADA".equals(orden.get("estado"))) {
-                db.ejecutar("UPDATE formula_medica SET formula_clinica_id = NULL WHERE id = :id", Db.p("id", prescripcionId));
+                repositorio.actualizarFormulaMedicaEnSincronizarEstado(Db.p("id", prescripcionId));
                 generarOrden(prescripcionId);
             }
             return;
@@ -167,19 +149,14 @@ public class FormulaIntegracionService {
             return;
         }
         long ordenId = Validar.largo(orden, "id");
-        long lineas = db.contar("SELECT COUNT(*) FROM formula_clinica_detalle WHERE formula_id = :o", Db.p("o", ordenId));
+        long lineas = repositorio.contarFormulaClinicaDetalle(Db.p("o", ordenId));
         if (lineas > 1) {
-            db.ejecutar("DELETE FROM formula_clinica_detalle WHERE formula_id = :o AND medicamento_id = :m",
-                    Db.p("o", ordenId, "m", p.get("medicamento_id")));
-            db.ejecutar("UPDATE formula_medica SET formula_clinica_id = NULL WHERE id = :id", Db.p("id", prescripcionId));
+            repositorio.eliminarFormulaClinicaDetalle(Db.p("o", ordenId, "m", p.get("medicamento_id")));
+            repositorio.actualizarFormulaMedicaEnSincronizarEstado(Db.p("id", prescripcionId));
             return;
         }
-        db.ejecutar("UPDATE formula_clinica SET estado = 'ANULADA', estado_despacho = 'CANCELADO', revision = revision + 1 WHERE id = :o",
-                Db.p("o", ordenId));
-        db.insertar("""
-                INSERT INTO despacho_estado_historial (formula_id, estado_anterior, estado_nuevo, usuario_id, fecha, motivo)
-                VALUES (:f, 'PENDIENTE_DESPACHO', 'CANCELADO', :u, :ahora, 'Prescripción inactivada en la historia clínica')
-                """, Db.p("f", ordenId, "u", SesionActual.usuarioId(), "ahora", Tiempo.ahora()));
+        repositorio.actualizarFormulaClinicaEnSincronizarEstado(Db.p("o", ordenId));
+        repositorio.insertarDespachoEstadoHistorialEnSincronizarEstado(Db.p("f", ordenId, "u", SesionActual.usuarioId(), "ahora", Tiempo.ahora()));
     }
 
     /**
@@ -188,8 +165,7 @@ public class FormulaIntegracionService {
      * @param ordenId identificador en {@code formula_clinica}.
      */
     public void inactivarPorOrden(long ordenId) {
-        db.ejecutar("UPDATE formula_medica SET activo = 0, fecha_actualizacion_registro = :ahora WHERE formula_clinica_id = :o",
-                Db.p("o", ordenId, "ahora", Tiempo.ahora()));
+        repositorio.actualizarFormulaMedicaEnInactivarPorOrden(Db.p("o", ordenId, "ahora", Tiempo.ahora()));
     }
 
     /**
@@ -243,32 +219,22 @@ public class FormulaIntegracionService {
      * @return atención o null si la cita aún no se atiende.
      */
     private Long atencionDisponible(long citaId) {
-        Long atencion = db.valor("SELECT id FROM atencion_medica WHERE cita_id = :c", Db.p("c", citaId), Long.class);
+        Long atencion = repositorio.valorAtencionMedica(Db.p("c", citaId), Long.class);
         if (atencion != null) {
             return atencion;
         }
-        Map<String, Object> cita = db.requerido("""
-                SELECT c.*, md.especializacion_id FROM cita c JOIN medico md ON md.id = c.medico_id WHERE c.id = :c
-                """, Db.p("c", citaId), "La cita no existe.");
+        Map<String, Object> cita = repositorio.obtenerCita(Db.p("c", citaId), "La cita no existe.");
         if (!List.of("atendida", "finalizada").contains(Validar.cadena(cita, "estado"))) {
             return null;
         }
-        Long historia = db.valor("SELECT id FROM historia_medica WHERE cita_id = :c", Db.p("c", citaId), Long.class);
+        Long historia = repositorio.valorHistoriaMedica(Db.p("c", citaId), Long.class);
         LocalDateTime ahora = Tiempo.ahora();
         if (historia == null) {
-            historia = db.insertar("""
-                    INSERT INTO historia_medica (paciente_id, cita_id, medico_id, fecha, motivo, activo, fecha_creacion)
-                    VALUES (:m, :c, :medico, :fecha, :motivo, 1, :ahora)
-                    """, Db.p("m", cita.get("mascota_id"), "c", citaId, "medico", cita.get("medico_id"),
+            historia = repositorio.insertarHistoriaMedica(Db.p("m", cita.get("mascota_id"), "c", citaId, "medico", cita.get("medico_id"),
                     "fecha", cita.get("fecha_hora"), "motivo", cita.get("motivo"), "ahora", ahora));
-            db.ejecutar("UPDATE formula_medica SET historia_id = :h WHERE cita_id = :c AND historia_id IS NULL",
-                    Db.p("h", historia, "c", citaId));
+            repositorio.actualizarFormulaMedicaEnAtencionDisponible(Db.p("h", historia, "c", citaId));
         }
-        return db.insertar("""
-                INSERT INTO atencion_medica (cita_id, historia_id, medico_id, especializacion_id, motivo, version,
-                                             fecha_apertura, fecha_finalizacion)
-                VALUES (:c, :h, :m, :e, :motivo, 0, :ahora, :ahora)
-                """, Db.p("c", citaId, "h", historia, "m", cita.get("medico_id"), "e", cita.get("especializacion_id"),
+        return repositorio.insertarAtencionMedica(Db.p("c", citaId, "h", historia, "m", cita.get("medico_id"), "e", cita.get("especializacion_id"),
                 "motivo", cita.get("motivo"), "ahora", ahora));
     }
 
@@ -279,11 +245,7 @@ public class FormulaIntegracionService {
      * @param cantidad unidades requeridas.
      */
     private void verificarExistencias(long medicamento, int cantidad) {
-        Map<String, Object> m = db.requerido("""
-                SELECT nombre, COALESCE((SELECT SUM(l.cantidad) FROM medicamento_lote l WHERE l.medicamento_id = m.id
-                       AND (l.fecha_vence IS NULL OR l.fecha_vence >= :hoy)), 0) AS disponible
-                FROM medicamento m WHERE m.id = :id
-                """, Db.p("id", medicamento, "hoy", Tiempo.hoy()), "El medicamento no existe.");
+        Map<String, Object> m = repositorio.obtenerMedicamentoLote(Db.p("id", medicamento, "hoy", Tiempo.hoy()), "El medicamento no existe.");
         if (cantidad > Validar.numero(m, "disponible")) {
             throw new ConflictException("No hay existencias suficientes de " + m.get("nombre") + ": se requieren " + cantidad
                     + " unidades según la formulación y hay " + m.get("disponible") + " disponibles.");
@@ -298,10 +260,7 @@ public class FormulaIntegracionService {
      * @param cantidad unidades calculadas.
      */
     private void insertarLinea(long orden, Map<String, Object> p, int cantidad) {
-        db.insertar("""
-                INSERT INTO formula_clinica_detalle (formula_id, medicamento_id, dosis, frecuencia, duracion, cantidad, via, indicaciones)
-                VALUES (:o, :m, :dosis, :frec, :dur, :cant, :via, :ind)
-                """, Db.p("o", orden, "m", p.get("medicamento_id"), "dosis", p.get("dosis"),
+        repositorio.insertarFormulaClinicaDetalle(Db.p("o", orden, "m", p.get("medicamento_id"), "dosis", p.get("dosis"),
                 "frec", p.get("frecuencia") == null ? "Según indicación" : p.get("frecuencia"),
                 "dur", p.get("duracion"), "cant", cantidad, "via", VIA_POR_DEFECTO, "ind", p.get("indicaciones")));
     }
@@ -312,6 +271,6 @@ public class FormulaIntegracionService {
      */
     private Map<String, Object> orden(Map<String, Object> prescripcion) {
         Object id = prescripcion.get("formula_clinica_id");
-        return id == null ? null : db.uno("SELECT * FROM formula_clinica WHERE id = :id FOR UPDATE", Db.p("id", id));
+        return id == null ? null : repositorio.buscarFormulaClinica(Db.p("id", id));
     }
 }

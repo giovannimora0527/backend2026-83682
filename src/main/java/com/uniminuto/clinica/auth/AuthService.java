@@ -43,8 +43,6 @@ public class AuthService {
     /** Tiempo mínimo entre reenvíos de código. */
     private static final int SEGUNDOS_REENVIO = 30;
 
-    /** Acceso a datos. */
-    private final Db db;
     /** Emisión de tokens. */
     private final JwtServicio jwt;
     /** Envío de códigos por correo. */
@@ -61,8 +59,14 @@ public class AuthService {
     /** Log central de operaciones sensibles. */
     private final com.uniminuto.clinica.auditoria.AuditoriaService auditoria;
 
+    /** Acceso a datos del módulo (SQL). */
+    private final AuthRepository repositorio;
+    /** Permisos del rol para la respuesta del login. */
+    private final com.uniminuto.clinica.seguridad.SesionRepository sesiones;
+
     /**
-     * @param db acceso a datos.
+     * @param repositorio acceso a datos del módulo.
+     * @param sesiones permisos del rol.
      * @param jwt servicio de tokens.
      * @param correo servicio de correo.
      * @param horas duración de la sesión.
@@ -71,10 +75,11 @@ public class AuthService {
      * @param intentos intentos permitidos.
      * @param auditoria log de operaciones sensibles.
      */
-    public AuthService(Db db, JwtServicio jwt, CorreoService correo, @Value("${clinica.jwt.horas}") int horas,
+    public AuthService(AuthRepository repositorio, com.uniminuto.clinica.seguridad.SesionRepository sesiones, JwtServicio jwt, CorreoService correo, @Value("${clinica.jwt.horas}") int horas,
                        @Value("${clinica.otp.habilitado:true}") boolean otpHabilitado,
                        @Value("${clinica.otp.minutos:5}") int minutos, @Value("${clinica.otp.intentos:5}") int intentos, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
-        this.db = db;
+        this.repositorio = repositorio;
+        this.sesiones = sesiones;
         this.auditoria = auditoria;
         this.jwt = jwt;
         this.correo = correo;
@@ -98,7 +103,7 @@ public class AuthService {
                 || datos.password() == null || datos.password().isEmpty()) {
             throw new BadRequestException("Debes ingresar tu usuario y contraseña.");
         }
-        Map<String, Object> usuario = usuario("u.username = :valor", datos.username().trim());
+        Map<String, Object> usuario = repositorio.usuarioPor(AuthRepository.Criterio.USERNAME, datos.username().trim());
         String hash = usuario == null ? null : Validar.cadena(usuario, "password_hash");
         if (usuario == null || !ClaveUtil.verificar(datos.password(), hash)) {
             auditoria.registrarSinSesion(usuario == null ? null : Validar.largo(usuario, "id"), datos.username().trim(), null,
@@ -108,8 +113,7 @@ public class AuthService {
         verificarActivo(usuario);
         long usuarioId = Validar.largo(usuario, "id");
         if (ClaveUtil.esHeredado(hash)) {
-            db.ejecutar("UPDATE usuario SET password_hash = :hash WHERE id = :id",
-                    Db.p("hash", ClaveUtil.hash(datos.password()), "id", usuarioId));
+            repositorio.actualizarUsuario(Db.p("hash", ClaveUtil.hash(datos.password()), "id", usuarioId));
         }
         if (!otpHabilitado) {
             return new AuthApi.DesafioRs(false, null, null, 0, emitirSesion(usuario));
@@ -124,7 +128,7 @@ public class AuthService {
     public AuthApi.LoginRs verificar(AuthApi.VerificarRq datos) {
         Map<String, Object> token = validarCodigo(datos == null ? null : datos.desafio(),
                 datos == null ? null : datos.codigo(), "LOGIN");
-        Map<String, Object> usuario = usuario("u.id = :valor", token.get("usuario_id"));
+        Map<String, Object> usuario = repositorio.usuarioPor(AuthRepository.Criterio.ID, token.get("usuario_id"));
         verificarActivo(usuario);
         return emitirSesion(usuario);
     }
@@ -137,8 +141,7 @@ public class AuthService {
      */
     @Transactional
     public AuthApi.DesafioRs reenviar(String desafio) {
-        Map<String, Object> token = desafio == null ? null : db.uno(
-                "SELECT * FROM otp_token WHERE desafio = :d FOR UPDATE", Db.p("d", desafio));
+        Map<String, Object> token = desafio == null ? null : repositorio.buscarOtpToken(Db.p("d", desafio));
         if (token == null || Validar.bool(token, "usado")) {
             throw new ConflictException("La solicitud expiró. Vuelve a iniciar el proceso.");
         }
@@ -146,14 +149,11 @@ public class AuthService {
         if (creado.plusSeconds(SEGUNDOS_REENVIO).isAfter(Tiempo.ahora())) {
             throw new ConflictException("Espera unos segundos antes de solicitar un nuevo código.");
         }
-        Map<String, Object> usuario = usuario("u.id = :valor", token.get("usuario_id"));
+        Map<String, Object> usuario = repositorio.usuarioPor(AuthRepository.Criterio.ID, token.get("usuario_id"));
         verificarActivo(usuario);
         String codigo = generarCodigo();
         LocalDateTime ahora = Tiempo.ahora();
-        db.ejecutar("""
-                UPDATE otp_token SET codigo_hash = :h, fecha_creacion = :ahora, fecha_expiracion = :vence, intentos = 0
-                WHERE id = :id
-                """, Db.p("h", ClaveUtil.sha256(codigo), "ahora", ahora, "vence", ahora.plusMinutes(minutos),
+        repositorio.actualizarOtpToken(Db.p("h", ClaveUtil.sha256(codigo), "ahora", ahora, "vence", ahora.plusMinutes(minutos),
                 "id", token.get("id")));
         String proposito = Validar.cadena(token, "proposito");
         correo.enviarCodigo(Validar.cadena(usuario, "email"), Validar.cadena(usuario, "username"), codigo, proposito, minutos);
@@ -173,7 +173,7 @@ public class AuthService {
         if (valor == null || valor.isBlank()) {
             throw new BadRequestException("Ingresa tu usuario o tu correo electrónico.");
         }
-        Map<String, Object> usuario = usuario("(u.username = :valor OR u.email = :valor)", valor.trim());
+        Map<String, Object> usuario = repositorio.usuarioPor(AuthRepository.Criterio.USERNAME_O_CORREO, valor.trim());
         if (usuario == null || !Validar.bool(usuario, "activo")) {
             // Misma respuesta que un usuario existente: no se revela si la cuenta existe.
             return new AuthApi.DesafioRs(true, UUID.randomUUID().toString(), null, minutos, null);
@@ -197,9 +197,8 @@ public class AuthService {
         }
         Map<String, Object> token = validarCodigo(datos.desafio(), datos.codigo(), "RECUPERACION");
         long usuarioId = Validar.largo(token, "usuario_id");
-        db.ejecutar("UPDATE usuario SET password_hash = :h WHERE id = :id",
-                Db.p("h", ClaveUtil.hash(clave), "id", usuarioId));
-        db.ejecutar("UPDATE session SET activo = 0 WHERE user_id = :id", Db.p("id", usuarioId));
+        repositorio.actualizarUsuarioEnRestablecer(Db.p("h", ClaveUtil.hash(clave), "id", usuarioId));
+        repositorio.actualizarSession(Db.p("id", usuarioId));
     }
 
     // ------------------------------------------------------------------ Sesión
@@ -214,8 +213,7 @@ public class AuthService {
 
     /** Cierra la sesión actual (el token deja de ser válido). */
     public void logout() {
-        db.ejecutar("UPDATE session SET activo = 0 WHERE session_id = :id",
-                Db.p("id", SesionActual.obtener().sesionId()));
+        repositorio.actualizarSessionEnLogout(Db.p("id", SesionActual.obtener().sesionId()));
         auditoria.registrar("LOGOUT", "usuario", SesionActual.usuarioId(), "Cierre de sesión");
     }
 
@@ -230,15 +228,11 @@ public class AuthService {
      */
     private AuthApi.DesafioRs enviarDesafio(Map<String, Object> usuario, String proposito) {
         long usuarioId = Validar.largo(usuario, "id");
-        db.ejecutar("UPDATE otp_token SET usado = 1 WHERE usuario_id = :u AND proposito = :p AND usado = 0",
-                Db.p("u", usuarioId, "p", proposito));
+        repositorio.actualizarOtpTokenEnLogout(Db.p("u", usuarioId, "p", proposito));
         String desafio = UUID.randomUUID().toString();
         String codigo = generarCodigo();
         LocalDateTime ahora = Tiempo.ahora();
-        db.insertar("""
-                INSERT INTO otp_token (usuario_id, desafio, proposito, codigo_hash, fecha_creacion, fecha_expiracion, intentos, usado)
-                VALUES (:u, :d, :p, :h, :ahora, :vence, 0, 0)
-                """, Db.p("u", usuarioId, "d", desafio, "p", proposito, "h", ClaveUtil.sha256(codigo), "ahora", ahora,
+        repositorio.insertarOtpToken(Db.p("u", usuarioId, "d", desafio, "p", proposito, "h", ClaveUtil.sha256(codigo), "ahora", ahora,
                 "vence", ahora.plusMinutes(minutos)));
         correo.enviarCodigo(Validar.cadena(usuario, "email"), Validar.cadena(usuario, "username"), codigo, proposito, minutos);
         return new AuthApi.DesafioRs(true, desafio, enmascarar(Validar.cadena(usuario, "email")), minutos, null);
@@ -256,8 +250,7 @@ public class AuthService {
         if (desafio == null || desafio.isBlank() || codigo == null || codigo.isBlank()) {
             throw new BadRequestException("Ingresa el código de 6 caracteres.");
         }
-        Map<String, Object> token = db.uno("SELECT * FROM otp_token WHERE desafio = :d AND proposito = :p FOR UPDATE",
-                Db.p("d", desafio, "p", proposito));
+        Map<String, Object> token = repositorio.buscarOtpTokenEnValidarCodigo(Db.p("d", desafio, "p", proposito));
         if (token == null || Validar.bool(token, "usado")) {
             throw new ClinicaException(HttpStatus.UNAUTHORIZED, "El código no es válido. Solicita uno nuevo.");
         }
@@ -269,13 +262,13 @@ public class AuthService {
         }
         String limpio = codigo.trim().toUpperCase(Locale.ROOT);
         if (!ClaveUtil.sha256(limpio).equals(Validar.cadena(token, "codigo_hash"))) {
-            db.ejecutar("UPDATE otp_token SET intentos = intentos + 1 WHERE id = :id", Db.p("id", token.get("id")));
+            repositorio.actualizarOtpTokenEnValidarCodigo(Db.p("id", token.get("id")));
             int restantes = intentos - Validar.numero(token, "intentos") - 1;
             throw new ClinicaException(HttpStatus.UNAUTHORIZED, restantes > 0
                     ? "Código incorrecto. Te quedan " + restantes + " intento(s)."
                     : "Código incorrecto. Superaste el número de intentos; solicita un nuevo código.");
         }
-        db.ejecutar("UPDATE otp_token SET usado = 1 WHERE id = :id", Db.p("id", token.get("id")));
+        repositorio.actualizarOtpTokenEnValidarCodigo2(Db.p("id", token.get("id")));
         return token;
     }
 
@@ -292,29 +285,14 @@ public class AuthService {
         LocalDateTime expira = inicio.plusHours(horas);
         String token = jwt.emitir(usuarioId, Validar.cadena(usuario, "username"), perfil,
                 inicio.toEpochSecond(ZoneOffset.ofHours(-5)), expira.toEpochSecond(ZoneOffset.ofHours(-5)));
-        db.insertar("""
-                INSERT INTO session (user_id, token, fecha_ini_sesion, fecha_expiracion, activo)
-                VALUES (:usuario, :token, :inicio, :expira, 1)
-                """, Db.p("usuario", usuarioId, "token", ClaveUtil.sha256(token), "inicio", inicio, "expira", expira));
+        repositorio.insertarSession(Db.p("usuario", usuarioId, "token", ClaveUtil.sha256(token), "inicio", inicio, "expira", expira));
         auditoria.registrarSinSesion(usuarioId, Validar.cadena(usuario, "username"), perfil, "LOGIN", "Inicio de sesión exitoso (contraseña y código verificados)");
         return new AuthApi.LoginRs(token, "Bearer", usuarioId, Validar.cadena(usuario, "username"),
                 Validar.largo(usuario, "perfil_id"), perfil,
-                com.uniminuto.clinica.seguridad.FiltroAutenticacion.permisos(db, Validar.largo(usuario, "perfil_id")));
+                sesiones.permisos(Validar.largo(usuario, "perfil_id")));
     }
 
-    /**
-     * @param filtro condición SQL sobre el usuario.
-     * @param valor valor del parámetro :valor.
-     * @return usuario con su perfil o null.
-     */
-    private Map<String, Object> usuario(String filtro, Object valor) {
-        return db.uno("""
-                SELECT u.id, u.username, u.email, u.password_hash, u.activo, p.perfil_id, p.nombre AS perfil,
-                       p.activo AS perfil_activo
-                FROM usuario u JOIN perfil p ON p.perfil_id = u.rol
-                WHERE
-                """ + filtro, Db.p("valor", valor));
-    }
+
 
     /**
      * Verifica que el usuario y su perfil estén activos.

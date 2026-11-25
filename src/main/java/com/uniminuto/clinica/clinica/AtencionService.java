@@ -44,21 +44,22 @@ public class AtencionService {
     /** Formato de moneda colombiana para los PDF. */
     private static final NumberFormat COP = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-CO"));
 
-    /** Acceso a datos. */
-    private final Db db;
     /** Consulta de tarifas vigentes. */
     private final TarifarioService tarifario;
     /** Enlace entre la fórmula de la atención y la prescripción en la historia clínica. */
     private final com.uniminuto.clinica.historia.FormulaIntegracionService integracion;
 
+    /** Acceso a datos del módulo (SQL). */
+    private final AtencionRepository repositorio;
+
     /**
-     * @param db acceso a datos.
+     * @param repositorio acceso a datos del módulo.
      * @param tarifario servicio de tarifas.
      * @param integracion enlace con la historia clínica.
      */
-    public AtencionService(Db db, TarifarioService tarifario,
+    public AtencionService(AtencionRepository repositorio, TarifarioService tarifario,
                            com.uniminuto.clinica.historia.FormulaIntegracionService integracion) {
-        this.db = db;
+        this.repositorio = repositorio;
         this.integracion = integracion;
         this.tarifario = tarifario;
     }
@@ -109,28 +110,13 @@ public class AtencionService {
             a.put("observaciones", atencion.get("observaciones"));
             a.put("recomendaciones", atencion.get("recomendaciones"));
             r.put("atencion", a);
-            r.put("servicios", db.lista("""
-                    SELECT s.servicio_id AS servicioId, sc.nombre, s.cantidad, s.valor_unitario AS valor,
-                           s.iva_porcentaje AS iva, s.impuesto_porcentaje AS impuesto
-                    FROM atencion_servicio s JOIN servicio_clinico sc ON sc.id = s.servicio_id
-                    WHERE s.atencion_id = :a ORDER BY s.id
-                    """, Db.p("a", atencion.get("id"))));
+            r.put("servicios", repositorio.listarAtencionServicio(Db.p("a", atencion.get("id"))));
         }
-        r.put("antecedentes", db.lista("""
-                SELECT an.fecha, CONCAT(md.nombres, ' ', md.apellidos) AS medico, an.descripcion
-                FROM anotacion_historia an
-                JOIN historia_medica h ON h.id = an.historia_id
-                JOIN medico md ON md.id = an.medico_id
-                WHERE h.paciente_id = :m AND (an.cita_id IS NULL OR an.cita_id <> :c)
-                ORDER BY an.fecha DESC LIMIT 30
-                """, Db.p("m", cita.get("mascota_id"), "c", citaId)));
+        r.put("antecedentes", repositorio.listarAnotacionHistoria(Db.p("m", cita.get("mascota_id"), "c", citaId)));
         long especialidad = atencion == null ? Validar.largo(cita, "especializacion_id")
                 : Validar.largo(atencion, "especializacion_id");
         List<Map<String, Object>> catalogo = new ArrayList<>();
-        for (Map<String, Object> s : db.lista("""
-                SELECT id, especializacion_id AS especialidadId, nombre FROM servicio_clinico
-                WHERE especializacion_id = :e AND activo = 1 ORDER BY nombre
-                """, Db.p("e", especialidad))) {
+        for (Map<String, Object> s : repositorio.listarServicioClinico(Db.p("e", especialidad))) {
             Map<String, Object> item = new LinkedHashMap<>();
             item.put("servicio", s);
             item.put("tarifa", tarifario.vigente(Validar.largo(s, "id"), fecha));
@@ -161,20 +147,12 @@ public class AtencionService {
         }
         if (atencionDeCita(citaId) == null) {
             // La historia clínica corresponde a la consulta (cita): se reutiliza si ya existe.
-            Long historia = db.valor("SELECT id FROM historia_medica WHERE cita_id = :c",
-                    Db.p("c", citaId), Long.class);
+            Long historia = repositorio.valorHistoriaMedica(Db.p("c", citaId), Long.class);
             if (historia == null) {
-                historia = db.insertar("""
-                        INSERT INTO historia_medica (paciente_id, cita_id, medico_id, fecha, motivo, activo, fecha_creacion)
-                        VALUES (:m, :c, :medico, :fecha, :motivo, 1, :ahora)
-                        """, Db.p("m", cita.get("mascota_id"), "c", citaId, "medico", cita.get("medico_id"),
+                historia = repositorio.insertarHistoriaMedica(Db.p("m", cita.get("mascota_id"), "c", citaId, "medico", cita.get("medico_id"),
                         "fecha", cita.get("fecha_hora"), "motivo", cita.get("motivo"), "ahora", Tiempo.ahora()));
             }
-            db.insertar("""
-                    INSERT INTO atencion_medica (cita_id, historia_id, medico_id, especializacion_id, motivo, version,
-                                                 fecha_apertura)
-                    VALUES (:c, :h, :m, :e, :motivo, 0, :ahora)
-                    """, Db.p("c", citaId, "h", historia, "m", cita.get("medico_id"), "e", cita.get("especializacion_id"),
+            repositorio.insertarAtencionMedica(Db.p("c", citaId, "h", historia, "m", cita.get("medico_id"), "e", cita.get("especializacion_id"),
                     "motivo", cita.get("motivo"), "ahora", Tiempo.ahora()));
         }
         return consultar(citaId);
@@ -208,8 +186,7 @@ public class AtencionService {
             if (!vistos.add(s.servicioId())) {
                 throw new BadRequestException("Un servicio no puede registrarse dos veces en la misma atención.");
             }
-            Map<String, Object> sc = db.requerido("SELECT especializacion_id, activo, nombre FROM servicio_clinico WHERE id = :id",
-                    Db.p("id", s.servicioId()), "El servicio no existe.");
+            Map<String, Object> sc = repositorio.obtenerServicioClinico(Db.p("id", s.servicioId()), "El servicio no existe.");
             if (Validar.largo(sc, "especializacion_id") != Validar.largo(atencion, "especializacion_id")
                     || !Validar.bool(sc, "activo")) {
                 throw new BadRequestException("El servicio " + sc.get("nombre") + " no está disponible para la especialidad.");
@@ -220,16 +197,12 @@ public class AtencionService {
             }
             servicios.add(new Object[]{s.servicioId(), tarifa, cantidad});
         }
-        db.ejecutar("""
-                UPDATE atencion_medica SET motivo = :motivo, sintomas = :sintomas, diagnostico = :diagnostico,
-                       observaciones = :obs, recomendaciones = :rec, version = version + 1
-                WHERE id = :id
-                """, Db.p("motivo", Validar.opcional(d.motivo(), "motivo", 4000),
+        repositorio.actualizarAtencionMedica(Db.p("motivo", Validar.opcional(d.motivo(), "motivo", 4000),
                 "sintomas", Validar.opcional(d.sintomas(), "síntomas", 4000),
                 "diagnostico", Validar.opcional(d.diagnostico(), "diagnóstico", 4000),
                 "obs", Validar.opcional(d.observaciones(), "observaciones", 4000),
                 "rec", Validar.opcional(d.recomendaciones(), "recomendaciones", 4000), "id", atencion.get("id")));
-        db.ejecutar("DELETE FROM atencion_servicio WHERE atencion_id = :a", Db.p("a", atencion.get("id")));
+        repositorio.eliminarAtencionServicio(Db.p("a", atencion.get("id")));
         for (Object[] s : servicios) {
             insertarServicio(Validar.largo(atencion, "id"), (Long) s[0], (Map<String, Object>) s[1], (int) s[2]);
         }
@@ -253,14 +226,13 @@ public class AtencionService {
             throw new BadRequestException("Registra el motivo de consulta y el diagnóstico antes de finalizar.");
         }
         long atencionId = Validar.largo(atencion, "id");
-        List<Map<String, Object>> servicios = db.lista("SELECT servicio_id, cantidad FROM atencion_servicio WHERE atencion_id = :a",
-                Db.p("a", atencionId));
+        List<Map<String, Object>> servicios = repositorio.listarAtencionServicioEnFinalizar(Db.p("a", atencionId));
         if (servicios.isEmpty()) {
             throw new BadRequestException("Registra al menos un servicio o consulta prestada antes de finalizar.");
         }
         // Congela la tarifa vigente en la fecha de la cita (valores históricos para la factura).
         LocalDate fecha = ((LocalDateTime) cita.get("fecha_hora")).toLocalDate();
-        db.ejecutar("DELETE FROM atencion_servicio WHERE atencion_id = :a", Db.p("a", atencionId));
+        repositorio.eliminarAtencionServicio(Db.p("a", atencionId));
         for (Map<String, Object> s : servicios) {
             Map<String, Object> tarifa = tarifario.vigente(Validar.largo(s, "servicio_id"), fecha);
             if (tarifa == null) {
@@ -269,31 +241,19 @@ public class AtencionService {
             insertarServicio(atencionId, Validar.largo(s, "servicio_id"), tarifa, Validar.numero(s, "cantidad"));
         }
         LocalDateTime ahora = Tiempo.ahora();
-        db.ejecutar("UPDATE atencion_medica SET fecha_finalizacion = :f, version = version + 1 WHERE id = :id",
-                Db.p("f", ahora, "id", atencionId));
+        repositorio.actualizarAtencionMedicaEnFinalizar(Db.p("f", ahora, "id", atencionId));
         if (!"atendida".equals(cita.get("estado"))) {
-            db.ejecutar("UPDATE cita SET estado = 'atendida', fecha_modificacion = :f WHERE id = :id",
-                    Db.p("f", ahora, "id", citaId));
-            db.insertar("""
-                    INSERT INTO cita_revision (cita_id, usuario_id, fecha, estado_anterior, inicio_anterior, fin_anterior,
-                                               estado_nuevo, inicio_nuevo, fin_nuevo)
-                    VALUES (:c, :u, :f, :ea, :i, :fin, 'atendida', :i, :fin)
-                    """, Db.p("c", citaId, "u", SesionActual.usuarioId(), "f", ahora, "ea", cita.get("estado"),
+            repositorio.actualizarCita(Db.p("f", ahora, "id", citaId));
+            repositorio.insertarCitaRevision(Db.p("c", citaId, "u", SesionActual.usuarioId(), "f", ahora, "ea", cita.get("estado"),
                     "i", cita.get("fecha_hora"), "fin", cita.get("fecha_fin")));
         }
         String resumen = "Atención de la cita #" + citaId + ". Motivo: " + atencion.get("motivo")
                 + ". Síntomas: " + valor(atencion.get("sintomas")) + ". Diagnóstico: " + atencion.get("diagnostico")
                 + ". Observaciones: " + valor(atencion.get("observaciones"))
                 + ". Recomendaciones: " + valor(atencion.get("recomendaciones")) + ".";
-        db.ejecutar("""
-                UPDATE historia_medica SET motivo = :motivo, diagnostico = :diagnostico, observaciones = :obs,
-                       fecha_modificacion = :f WHERE id = :h
-                """, Db.p("motivo", atencion.get("motivo"), "diagnostico", atencion.get("diagnostico"),
+        repositorio.actualizarHistoriaMedica(Db.p("motivo", atencion.get("motivo"), "diagnostico", atencion.get("diagnostico"),
                 "obs", atencion.get("observaciones"), "f", ahora, "h", atencion.get("historia_id")));
-        db.insertar("""
-                INSERT INTO anotacion_historia (historia_id, medico_id, cita_id, fecha, descripcion, observacion, diagnostico)
-                VALUES (:h, :m, :c, :f, :d, :o, :dx)
-                """, Db.p("h", atencion.get("historia_id"), "m", atencion.get("medico_id"), "c", citaId, "f", ahora,
+        repositorio.insertarAnotacionHistoria(Db.p("h", atencion.get("historia_id"), "m", atencion.get("medico_id"), "c", citaId, "f", ahora,
                 "d", resumen, "o", atencion.get("observaciones"), "dx", atencion.get("diagnostico")));
         // Prescripciones registradas en la historia antes de atender: ahora generan su orden de despacho.
         integracion.generarPendientesDeCita(citaId);
@@ -306,7 +266,7 @@ public class AtencionService {
      * @return fórmulas emitidas por el médico autenticado.
      */
     public List<Map<String, Object>> formulasPropias() {
-        return formulas("WHERE f.medico_id = :m", Db.p("m", SesionActual.medicoId()));
+        return formulas(AtencionRepository.CriterioFormula.MEDICO, SesionActual.medicoId());
     }
 
     /**
@@ -325,10 +285,7 @@ public class AtencionService {
             throw new ConflictException("Abre la atención de la cita antes de formular.");
         }
         List<Linea> lineas = validarLineas(d);
-        long id = db.insertar("""
-                INSERT INTO formula_clinica (cita_id, atencion_id, medico_id, mascota_id, estado, revision, fecha_creacion)
-                VALUES (:c, :a, :m, :mascota, 'BORRADOR', 0, :f)
-                """, Db.p("c", citaId, "a", atencion.get("id"), "m", cita.get("medico_id"), "mascota", cita.get("mascota_id"),
+        long id = repositorio.insertarFormulaClinica(Db.p("c", citaId, "a", atencion.get("id"), "m", cita.get("medico_id"), "mascota", cita.get("mascota_id"),
                 "f", Tiempo.ahora()));
         guardarLineas(id, lineas);
         return formula(id);
@@ -354,9 +311,9 @@ public class AtencionService {
         }
         verificarRevision(f, d == null ? null : d.revision());
         List<Linea> lineas = validarLineas(d);
-        db.ejecutar("DELETE FROM formula_clinica_detalle WHERE formula_id = :f", Db.p("f", formulaId));
+        repositorio.eliminarFormulaClinicaDetalle(Db.p("f", formulaId));
         guardarLineas(formulaId, lineas);
-        db.ejecutar("UPDATE formula_clinica SET revision = revision + 1 WHERE id = :id", Db.p("id", formulaId));
+        repositorio.actualizarFormulaClinica(Db.p("id", formulaId));
         return formula(formulaId);
     }
 
@@ -377,12 +334,7 @@ public class AtencionService {
         verificarRevision(f, revision);
         // Validación de disponibilidad en inventario (lotes vigentes) al confirmar la prescripción.
         List<String> faltantes = new ArrayList<>();
-        for (Map<String, Object> l : db.lista("""
-                SELECT d.cantidad, m.nombre, COALESCE((SELECT SUM(l.cantidad) FROM medicamento_lote l
-                       WHERE l.medicamento_id = m.id AND (l.fecha_vence IS NULL OR l.fecha_vence >= :hoy)), 0) AS disponible
-                FROM formula_clinica_detalle d JOIN medicamento m ON m.id = d.medicamento_id
-                WHERE d.formula_id = :f
-                """, Db.p("f", formulaId, "hoy", Tiempo.hoy()))) {
+        for (Map<String, Object> l : repositorio.listarMedicamentoLote(Db.p("f", formulaId, "hoy", Tiempo.hoy()))) {
             if (Validar.numero(l, "cantidad") > Validar.numero(l, "disponible")) {
                 faltantes.add(l.get("nombre") + " (prescrito " + l.get("cantidad") + ", disponible " + l.get("disponible") + ")");
             }
@@ -392,14 +344,8 @@ public class AtencionService {
                     + ". Ajusta las cantidades o selecciona otro medicamento.");
         }
         LocalDateTime ahora = Tiempo.ahora();
-        db.ejecutar("""
-                UPDATE formula_clinica SET estado = 'CONFIRMADA', estado_despacho = 'PENDIENTE_DESPACHO',
-                       revision = revision + 1, fecha_confirmacion = :f WHERE id = :id
-                """, Db.p("f", ahora, "id", formulaId));
-        db.insertar("""
-                INSERT INTO despacho_estado_historial (formula_id, estado_anterior, estado_nuevo, usuario_id, fecha, motivo)
-                VALUES (:f, 'BORRADOR', 'PENDIENTE_DESPACHO', :u, :ahora, 'Fórmula confirmada por el médico')
-                """, Db.p("f", formulaId, "u", SesionActual.usuarioId(), "ahora", ahora));
+        repositorio.actualizarFormulaClinicaEnConfirmarFormula(Db.p("f", ahora, "id", formulaId));
+        repositorio.insertarDespachoEstadoHistorial(Db.p("f", formulaId, "u", SesionActual.usuarioId(), "ahora", ahora));
         // La fórmula confirmada queda también en la historia clínica (Gestión de Fórmulas e historia de la mascota).
         integracion.registrarEnHistoria(formulaId);
         return formula(formulaId);
@@ -420,8 +366,7 @@ public class AtencionService {
             throw new ConflictException("Solo se pueden anular borradores; la fórmula confirmada se gestiona en despacho.");
         }
         verificarRevision(f, revision);
-        db.ejecutar("UPDATE formula_clinica SET estado = 'ANULADA', revision = revision + 1 WHERE id = :id",
-                Db.p("id", formulaId));
+        repositorio.actualizarFormulaClinicaEnAnularFormula(Db.p("id", formulaId));
         return formula(formulaId);
     }
 
@@ -430,7 +375,7 @@ public class AtencionService {
      * @return fórmula con sus líneas.
      */
     public Map<String, Object> formula(long id) {
-        List<Map<String, Object>> f = formulas("WHERE f.id = :id", Db.p("id", id));
+        List<Map<String, Object>> f = formulas(AtencionRepository.CriterioFormula.ID, id);
         if (f.isEmpty()) {
             throw new com.uniminuto.clinica.exception.NotFoundException("La fórmula no existe.");
         }
@@ -442,29 +387,20 @@ public class AtencionService {
      * @return fórmulas de la cita.
      */
     private List<Map<String, Object>> formulasDeCita(long cita) {
-        return formulas("WHERE f.cita_id = :c", Db.p("c", cita));
+        return formulas(AtencionRepository.CriterioFormula.CITA, cita);
     }
 
     /**
      * Consulta fórmulas con sus líneas.
      *
-     * @param filtro cláusula WHERE.
-     * @param params parámetros.
+     * @param criterio criterio de búsqueda.
+     * @param valor valor buscado.
      * @return fórmulas.
      */
-    private List<Map<String, Object>> formulas(String filtro, Map<String, Object> params) {
+    private List<Map<String, Object>> formulas(AtencionRepository.CriterioFormula criterio, Object valor) {
         List<Map<String, Object>> resultado = new ArrayList<>();
-        for (Map<String, Object> f : db.lista("""
-                SELECT f.id, f.cita_id AS citaId, m.nombre_mascota AS paciente, f.estado, f.estado_despacho AS estadoDespacho,
-                       f.revision, f.fecha_creacion AS creada, f.fecha_confirmacion AS confirmada
-                FROM formula_clinica f JOIN mascota m ON m.mascota_id = f.mascota_id
-                """ + filtro + " ORDER BY f.fecha_creacion DESC, f.id DESC", params)) {
-            f.put("medicamentos", db.lista("""
-                    SELECT d.medicamento_id AS medicamentoId, m.nombre, d.dosis, d.frecuencia, d.duracion, d.cantidad,
-                           d.via, d.indicaciones, m.precio_venta * d.cantidad AS precioEstimado
-                    FROM formula_clinica_detalle d JOIN medicamento m ON m.id = d.medicamento_id
-                    WHERE d.formula_id = :f ORDER BY d.id
-                    """, Db.p("f", f.get("id"))));
+        for (Map<String, Object> f : repositorio.formulasPor(criterio, valor)) {
+            f.put("medicamentos", repositorio.listarFormulaClinicaDetalle(Db.p("f", f.get("id"))));
             resultado.add(f);
         }
         return resultado;
@@ -494,8 +430,7 @@ public class AtencionService {
             if (!vistos.add(l.medicamentoId())) {
                 throw new BadRequestException("Un medicamento no puede repetirse en la misma fórmula.");
             }
-            Map<String, Object> m = db.requerido("SELECT nombre, tipo, activo FROM medicamento WHERE id = :id",
-                    Db.p("id", l.medicamentoId()), "El medicamento no existe.");
+            Map<String, Object> m = repositorio.obtenerMedicamento(Db.p("id", l.medicamentoId()), "El medicamento no existe.");
             if (!"MEDICAMENTO".equals(m.get("tipo")) || !Validar.bool(m, "activo")) {
                 throw new BadRequestException(m.get("nombre") + " no es un medicamento activo formulable.");
             }
@@ -519,11 +454,7 @@ public class AtencionService {
      */
     private void guardarLineas(long formula, List<Linea> lineas) {
         for (Linea l : lineas) {
-            db.insertar("""
-                    INSERT INTO formula_clinica_detalle (formula_id, medicamento_id, dosis, frecuencia, duracion, cantidad,
-                                                         via, indicaciones)
-                    VALUES (:f, :m, :dosis, :frecuencia, :duracion, :cantidad, :via, :ind)
-                    """, Db.p("f", formula, "m", l.medicamento(), "dosis", l.dosis(), "frecuencia", l.frecuencia(),
+            repositorio.insertarFormulaClinicaDetalle(Db.p("f", formula, "m", l.medicamento(), "dosis", l.dosis(), "frecuencia", l.frecuencia(),
                     "duracion", l.duracion(), "cantidad", l.cantidad(), "via", l.via(), "ind", l.indicaciones()));
         }
     }
@@ -537,19 +468,7 @@ public class AtencionService {
      * @return PDF.
      */
     public byte[] formulaPdf(long formulaId) {
-        Map<String, Object> f = db.requerido("""
-                SELECT f.*, c.fecha_hora, m.nombre_mascota, r.especie, r.nombre AS raza, m.edad,
-                       CONCAT(cl.nombres, ' ', cl.apellidos) AS propietario, cl.tipo_documento, cl.numero_documento,
-                       CONCAT(md.nombres, ' ', md.apellidos) AS medico, md.registro_profesional, e.nombre AS especialidad
-                FROM formula_clinica f
-                JOIN cita c ON c.id = f.cita_id
-                JOIN mascota m ON m.mascota_id = f.mascota_id
-                JOIN raza r ON r.raza_id = m.raza_id
-                JOIN cliente cl ON cl.cliente_id = c.cliente_id
-                JOIN medico md ON md.id = f.medico_id
-                JOIN especializacion e ON e.id = md.especializacion_id
-                WHERE f.id = :id
-                """, Db.p("id", formulaId), "La fórmula no existe.");
+        Map<String, Object> f = repositorio.obtenerFormulaClinica(Db.p("id", formulaId), "La fórmula no existe.");
         SesionUsuario s = SesionActual.obtener();
         if (s.es(Perfiles.VETERINARIO) && Validar.largo(f, "medico_id") != SesionActual.medicoId()) {
             throw new ForbiddenException("Solo puedes descargar tus propias fórmulas.");
@@ -567,10 +486,7 @@ public class AtencionService {
                 {"Confirmada", texto(f.get("fecha_confirmacion"))}});
         pdf.seccion("Medicamentos prescritos");
         List<String[]> filas = new ArrayList<>();
-        for (Map<String, Object> l : db.lista("""
-                SELECT m.nombre, m.presentacion, d.dosis, d.frecuencia, d.duracion, d.via, d.cantidad, d.indicaciones
-                FROM formula_clinica_detalle d JOIN medicamento m ON m.id = d.medicamento_id WHERE d.formula_id = :f ORDER BY d.id
-                """, Db.p("f", formulaId))) {
+        for (Map<String, Object> l : repositorio.listarFormulaClinicaDetalleEnFormulaPdf(Db.p("f", formulaId))) {
             filas.add(new String[]{l.get("nombre") + (l.get("presentacion") == null ? "" : "\n" + l.get("presentacion")),
                     texto(l.get("dosis")), texto(l.get("frecuencia")), texto(l.get("duracion")), texto(l.get("via")),
                     texto(l.get("cantidad")), texto(l.get("indicaciones"))});
@@ -590,18 +506,7 @@ public class AtencionService {
      * @return PDF.
      */
     public byte[] formulaLegadaPdf(long id) {
-        Map<String, Object> f = db.requerido("""
-                SELECT fm.*, md.nombre AS medicamento, md.presentacion, c.fecha_hora, m.nombre_mascota,
-                       CONCAT(cl.nombres, ' ', cl.apellidos) AS propietario, CONCAT(me.nombres, ' ', me.apellidos) AS medico,
-                       me.registro_profesional
-                FROM formula_medica fm
-                JOIN medicamento md ON md.id = fm.medicamento_id
-                JOIN cita c ON c.id = fm.cita_id
-                JOIN mascota m ON m.mascota_id = c.mascota_id
-                JOIN cliente cl ON cl.cliente_id = c.cliente_id
-                JOIN medico me ON me.id = c.medico_id
-                WHERE fm.id = :id
-                """, Db.p("id", id), "La fórmula no existe.");
+        Map<String, Object> f = repositorio.obtenerFormulaMedica(Db.p("id", id), "La fórmula no existe.");
         PdfDocumento pdf = new PdfDocumento("Fórmula histórica N.º " + id);
         pdf.campos(new String[][]{{"Paciente", texto(f.get("nombre_mascota"))}, {"Propietario", texto(f.get("propietario"))},
                 {"Veterinario", f.get("medico") + " · Reg. " + f.get("registro_profesional")},
@@ -628,21 +533,12 @@ public class AtencionService {
             throw new ConflictException("La prefactura está disponible al finalizar la atención médica.");
         }
         List<Liquidador.Concepto> conceptos = new ArrayList<>();
-        for (Map<String, Object> sv : db.lista("""
-                SELECT s.servicio_id, s.tarifa_id, sc.nombre, s.cantidad, s.valor_unitario, s.iva_porcentaje, s.impuesto_porcentaje
-                FROM atencion_servicio s JOIN servicio_clinico sc ON sc.id = s.servicio_id WHERE s.atencion_id = :a ORDER BY s.id
-                """, Db.p("a", atencion.get("id")))) {
+        for (Map<String, Object> sv : repositorio.listarAtencionServicioEnPrefactura(Db.p("a", atencion.get("id")))) {
             conceptos.add(new Liquidador.Concepto(Validar.largo(sv, "servicio_id"), Validar.largo(sv, "tarifa_id"), null,
                     "Servicio: " + sv.get("nombre"), Validar.numero(sv, "cantidad"), Validar.decimal(sv, "valor_unitario"),
                     Validar.decimal(sv, "iva_porcentaje"), Validar.decimal(sv, "impuesto_porcentaje")));
         }
-        for (Map<String, Object> m : db.lista("""
-                SELECT md.id, md.nombre, SUM(d.cantidad) AS cantidad, md.precio_venta, md.iva_porcentaje
-                FROM formula_clinica f JOIN formula_clinica_detalle d ON d.formula_id = f.id
-                JOIN medicamento md ON md.id = d.medicamento_id
-                WHERE f.cita_id = :c AND f.estado = 'CONFIRMADA'
-                GROUP BY md.id, md.nombre, md.precio_venta, md.iva_porcentaje ORDER BY md.nombre
-                """, Db.p("c", citaId))) {
+        for (Map<String, Object> m : repositorio.listarFormulaClinica(Db.p("c", citaId))) {
             conceptos.add(new Liquidador.Concepto(null, null, Validar.largo(m, "id"), "Medicamento formulado: " + m.get("nombre"),
                     Validar.numero(m, "cantidad"), Validar.decimal(m, "precio_venta"), Validar.decimal(m, "iva_porcentaje"),
                     BigDecimal.ZERO));
@@ -674,18 +570,7 @@ public class AtencionService {
      * @return cita con cliente, mascota y médico.
      */
     private Map<String, Object> cita(long id) {
-        return db.requerido("""
-                SELECT c.*, m.nombre_mascota AS mascota, r.especie, r.nombre AS raza, m.edad,
-                       CONCAT(cl.nombres, ' ', cl.apellidos) AS propietario,
-                       CONCAT(cl.tipo_documento, ' ', cl.numero_documento) AS documento, cl.telefono,
-                       CONCAT(md.nombres, ' ', md.apellidos) AS medico, md.especializacion_id
-                FROM cita c
-                JOIN mascota m ON m.mascota_id = c.mascota_id
-                JOIN raza r ON r.raza_id = m.raza_id
-                JOIN cliente cl ON cl.cliente_id = c.cliente_id
-                JOIN medico md ON md.id = c.medico_id
-                WHERE c.id = :id
-                """, Db.p("id", id), "La cita no existe.");
+        return repositorio.obtenerCita(Db.p("id", id), "La cita no existe.");
     }
 
     /**
@@ -693,7 +578,7 @@ public class AtencionService {
      * @return cita bloqueada para actualización.
      */
     private Map<String, Object> bloquearCita(long id) {
-        db.requerido("SELECT id FROM cita WHERE id = :id FOR UPDATE", Db.p("id", id), "La cita no existe.");
+        repositorio.obtenerCitaEnBloquearCita(Db.p("id", id), "La cita no existe.");
         return cita(id);
     }
 
@@ -702,10 +587,7 @@ public class AtencionService {
      * @return atención de la cita o null.
      */
     private Map<String, Object> atencionDeCita(long cita) {
-        return db.uno("""
-                SELECT a.*, e.nombre AS especialidad FROM atencion_medica a
-                JOIN especializacion e ON e.id = a.especializacion_id WHERE a.cita_id = :c
-                """, Db.p("c", cita));
+        return repositorio.buscarAtencionMedica(Db.p("c", cita));
     }
 
     /**
@@ -713,7 +595,7 @@ public class AtencionService {
      * @return atención bloqueada para actualización.
      */
     private Map<String, Object> bloquearAtencion(long cita) {
-        Map<String, Object> a = db.uno("SELECT * FROM atencion_medica WHERE cita_id = :c FOR UPDATE", Db.p("c", cita));
+        Map<String, Object> a = repositorio.buscarAtencionMedicaEnBloquearAtencion(Db.p("c", cita));
         if (a == null) {
             throw new ConflictException("La atención aún no ha sido abierta.");
         }
@@ -728,8 +610,7 @@ public class AtencionService {
      * @return fórmula bloqueada para actualización.
      */
     private Map<String, Object> bloquearFormula(long id) {
-        return db.requerido("SELECT * FROM formula_clinica WHERE id = :id FOR UPDATE", Db.p("id", id),
-                "La fórmula no existe.");
+        return repositorio.obtenerFormulaClinicaEnBloquearFormula(Db.p("id", id), "La fórmula no existe.");
     }
 
     /**
@@ -741,11 +622,7 @@ public class AtencionService {
      * @param cantidad cantidad.
      */
     private void insertarServicio(long atencion, long servicio, Map<String, Object> tarifa, int cantidad) {
-        db.insertar("""
-                INSERT INTO atencion_servicio (atencion_id, servicio_id, tarifa_id, cantidad, valor_unitario, iva_porcentaje,
-                                               impuesto_porcentaje)
-                VALUES (:a, :s, :t, :c, :v, :iva, :imp)
-                """, Db.p("a", atencion, "s", servicio, "t", tarifa.get("id"), "c", cantidad, "v", tarifa.get("valor"),
+        repositorio.insertarAtencionServicio(Db.p("a", atencion, "s", servicio, "t", tarifa.get("id"), "c", cantidad, "v", tarifa.get("valor"),
                 "iva", tarifa.get("iva"), "imp", tarifa.get("impuesto")));
     }
 

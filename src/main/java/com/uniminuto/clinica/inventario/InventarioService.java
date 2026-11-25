@@ -33,30 +33,20 @@ public class InventarioService {
     /** Tipos de producto. */
     static final Set<String> TIPOS = Set.of("MEDICAMENTO", "PRODUCTO", "UTENSILIO");
 
-    /** Consulta base de la ficha de producto con existencias. */
-    private static final String FICHA = """
-            SELECT m.*,
-                   COALESCE(SUM(l.cantidad), 0) AS existencia,
-                   COALESCE(SUM(CASE WHEN l.fecha_vence IS NULL OR l.fecha_vence >= :hoy THEN l.cantidad END), 0) AS disponible,
-                   MAX(CASE WHEN l.cantidad > 0 AND l.fecha_vence < :hoy THEN 1 ELSE 0 END) AS lote_vencido,
-                   MAX(CASE WHEN l.cantidad > 0 AND l.fecha_vence BETWEEN :hoy AND :limite THEN 1 ELSE 0 END) AS lote_proximo,
-                   MIN(CASE WHEN l.cantidad > 0 AND l.fecha_vence >= :hoy THEN l.fecha_vence END) AS vencimiento_lote
-            FROM medicamento m
-            LEFT JOIN medicamento_lote l ON l.medicamento_id = m.id
-            """;
 
-    /** Acceso a datos. */
-    private final Db db;
 
     /** Log central de operaciones sensibles. */
     private final com.uniminuto.clinica.auditoria.AuditoriaService auditoria;
 
+    /** Acceso a datos del módulo (SQL). */
+    private final InventarioRepository repositorio;
+
     /**
-     * @param db acceso a datos.
+     * @param repositorio acceso a datos del módulo.
      * @param auditoria log de operaciones sensibles.
      */
-    public InventarioService(Db db, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
-        this.db = db;
+    public InventarioService(InventarioRepository repositorio, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
+        this.repositorio = repositorio;
         this.auditoria = auditoria;
     }
 
@@ -66,7 +56,7 @@ public class InventarioService {
      * @return productos con existencias.
      */
     public List<Map<String, Object>> listar() {
-        return db.lista(FICHA + " GROUP BY m.id ORDER BY m.nombre", fechas()).stream().map(this::ficha).toList();
+        return repositorio.listarMedicamento(fechas()).stream().map(this::ficha).toList();
     }
 
     /**
@@ -74,8 +64,7 @@ public class InventarioService {
      * @return ficha del producto.
      */
     public Map<String, Object> ficha(long id) {
-        Map<String, Object> fila = db.requerido(FICHA + " WHERE m.id = :id GROUP BY m.id",
-                with(fechas(), "id", id), "El producto no existe.");
+        Map<String, Object> fila = repositorio.obtenerMedicamento(with(fechas(), "id", id), "El producto no existe.");
         return ficha(fila);
     }
 
@@ -130,11 +119,7 @@ public class InventarioService {
         ficha(producto);
         LocalDate hoy = Tiempo.hoy();
         List<Map<String, Object>> lotes = new ArrayList<>();
-        for (Map<String, Object> l : db.lista("""
-                SELECT id, numero, costo, fecha_ingreso AS fechaIngreso, fecha_vence AS fechaVence, cantidad
-                FROM medicamento_lote WHERE medicamento_id = :m
-                ORDER BY fecha_vence IS NULL, fecha_vence, id
-                """, Db.p("m", producto))) {
+        for (Map<String, Object> l : repositorio.listarMedicamentoLote(Db.p("m", producto))) {
             LocalDate vence = (LocalDate) l.get("fechaVence");
             boolean vencido = vence != null && vence.isBefore(hoy);
             l.put("vencido", vencido);
@@ -151,16 +136,7 @@ public class InventarioService {
      */
     public List<Map<String, Object>> movimientos(long producto) {
         ficha(producto);
-        return db.lista("""
-                SELECT mv.id, mv.tipo, mv.cantidad, mv.delta, mv.motivo, mv.referencia, l.numero AS lote,
-                       u.username AS usuario, mv.fecha, mv.saldo_lote AS saldo, mv.formula_id AS formula,
-                       mv.despacho_id AS despacho
-                FROM movimiento_inventario mv
-                JOIN medicamento_lote l ON l.id = mv.lote_id
-                JOIN usuario u ON u.id = mv.usuario_id
-                WHERE mv.medicamento_id = :m
-                ORDER BY mv.fecha DESC, mv.id DESC
-                """, Db.p("m", producto));
+        return repositorio.listarMovimientoInventario(Db.p("m", producto));
     }
 
     // ------------------------------------------------------------------ Registro y edición
@@ -172,13 +148,7 @@ public class InventarioService {
     @Transactional
     public Map<String, Object> crear(ProductoRq datos) {
         Producto p = validarProducto(datos, null, true);
-        long id = db.insertar("""
-                INSERT INTO medicamento (codigo, nombre, descripcion, presentacion, tipo, invima, precio_compra,
-                       precio_venta, iva_porcentaje, stock_minimo, fecha_compra, fecha_ingreso, fecha_proximo_pedido,
-                       fecha_vence, activo, fecha_creacion_registro)
-                VALUES (:codigo, :nombre, :descripcion, :presentacion, :tipo, :invima, :compra, :venta, :iva, :minimo,
-                       :fcompra, :fingreso, :fpedido, :fvence, :activo, :ahora)
-                """, p.parametros());
+        long id = repositorio.insertarMedicamento(p.parametros());
         auditoria.registrar("PRODUCTO_CREADO", "medicamento", null, "Producto " + datos.codigo() + " · " + datos.nombre());
         return ficha(id);
     }
@@ -190,18 +160,11 @@ public class InventarioService {
      */
     @Transactional
     public Map<String, Object> actualizar(long id, ProductoRq datos) {
-        db.requerido("SELECT id FROM medicamento WHERE id = :id FOR UPDATE", Db.p("id", id), "El producto no existe.");
+        repositorio.obtenerMedicamentoEnActualizar(Db.p("id", id), "El producto no existe.");
         Producto p = validarProducto(datos, id, true);
         Map<String, Object> params = p.parametros();
         params.put("id", id);
-        db.ejecutar("""
-                UPDATE medicamento SET codigo = :codigo, nombre = :nombre, descripcion = :descripcion,
-                       presentacion = :presentacion, tipo = :tipo, invima = :invima, precio_compra = :compra,
-                       precio_venta = :venta, iva_porcentaje = :iva, stock_minimo = :minimo, fecha_compra = :fcompra,
-                       fecha_ingreso = :fingreso, fecha_proximo_pedido = :fpedido, fecha_vence = :fvence,
-                       activo = :activo, fecha_modificacion_registro = :ahora
-                WHERE id = :id
-                """, params);
+        repositorio.actualizarMedicamento(params);
         auditoria.registrar("PRODUCTO_ACTUALIZADO", "medicamento", id, "Producto " + datos.codigo() + " · " + datos.nombre() + " (datos o precios)");
         return ficha(id);
     }
@@ -215,8 +178,7 @@ public class InventarioService {
      */
     @Transactional
     public Map<String, Object> registrarLote(long producto, InventarioApi.LoteRq l) {
-        Map<String, Object> m = db.requerido("SELECT tipo, activo, codigo FROM medicamento WHERE id = :id FOR UPDATE",
-                Db.p("id", producto), "El producto no existe.");
+        Map<String, Object> m = repositorio.obtenerMedicamentoEnRegistrarLote(Db.p("id", producto), "El producto no existe.");
         if (l == null) {
             throw new BadRequestException("Los datos del lote son obligatorios.");
         }
@@ -235,14 +197,10 @@ public class InventarioService {
         if (vence != null && vence.isBefore(Tiempo.hoy())) {
             throw new BadRequestException("No se pueden ingresar lotes vencidos.");
         }
-        if (db.existe("SELECT 1 FROM medicamento_lote WHERE medicamento_id = :m AND numero = :n",
-                Db.p("m", producto, "n", numero))) {
+        if (repositorio.existeMedicamentoLote(Db.p("m", producto, "n", numero))) {
             throw new ConflictException("El lote " + numero + " ya existe para este producto.");
         }
-        long lote = db.insertar("""
-                INSERT INTO medicamento_lote (medicamento_id, numero, costo, fecha_ingreso, fecha_vence, cantidad_inicial, cantidad)
-                VALUES (:m, :n, :c, :i, :v, :q, 0)
-                """, Db.p("m", producto, "n", numero, "c", costo, "i", ingreso, "v", vence, "q", cantidad));
+        long lote = repositorio.insertarMedicamentoLote(Db.p("m", producto, "n", numero, "c", costo, "i", ingreso, "v", vence, "q", cantidad));
         mover(lote, "ENTRADA", cantidad, "Ingreso de lote", Validar.opcional(l.referencia(), "referencia", 255),
                 null, null, null);
         auditoria.registrar("LOTE_REGISTRADO", "medicamento", producto, "Lote " + l.numero() + " del producto " + producto);
@@ -259,8 +217,7 @@ public class InventarioService {
      */
     @Transactional
     public Map<String, Object> registrarMovimiento(long producto, long lote, InventarioApi.MovimientoRq mv) {
-        Map<String, Object> l = db.requerido("SELECT medicamento_id FROM medicamento_lote WHERE id = :id",
-                Db.p("id", lote), "El lote no existe.");
+        Map<String, Object> l = repositorio.obtenerMedicamentoLote(Db.p("id", lote), "El lote no existe.");
         if (Validar.largo(l, "medicamento_id") != producto) {
             throw new BadRequestException("El lote no pertenece al producto indicado.");
         }
@@ -296,20 +253,14 @@ public class InventarioService {
     @Transactional(propagation = Propagation.MANDATORY)
     public long mover(long lote, String tipo, int delta, String motivo, String referencia, Long formula,
                       Long despacho, Long importacion) {
-        Map<String, Object> l = db.requerido("SELECT medicamento_id, cantidad FROM medicamento_lote WHERE id = :id FOR UPDATE",
-                Db.p("id", lote), "El lote no existe.");
+        Map<String, Object> l = repositorio.obtenerMedicamentoLoteEnMover(Db.p("id", lote), "El lote no existe.");
         int saldo = Validar.numero(l, "cantidad") + delta;
         if (saldo < 0) {
             throw new ConflictException("El movimiento dejaría el lote con existencias negativas (disponible: "
                     + Validar.numero(l, "cantidad") + ").");
         }
-        db.ejecutar("UPDATE medicamento_lote SET cantidad = :s WHERE id = :id", Db.p("s", saldo, "id", lote));
-        return db.insertar("""
-                INSERT INTO movimiento_inventario (medicamento_id, lote_id, tipo, cantidad, delta, saldo_lote, motivo,
-                       referencia, formula_id, despacho_id, importacion_id, usuario_id, fecha)
-                VALUES (:m, :l, :tipo, :cantidad, :delta, :saldo, :motivo, :ref, :formula, :despacho, :importacion,
-                       :usuario, :ahora)
-                """, Db.p("m", l.get("medicamento_id"), "l", lote, "tipo", tipo, "cantidad", Math.abs(delta),
+        repositorio.actualizarMedicamentoLote(Db.p("s", saldo, "id", lote));
+        return repositorio.insertarMovimientoInventario(Db.p("m", l.get("medicamento_id"), "l", lote, "tipo", tipo, "cantidad", Math.abs(delta),
                 "delta", delta, "saldo", saldo, "motivo", motivo, "ref", referencia, "formula", formula,
                 "despacho", despacho, "importacion", importacion, "usuario", SesionActual.usuarioId(),
                 "ahora", Tiempo.ahora()));
@@ -411,12 +362,10 @@ public class InventarioService {
         if (fcompra != null && fpedido != null && fpedido.isBefore(fcompra)) {
             errores.add("La fecha del próximo pedido no puede ser anterior a la de compra.");
         }
-        if (!codigo.isEmpty() && db.existe("SELECT 1 FROM medicamento WHERE codigo = :c AND (:id IS NULL OR id <> :id)",
-                Db.p("c", codigo, "id", id))) {
+        if (!codigo.isEmpty() && repositorio.existeMedicamento(Db.p("c", codigo, "id", id))) {
             errores.add("Ya existe un producto con el código " + codigo + ".");
         }
-        if (!nombre.isEmpty() && db.existe("SELECT 1 FROM medicamento WHERE nombre = :n AND (:id IS NULL OR id <> :id)",
-                Db.p("n", nombre, "id", id))) {
+        if (!nombre.isEmpty() && repositorio.existeMedicamentoEnValidarProducto(Db.p("n", nombre, "id", id))) {
             errores.add("Ya existe un producto con el nombre " + nombre + ".");
         }
         String descripcion = d.descripcion() == null || d.descripcion().isBlank() ? null : d.descripcion().trim();

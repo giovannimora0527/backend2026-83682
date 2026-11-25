@@ -55,14 +55,15 @@ public class ReportesService {
                    Map<String, String> filtros) {
     }
 
-    /** Acceso a datos. */
-    private final Db db;
+
+    /** Acceso a datos del módulo (SQL). */
+    private final ReportesRepository repositorio;
 
     /**
-     * @param db acceso a datos.
+     * @param repositorio acceso a datos del módulo.
      */
-    public ReportesService(Db db) {
-        this.db = db;
+    public ReportesService(ReportesRepository repositorio) {
+        this.repositorio = repositorio;
     }
 
     /**
@@ -243,13 +244,12 @@ public class ReportesService {
             if (d != null) {
                 descripcion.put(tipo.equals("LOTES") ? "Vencimiento" : "Período", d + " a " + h);
             }
-            describir("Médico", medico, "SELECT CONCAT(nombres, ' ', apellidos) FROM medico WHERE id = :id");
-            describir("Especialidad", especialidad, "SELECT nombre FROM especializacion WHERE id = :id");
-            describir("Medicamento", medicamento, "SELECT CONCAT(codigo, ' · ', nombre) FROM medicamento WHERE id = :id");
-            describir("Lote", lote, "SELECT numero FROM medicamento_lote WHERE id = :id");
-            describir("Mascota", mascota, "SELECT nombre_mascota FROM mascota WHERE mascota_id = :id");
-            describir("Propietario", propietario,
-                    "SELECT CONCAT(nombres, ' ', apellidos) FROM cliente WHERE cliente_id = :id");
+            describir("Médico", medico, ReportesRepository.Entidad.MEDICO);
+            describir("Especialidad", especialidad, ReportesRepository.Entidad.ESPECIALIDAD);
+            describir("Medicamento", medicamento, ReportesRepository.Entidad.MEDICAMENTO);
+            describir("Lote", lote, ReportesRepository.Entidad.LOTE);
+            describir("Mascota", mascota, ReportesRepository.Entidad.MASCOTA);
+            describir("Propietario", propietario, ReportesRepository.Entidad.PROPIETARIO);
             if (estado != null) {
                 descripcion.put("Estado o tipo", estado);
             }
@@ -259,9 +259,9 @@ public class ReportesService {
             descripcion.put("Generado por", s.username());
         }
 
-        private void describir(String etiqueta, Long id, String sql) {
+        private void describir(String etiqueta, Long id, ReportesRepository.Entidad entidad) {
             if (id != null) {
-                String nombre = db.valor(sql, Db.p("id", id), String.class);
+                String nombre = repositorio.nombreDe(entidad, id);
                 descripcion.put(etiqueta, nombre == null ? "#" + id + " (no existe)" : nombre);
             }
         }
@@ -313,24 +313,7 @@ public class ReportesService {
         };
         Map<String, Object> params = f.params();
         params.put("formato", formato);
-        List<Map<String, Object>> filas = db.lista("""
-                SELECT DATE_FORMAT(f.fecha_emision, :formato) AS periodo,
-                       SUM(f.estado <> 'ANULADA') AS facturas,
-                       SUM(f.estado = 'PAGADA') AS pagadas,
-                       SUM(f.estado = 'PENDIENTE_PAGO') AS pendientes,
-                       SUM(f.estado = 'PAGO_PARCIAL') AS parciales,
-                       SUM(f.estado = 'ANULADA') AS anuladas,
-                       SUM(IF(f.estado <> 'ANULADA', l.servicios, 0)) AS ingresos_consultas,
-                       SUM(IF(f.estado <> 'ANULADA', l.medicamentos, 0)) AS ingresos_medicamentos,
-                       SUM(IF(f.estado <> 'ANULADA', f.descuento, 0)) AS descuentos,
-                       SUM(IF(f.estado <> 'ANULADA', f.iva, 0)) AS iva,
-                       SUM(IF(f.estado <> 'ANULADA', f.otros_impuestos, 0)) AS otros_impuestos,
-                       SUM(IF(f.estado <> 'ANULADA', f.total, 0)) AS total_facturado,
-                       SUM(IF(f.estado <> 'ANULADA', f.pagado, 0)) AS recaudado,
-                       SUM(IF(f.estado <> 'ANULADA', f.total - f.pagado, 0)) AS saldo
-                FROM factura f JOIN
-                """ + LINEAS_POR_FACTURA + " ON l.factura_id = f.id WHERE " + FILTRO_FACTURA
-                + " GROUP BY periodo ORDER BY periodo", params);
+        List<Map<String, Object>> filas = repositorio.listarFactura(params);
         List<Columna> c = List.of(col("periodo", "Período", Formato.TEXTO), col("facturas", "Facturas", Formato.ENTERO),
                 col("pagadas", "Pagadas", Formato.ENTERO), col("pendientes", "Pendientes", Formato.ENTERO),
                 col("parciales", "Pago parcial", Formato.ENTERO), col("anuladas", "Anuladas", Formato.ENTERO),
@@ -348,13 +331,7 @@ public class ReportesService {
      */
     private Reporte facturas(Filtros f) {
         f.estadoEn(Set.of("PENDIENTE_PAGO", "PAGO_PARCIAL", "PAGADA", "ANULADA"));
-        List<Map<String, Object>> filas = db.lista("""
-                SELECT f.numero, f.fecha_emision AS emitida, f.propietario, f.mascota, f.veterinario, f.especialidad,
-                       f.estado, f.subtotal, f.descuento, f.iva, f.otros_impuestos, f.total, f.pagado,
-                       f.total - f.pagado AS saldo
-                FROM factura f WHERE
-                """ + FILTRO_FACTURA + " AND (:estado IS NULL OR f.estado = :estado) ORDER BY f.fecha_emision LIMIT :maximo",
-                f.params());
+        List<Map<String, Object>> filas = repositorio.listarFacturaEnFacturas(f.params());
         List<Columna> c = List.of(col("numero", "Factura", Formato.TEXTO), col("emitida", "Emitida", Formato.FECHAHORA),
                 col("propietario", "Propietario", Formato.TEXTO), col("mascota", "Mascota", Formato.TEXTO),
                 col("veterinario", "Veterinario", Formato.TEXTO), col("especialidad", "Especialidad", Formato.TEXTO),
@@ -375,18 +352,7 @@ public class ReportesService {
      */
     private Reporte pagos(Filtros f) {
         f.estadoEn(Set.of("EFECTIVO", "TARJETA", "TRANSFERENCIA", "OTRO"));
-        List<Map<String, Object>> filas = db.lista("""
-                SELECT p.fecha, f.numero AS factura, f.propietario, f.mascota, p.metodo, p.referencia, p.importe,
-                       u.username AS responsable, f.estado AS estado_factura
-                FROM pago p JOIN factura f ON f.id = p.factura_id JOIN usuario u ON u.id = p.usuario_id
-                WHERE p.fecha >= :desde AND p.fecha < :hasta
-                  AND (:medico IS NULL OR f.medico_id = :medico)
-                  AND (:especialidad IS NULL OR f.especializacion_id = :especialidad)
-                  AND (:mascota IS NULL OR f.mascota_id = :mascota)
-                  AND (:propietario IS NULL OR f.cliente_id = :propietario)
-                  AND (:estado IS NULL OR p.metodo = :estado)
-                ORDER BY p.fecha LIMIT :maximo
-                """, f.params());
+        List<Map<String, Object>> filas = repositorio.listarPago(f.params());
         List<Columna> c = List.of(col("fecha", "Fecha", Formato.FECHAHORA), col("factura", "Factura", Formato.TEXTO),
                 col("propietario", "Propietario", Formato.TEXTO), col("mascota", "Mascota", Formato.TEXTO),
                 col("metodo", "Método", Formato.TEXTO), col("referencia", "Referencia", Formato.TEXTO),
@@ -404,14 +370,7 @@ public class ReportesService {
      * @return ventas agrupadas.
      */
     private Reporte agrupado(Filtros f, String campo, String titulo) {
-        List<Map<String, Object>> filas = db.lista("SELECT f." + campo + " AS grupo, " + """
-                       COUNT(*) AS facturas,
-                       SUM(l.servicios) AS ingresos_consultas, SUM(l.medicamentos) AS ingresos_medicamentos,
-                       SUM(f.descuento) AS descuentos, SUM(f.iva) AS iva, SUM(f.otros_impuestos) AS otros_impuestos,
-                       SUM(f.total) AS total_facturado, SUM(f.pagado) AS recaudado, SUM(f.total - f.pagado) AS saldo
-                FROM factura f JOIN
-                """ + LINEAS_POR_FACTURA + " ON l.factura_id = f.id WHERE f.estado <> 'ANULADA' AND " + FILTRO_FACTURA
-                + " GROUP BY f." + campo + " ORDER BY total_facturado DESC", f.params());
+        List<Map<String, Object>> filas = repositorio.ventasAgrupadas(campo, f.params());
         List<Columna> c = List.of(col("grupo", "veterinario".equals(campo) ? "Veterinario" : "Especialidad", Formato.TEXTO),
                 col("facturas", "Facturas", Formato.ENTERO), col("ingresos_consultas", "Ingresos consultas", Formato.COP),
                 col("ingresos_medicamentos", "Ingresos medicamentos", Formato.COP),
@@ -427,23 +386,7 @@ public class ReportesService {
      */
     private Reporte conceptos(Filtros f) {
         f.estadoEn(Set.of("SERVICIO", "MEDICAMENTO"));
-        List<Map<String, Object>> filas = db.lista("""
-                SELECT x.tipo, x.concepto, SUM(x.cantidad) AS cantidad, SUM(x.subtotal) AS subtotal,
-                       SUM(x.descuento) AS descuento, SUM(x.iva) AS iva, SUM(x.otros) AS otros_impuestos, SUM(x.total) AS total
-                FROM (SELECT IF(fl.servicio_id IS NOT NULL, 'SERVICIO', 'MEDICAMENTO') AS tipo,
-                             COALESCE(sc.nombre, md.nombre) AS concepto, fl.cantidad, fl.subtotal, fl.descuento, fl.iva,
-                             fl.otros_impuestos AS otros, fl.total
-                      FROM factura_linea fl
-                      JOIN factura f ON f.id = fl.factura_id
-                      LEFT JOIN servicio_clinico sc ON sc.id = fl.servicio_id
-                      LEFT JOIN movimiento_inventario mv ON mv.id = fl.movimiento_id
-                      LEFT JOIN medicamento md ON md.id = mv.medicamento_id
-                      WHERE f.estado <> 'ANULADA' AND
-                """ + FILTRO_FACTURA + """
-                        AND (:medicamento IS NULL OR mv.medicamento_id = :medicamento)) x
-                WHERE (:estado IS NULL OR x.tipo = :estado)
-                GROUP BY x.tipo, x.concepto ORDER BY x.tipo DESC, total DESC
-                """, f.params());
+        List<Map<String, Object>> filas = repositorio.listarFacturaLinea(f.params());
         List<Columna> c = List.of(col("tipo", "Tipo", Formato.TEXTO), col("concepto", "Servicio o medicamento", Formato.TEXTO),
                 col("cantidad", "Cantidad", Formato.ENTERO), col("subtotal", "Subtotal", Formato.COP),
                 col("descuento", "Descuento", Formato.COP), col("iva", "IVA", Formato.COP),
@@ -462,22 +405,7 @@ public class ReportesService {
      */
     private Reporte existencias(Filtros f) {
         f.estadoEn(Set.of("agotado", "minimo", "vencido", "proximo"));
-        List<Map<String, Object>> filas = db.lista("""
-                SELECT * FROM (
-                  SELECT m.codigo, m.nombre, m.tipo, m.stock_minimo,
-                         COALESCE(SUM(l.cantidad), 0) AS existencia,
-                         COALESCE(SUM(CASE WHEN l.fecha_vence IS NULL OR l.fecha_vence >= :hoy THEN l.cantidad END), 0) AS disponible,
-                         COALESCE(SUM(CASE WHEN l.fecha_vence < :hoy THEN l.cantidad END), 0) AS vencidas,
-                         COALESCE(SUM(CASE WHEN l.fecha_vence BETWEEN :hoy AND :limite THEN l.cantidad END), 0) AS proximas,
-                         m.precio_compra, m.precio_venta,
-                         COALESCE(SUM(l.cantidad * l.costo), 0) AS valor_costo,
-                         COALESCE(SUM(CASE WHEN l.fecha_vence IS NULL OR l.fecha_vence >= :hoy THEN l.cantidad END), 0)
-                           * m.precio_venta AS valor_venta
-                  FROM medicamento m LEFT JOIN medicamento_lote l ON l.medicamento_id = m.id
-                  WHERE m.activo = 1 AND (:medicamento IS NULL OR m.id = :medicamento)
-                  GROUP BY m.id) x
-                ORDER BY x.nombre
-                """, f.params());
+        List<Map<String, Object>> filas = repositorio.listarMedicamento(f.params());
         List<Map<String, Object>> resultado = new ArrayList<>();
         for (Map<String, Object> x : filas) {
             int disponible = Validar.numero(x, "disponible");
@@ -516,20 +444,7 @@ public class ReportesService {
      * @return existencias a una fecha.
      */
     private Reporte existenciasHistoricas(Filtros f) {
-        List<Map<String, Object>> filas = db.lista("""
-                SELECT m.codigo, m.nombre, l.numero AS lote, l.fecha_vence,
-                       COALESCE(SUM(CASE WHEN mv.fecha < :desde THEN mv.delta END), 0) AS saldo_inicial,
-                       COALESCE(SUM(CASE WHEN mv.fecha >= :desde AND mv.fecha < :hasta AND mv.delta > 0 THEN mv.delta END), 0) AS entradas,
-                       COALESCE(SUM(CASE WHEN mv.fecha >= :desde AND mv.fecha < :hasta AND mv.delta < 0 THEN -mv.delta END), 0) AS salidas,
-                       COALESCE(SUM(CASE WHEN mv.fecha < :hasta THEN mv.delta END), 0) AS saldo_final,
-                       COALESCE(SUM(CASE WHEN mv.fecha < :hasta THEN mv.delta END), 0) * l.costo AS valor_costo
-                FROM medicamento_lote l
-                JOIN medicamento m ON m.id = l.medicamento_id
-                LEFT JOIN movimiento_inventario mv ON mv.lote_id = l.id
-                WHERE (:medicamento IS NULL OR m.id = :medicamento) AND (:lote IS NULL OR l.id = :lote)
-                GROUP BY l.id HAVING saldo_inicial <> 0 OR entradas <> 0 OR salidas <> 0 OR saldo_final <> 0
-                ORDER BY m.nombre, l.fecha_vence
-                """, f.params());
+        List<Map<String, Object>> filas = repositorio.listarMedicamentoLote(f.params());
         List<Columna> c = List.of(col("codigo", "Código", Formato.TEXTO), col("nombre", "Producto", Formato.TEXTO),
                 col("lote", "Lote", Formato.TEXTO), col("fecha_vence", "Vence", Formato.FECHA),
                 col("saldo_inicial", "Saldo inicial", Formato.ENTERO), col("entradas", "Entradas", Formato.ENTERO),
@@ -543,16 +458,7 @@ public class ReportesService {
      * @return lotes y vencimientos.
      */
     private Reporte lotes(Filtros f) {
-        List<Map<String, Object>> filas = db.lista("""
-                SELECT m.codigo, m.nombre, l.id AS lote_id, l.numero AS lote, l.fecha_ingreso, l.fecha_vence, l.cantidad_inicial,
-                       l.cantidad, l.costo, l.cantidad * l.costo AS valor_costo,
-                       CASE WHEN l.cantidad = 0 THEN 'agotado' WHEN l.fecha_vence < :hoy THEN 'vencido'
-                            WHEN l.fecha_vence <= :limite THEN 'proximo a vencer' ELSE 'vigente' END AS estado
-                FROM medicamento_lote l JOIN medicamento m ON m.id = l.medicamento_id
-                WHERE (:medicamento IS NULL OR m.id = :medicamento) AND (:lote IS NULL OR l.id = :lote)
-                  AND (:fdesde IS NULL OR (l.fecha_vence BETWEEN :fdesde AND :fhasta))
-                ORDER BY l.fecha_vence IS NULL, l.fecha_vence, m.nombre
-                """, f.params());
+        List<Map<String, Object>> filas = repositorio.listarMedicamentoLoteEnLotes(f.params());
         List<Columna> c = List.of(col("codigo", "Código", Formato.TEXTO), col("nombre", "Producto", Formato.TEXTO),
                 col("lote_id", "ID lote", Formato.ENTERO), col("lote", "Lote", Formato.TEXTO),
                 col("fecha_ingreso", "Ingreso", Formato.FECHA), col("fecha_vence", "Vence", Formato.FECHA),
@@ -571,20 +477,7 @@ public class ReportesService {
      */
     private Reporte movimientos(Filtros f) {
         f.estadoEn(Set.of("ENTRADA", "SALIDA", "AJUSTE"));
-        List<Map<String, Object>> filas = db.lista("""
-                SELECT mv.id, mv.fecha, mv.tipo, m.codigo, m.nombre, l.numero AS lote,
-                       IF(mv.delta > 0, mv.delta, 0) AS entrada, IF(mv.delta < 0, -mv.delta, 0) AS salida,
-                       mv.saldo_lote AS saldo, mv.motivo, mv.referencia, mv.formula_id AS formula, mv.despacho_id AS despacho,
-                       u.username AS usuario
-                FROM movimiento_inventario mv
-                JOIN medicamento m ON m.id = mv.medicamento_id
-                JOIN medicamento_lote l ON l.id = mv.lote_id
-                JOIN usuario u ON u.id = mv.usuario_id
-                WHERE mv.fecha >= :desde AND mv.fecha < :hasta
-                  AND (:medicamento IS NULL OR m.id = :medicamento) AND (:lote IS NULL OR l.id = :lote)
-                  AND (:estado IS NULL OR mv.tipo = :estado)
-                ORDER BY mv.fecha, mv.id LIMIT :maximo
-                """, f.params());
+        List<Map<String, Object>> filas = repositorio.listarMovimientoInventario(f.params());
         List<Columna> c = List.of(col("id", "Movimiento", Formato.ENTERO), col("fecha", "Fecha", Formato.FECHAHORA),
                 col("tipo", "Tipo", Formato.TEXTO), col("codigo", "Código", Formato.TEXTO),
                 col("nombre", "Producto", Formato.TEXTO), col("lote", "Lote", Formato.TEXTO),
@@ -605,29 +498,7 @@ public class ReportesService {
      */
     private Reporte dispensaciones(Filtros f) {
         f.estadoEn(Set.of("VIGENTE", "REVERTIDA"));
-        List<Map<String, Object>> filas = db.lista("""
-                SELECT d.fecha, d.id AS despacho, d.formula_id AS formula, ma.nombre_mascota AS mascota,
-                       CONCAT(cl.nombres, ' ', cl.apellidos) AS propietario, CONCAT(md.nombres, ' ', md.apellidos) AS veterinario,
-                       m.nombre AS medicamento, l.numero AS lote, dd.cantidad, dd.movimiento_id AS movimiento,
-                       dd.movimiento_reversion_id AS reversion, IF(d.fecha_reversion IS NULL, 'VIGENTE', 'REVERTIDA') AS estado,
-                       u.username AS responsable
-                FROM despacho_detalle dd
-                JOIN despacho d ON d.id = dd.despacho_id
-                JOIN formula_clinica fc ON fc.id = d.formula_id
-                JOIN mascota ma ON ma.mascota_id = fc.mascota_id
-                JOIN cita c ON c.id = fc.cita_id
-                JOIN cliente cl ON cl.cliente_id = c.cliente_id
-                JOIN medico md ON md.id = fc.medico_id
-                JOIN medicamento m ON m.id = dd.medicamento_id
-                JOIN medicamento_lote l ON l.id = dd.lote_id
-                JOIN usuario u ON u.id = d.usuario_id
-                WHERE d.fecha >= :desde AND d.fecha < :hasta
-                  AND (:medicamento IS NULL OR m.id = :medicamento) AND (:lote IS NULL OR l.id = :lote)
-                  AND (:medico IS NULL OR fc.medico_id = :medico) AND (:mascota IS NULL OR fc.mascota_id = :mascota)
-                  AND (:propietario IS NULL OR c.cliente_id = :propietario)
-                  AND (:estado IS NULL OR IF(d.fecha_reversion IS NULL, 'VIGENTE', 'REVERTIDA') = :estado)
-                ORDER BY d.fecha, dd.id LIMIT :maximo
-                """, f.params());
+        List<Map<String, Object>> filas = repositorio.listarDespachoDetalle(f.params());
         List<Columna> c = List.of(col("fecha", "Fecha", Formato.FECHAHORA), col("despacho", "Despacho", Formato.ENTERO),
                 col("formula", "Fórmula", Formato.ENTERO), col("mascota", "Mascota", Formato.TEXTO),
                 col("propietario", "Propietario", Formato.TEXTO), col("veterinario", "Veterinario", Formato.TEXTO),
@@ -643,15 +514,6 @@ public class ReportesService {
 
     // ------------------------------------------------------------------ Gestión médica
 
-    /** Filtro común de citas por fecha, médico y estado. */
-    private static final String FILTRO_CITA = """
-            c.fecha_hora >= :desde AND c.fecha_hora < :hasta
-              AND (:medico IS NULL OR c.medico_id = :medico)
-              AND (:especialidad IS NULL OR md.especializacion_id = :especialidad)
-              AND (:mascota IS NULL OR c.mascota_id = :mascota)
-              AND (:propietario IS NULL OR c.cliente_id = :propietario)
-              AND (:estado IS NULL OR c.estado = :estado)
-            """;
 
     /**
      * @param f filtros.
@@ -659,17 +521,7 @@ public class ReportesService {
      */
     private Reporte citas(Filtros f) {
         f.estadoEn(ESTADOS_CITA);
-        List<Map<String, Object>> filas = db.lista("""
-                SELECT c.id, c.fecha_hora AS inicio, c.fecha_fin AS fin, c.estado, ma.nombre_mascota AS mascota,
-                       CONCAT(cl.nombres, ' ', cl.apellidos) AS propietario, CONCAT(md.nombres, ' ', md.apellidos) AS veterinario,
-                       e.nombre AS especialidad, c.motivo
-                FROM cita c
-                JOIN medico md ON md.id = c.medico_id
-                JOIN especializacion e ON e.id = md.especializacion_id
-                JOIN mascota ma ON ma.mascota_id = c.mascota_id
-                JOIN cliente cl ON cl.cliente_id = c.cliente_id
-                WHERE
-                """ + FILTRO_CITA + " ORDER BY c.fecha_hora LIMIT :maximo", f.params());
+        List<Map<String, Object>> filas = repositorio.listarCita(f.params());
         List<Columna> c = List.of(col("id", "Cita", Formato.ENTERO), col("inicio", "Inicio", Formato.FECHAHORA),
                 col("fin", "Fin", Formato.FECHAHORA), col("estado", "Estado", Formato.TEXTO),
                 col("mascota", "Mascota", Formato.TEXTO), col("propietario", "Propietario", Formato.TEXTO),
@@ -689,28 +541,14 @@ public class ReportesService {
      */
     private Reporte consultas(Filtros f) {
         f.estadoEn(ESTADOS_CITA);
-        List<Map<String, Object>> filas = db.lista("""
-                SELECT CONCAT(md.nombres, ' ', md.apellidos) AS veterinario, e.nombre AS especialidad,
-                       COUNT(*) AS citas, SUM(c.estado = 'pendiente') AS pendientes, SUM(c.estado = 'confirmada') AS confirmadas,
-                       SUM(c.estado = 'cancelada') AS canceladas, SUM(c.estado IN ('atendida', 'finalizada')) AS atendidas,
-                       COUNT(a.fecha_finalizacion) AS consultas_realizadas,
-                       COUNT(DISTINCT IF(c.estado IN ('atendida', 'finalizada'), c.mascota_id, NULL)) AS mascotas_atendidas
-                FROM cita c
-                JOIN medico md ON md.id = c.medico_id
-                JOIN especializacion e ON e.id = md.especializacion_id
-                LEFT JOIN atencion_medica a ON a.cita_id = c.id
-                WHERE
-                """ + FILTRO_CITA + " GROUP BY md.id, e.nombre ORDER BY consultas_realizadas DESC, veterinario", f.params());
+        List<Map<String, Object>> filas = repositorio.listarCitaEnConsultas(f.params());
         List<Columna> c = List.of(col("veterinario", "Veterinario", Formato.TEXTO), col("especialidad", "Especialidad", Formato.TEXTO),
                 col("citas", "Citas", Formato.ENTERO), col("pendientes", "Pendientes", Formato.ENTERO),
                 col("confirmadas", "Confirmadas", Formato.ENTERO), col("canceladas", "Canceladas", Formato.ENTERO),
                 col("atendidas", "Atendidas", Formato.ENTERO), col("consultas_realizadas", "Consultas realizadas", Formato.ENTERO),
                 col("mascotas_atendidas", "Mascotas atendidas", Formato.ENTERO));
         Map<String, Object> t = totales(filas, c, null);
-        t.put("mascotas_atendidas", db.contar("""
-                SELECT COUNT(DISTINCT c.mascota_id) FROM cita c JOIN medico md ON md.id = c.medico_id
-                WHERE c.estado IN ('atendida', 'finalizada') AND
-                """ + FILTRO_CITA, f.params()));
+        t.put("mascotas_atendidas", repositorio.contarCita(f.params()));
         Map<String, Object> porEspecialidad = new LinkedHashMap<>();
         for (Map<String, Object> x : filas) {
             String clave = "especialidad_" + x.get("especialidad");
@@ -726,21 +564,7 @@ public class ReportesService {
      */
     private Reporte atenciones(Filtros f) {
         f.estadoEn(ESTADOS_CITA);
-        List<Map<String, Object>> filas = db.lista("""
-                SELECT a.fecha_finalizacion AS finalizada, c.id AS cita, ma.nombre_mascota AS mascota, r.especie,
-                       CONCAT(cl.nombres, ' ', cl.apellidos) AS propietario, CONCAT(md.nombres, ' ', md.apellidos) AS veterinario,
-                       e.nombre AS especialidad, a.diagnostico,
-                       (SELECT COUNT(*) FROM atencion_servicio s WHERE s.atencion_id = a.id) AS servicios,
-                       (SELECT COUNT(*) FROM formula_clinica fc WHERE fc.atencion_id = a.id AND fc.estado = 'CONFIRMADA') AS formulas
-                FROM atencion_medica a
-                JOIN cita c ON c.id = a.cita_id
-                JOIN medico md ON md.id = a.medico_id
-                JOIN especializacion e ON e.id = a.especializacion_id
-                JOIN mascota ma ON ma.mascota_id = c.mascota_id
-                JOIN raza r ON r.raza_id = ma.raza_id
-                JOIN cliente cl ON cl.cliente_id = c.cliente_id
-                WHERE a.fecha_finalizacion IS NOT NULL AND
-                """ + FILTRO_CITA + " ORDER BY a.fecha_finalizacion LIMIT :maximo", f.params());
+        List<Map<String, Object>> filas = repositorio.listarAtencionServicio(f.params());
         List<Columna> c = List.of(col("finalizada", "Finalizada", Formato.FECHAHORA), col("cita", "Cita", Formato.ENTERO),
                 col("mascota", "Mascota", Formato.TEXTO), col("especie", "Especie", Formato.TEXTO),
                 col("propietario", "Propietario", Formato.TEXTO), col("veterinario", "Veterinario", Formato.TEXTO),
@@ -758,14 +582,7 @@ public class ReportesService {
      */
     private Reporte operativas(Filtros f) {
         f.estadoEn(ESTADOS_CITA);
-        List<Map<String, Object>> filas = db.lista("""
-                SELECT DATE(c.fecha_hora) AS fecha, COUNT(*) AS citas, SUM(c.estado = 'pendiente') AS pendientes,
-                       SUM(c.estado = 'confirmada') AS confirmadas, SUM(c.estado = 'cancelada') AS canceladas,
-                       SUM(c.estado = 'atendida') AS atendidas, SUM(c.estado = 'finalizada') AS finalizadas,
-                       COUNT(DISTINCT c.mascota_id) AS mascotas, COUNT(DISTINCT c.medico_id) AS veterinarios
-                FROM cita c JOIN medico md ON md.id = c.medico_id
-                WHERE
-                """ + FILTRO_CITA + " GROUP BY DATE(c.fecha_hora) ORDER BY fecha", f.params());
+        List<Map<String, Object>> filas = repositorio.listarCitaEnOperativas(f.params());
         List<Columna> c = List.of(col("fecha", "Fecha", Formato.FECHA), col("citas", "Citas", Formato.ENTERO),
                 col("pendientes", "Pendientes", Formato.ENTERO), col("confirmadas", "Confirmadas", Formato.ENTERO),
                 col("canceladas", "Canceladas", Formato.ENTERO), col("atendidas", "Atendidas", Formato.ENTERO),

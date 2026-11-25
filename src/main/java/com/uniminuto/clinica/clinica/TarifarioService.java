@@ -22,23 +22,20 @@ import java.util.Map;
 @Service
 public class TarifarioService {
 
-    /** Consulta base de especialidades con su número de servicios. */
-    private static final String ESPECIALIDAD = """
-            SELECT id, codigo_especializacion AS codigo, nombre, descripcion, activo FROM especializacion
-            """;
 
-    /** Acceso a datos. */
-    private final Db db;
 
     /** Log central de operaciones sensibles. */
     private final com.uniminuto.clinica.auditoria.AuditoriaService auditoria;
 
+    /** Acceso a datos del módulo (SQL). */
+    private final TarifarioRepository repositorio;
+
     /**
-     * @param db acceso a datos.
+     * @param repositorio acceso a datos del módulo.
      * @param auditoria log de operaciones sensibles.
      */
-    public TarifarioService(Db db, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
-        this.db = db;
+    public TarifarioService(TarifarioRepository repositorio, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
+        this.repositorio = repositorio;
         this.auditoria = auditoria;
     }
 
@@ -46,7 +43,7 @@ public class TarifarioService {
      * @return especialidades del tarifario.
      */
     public List<Map<String, Object>> especialidades() {
-        return db.lista(ESPECIALIDAD + " ORDER BY nombre");
+        return repositorio.listarEspecializacion();
     }
 
     /**
@@ -64,25 +61,22 @@ public class TarifarioService {
         String codigo = Validar.texto(d.codigo(), "código", 10).toUpperCase();
         String nombre = Validar.texto(d.nombre(), "nombre", 100);
         boolean activo = d.activo() == null || d.activo();
-        if (db.existe("SELECT 1 FROM especializacion WHERE (codigo_especializacion = :c OR nombre = :n) "
-                + "AND (:id IS NULL OR id <> :id)", Db.p("c", codigo, "n", nombre, "id", id))) {
+        if (repositorio.existeEspecializacion(Db.p("c", codigo, "n", nombre, "id", id))) {
             throw new ConflictException("Ya existe una especialidad con ese código o nombre.");
         }
         Map<String, Object> p = Db.p("c", codigo, "n", nombre, "d", Validar.opcional(d.descripcion(), "descripción", 2000),
                 "a", activo, "id", id);
         if (id == null) {
-            id = db.insertar("INSERT INTO especializacion (codigo_especializacion, nombre, descripcion, activo) "
-                    + "VALUES (:c, :n, :d, :a)", p);
+            id = repositorio.insertarEspecializacion(p);
         } else {
-            db.requerido("SELECT id FROM especializacion WHERE id = :id", Db.p("id", id), "La especialidad no existe.");
-            if (!activo && db.existe("SELECT 1 FROM medico WHERE especializacion_id = :id AND activo = 1", Db.p("id", id))) {
+            repositorio.obtenerEspecializacion(Db.p("id", id), "La especialidad no existe.");
+            if (!activo && repositorio.existeMedico(Db.p("id", id))) {
                 throw new ConflictException("No se puede inactivar: hay médicos activos con esta especialidad.");
             }
-            db.ejecutar("UPDATE especializacion SET codigo_especializacion = :c, nombre = :n, descripcion = :d, "
-                    + "activo = :a WHERE id = :id", p);
+            repositorio.actualizarEspecializacion(p);
         }
         auditoria.registrar("ESPECIALIDAD_GUARDADA", "especializacion", id, "Especialidad " + d.nombre() + (id == null ? " creada" : " actualizada") + (Boolean.FALSE.equals(d.activo()) ? " (inactiva)" : ""));
-        return db.uno(ESPECIALIDAD + " WHERE id = :id", Db.p("id", id));
+        return repositorio.buscarEspecializacion(Db.p("id", id));
     }
 
     /**
@@ -90,11 +84,8 @@ public class TarifarioService {
      * @return servicios con su tarifa vigente.
      */
     public List<Map<String, Object>> servicios(long especialidad) {
-        db.requerido("SELECT id FROM especializacion WHERE id = :id", Db.p("id", especialidad), "La especialidad no existe.");
-        return db.lista("""
-                SELECT id, especializacion_id AS especialidadId, nombre, activo
-                FROM servicio_clinico WHERE especializacion_id = :e ORDER BY nombre
-                """, Db.p("e", especialidad));
+        repositorio.obtenerEspecializacion(Db.p("id", especialidad), "La especialidad no existe.");
+        return repositorio.listarServicioClinico(Db.p("e", especialidad));
     }
 
     /**
@@ -106,16 +97,13 @@ public class TarifarioService {
      */
     @Transactional
     public Map<String, Object> agregarServicio(long especialidad, String nombreRq) {
-        db.requerido("SELECT id FROM especializacion WHERE id = :id", Db.p("id", especialidad), "La especialidad no existe.");
+        repositorio.obtenerEspecializacion(Db.p("id", especialidad), "La especialidad no existe.");
         String nombre = Validar.texto(nombreRq, "nombre del servicio", 120);
-        if (db.existe("SELECT 1 FROM servicio_clinico WHERE especializacion_id = :e AND nombre = :n",
-                Db.p("e", especialidad, "n", nombre))) {
+        if (repositorio.existeServicioClinico(Db.p("e", especialidad, "n", nombre))) {
             throw new ConflictException("El servicio ya existe en esta especialidad.");
         }
-        long id = db.insertar("INSERT INTO servicio_clinico (especializacion_id, nombre, activo) VALUES (:e, :n, 1)",
-                Db.p("e", especialidad, "n", nombre));
-        return db.uno("SELECT id, especializacion_id AS especialidadId, nombre, activo FROM servicio_clinico WHERE id = :id",
-                Db.p("id", id));
+        long id = repositorio.insertarServicioClinico(Db.p("e", especialidad, "n", nombre));
+        return repositorio.buscarServicioClinico(Db.p("id", id));
     }
 
     /**
@@ -123,13 +111,8 @@ public class TarifarioService {
      * @return historial de tarifas del servicio.
      */
     public List<Map<String, Object>> tarifas(long servicio) {
-        db.requerido("SELECT id FROM servicio_clinico WHERE id = :id", Db.p("id", servicio), "El servicio no existe.");
-        return db.lista("""
-                SELECT t.id, t.valor, t.iva_porcentaje AS iva, t.impuesto_porcentaje AS impuesto, t.vigente_desde AS desde,
-                       t.vigente_hasta AS hasta, t.usuario_id AS usuarioId, u.username AS usuario, t.fecha_registro AS fecha
-                FROM tarifa_servicio t JOIN usuario u ON u.id = t.usuario_id
-                WHERE t.servicio_id = :s ORDER BY t.vigente_desde DESC, t.id DESC
-                """, Db.p("s", servicio));
+        repositorio.obtenerServicioClinico(Db.p("id", servicio), "El servicio no existe.");
+        return repositorio.listarTarifaServicio(Db.p("s", servicio));
     }
 
     /**
@@ -139,8 +122,7 @@ public class TarifarioService {
      */
     @Transactional
     public Map<String, Object> nuevaTarifa(long servicio, TarifarioApi.TarifaRq t) {
-        db.requerido("SELECT id FROM servicio_clinico WHERE id = :id FOR UPDATE", Db.p("id", servicio),
-                "El servicio no existe.");
+        repositorio.obtenerServicioClinicoEnNuevaTarifa(Db.p("id", servicio), "El servicio no existe.");
         if (t == null) {
             throw new BadRequestException("Los datos de la tarifa son obligatorios.");
         }
@@ -152,20 +134,12 @@ public class TarifarioService {
         if (hasta != null && hasta.isBefore(desde)) {
             throw new BadRequestException("La fecha final de vigencia no puede ser anterior a la inicial.");
         }
-        if (db.existe("SELECT 1 FROM tarifa_servicio WHERE servicio_id = :s AND vigente_desde >= :d",
-                Db.p("s", servicio, "d", desde))) {
+        if (repositorio.existeTarifaServicio(Db.p("s", servicio, "d", desde))) {
             throw new ConflictException("Ya existe una tarifa que inicia en esa fecha o después. "
                     + "Registra la nueva vigencia con una fecha posterior.");
         }
-        db.ejecutar("""
-                UPDATE tarifa_servicio SET vigente_hasta = :cierre
-                WHERE servicio_id = :s AND (vigente_hasta IS NULL OR vigente_hasta >= :d)
-                """, Db.p("cierre", desde.minusDays(1), "s", servicio, "d", desde));
-        long id = db.insertar("""
-                INSERT INTO tarifa_servicio (servicio_id, valor, iva_porcentaje, impuesto_porcentaje, vigente_desde,
-                       vigente_hasta, usuario_id, fecha_registro)
-                VALUES (:s, :v, :iva, :imp, :d, :h, :u, :ahora)
-                """, Db.p("s", servicio, "v", valor, "iva", iva, "imp", impuesto, "d", desde, "h", hasta,
+        repositorio.actualizarTarifaServicio(Db.p("cierre", desde.minusDays(1), "s", servicio, "d", desde));
+        long id = repositorio.insertarTarifaServicio(Db.p("s", servicio, "v", valor, "iva", iva, "imp", impuesto, "d", desde, "h", hasta,
                 "u", SesionActual.usuarioId(), "ahora", Tiempo.ahora()));
         auditoria.registrar("TARIFA_REGISTRADA", "servicio_clinico", servicio, "Nueva vigencia del servicio " + servicio + ": valor " + t.valor() + ", IVA " + t.iva() + "%, otros " + t.impuesto() + "% desde " + t.desde());
         return tarifas(servicio).stream().filter(x -> Validar.largo(x, "id") == id).findFirst().orElseThrow();
@@ -173,12 +147,6 @@ public class TarifarioService {
 
     /** Tarifa vigente de un servicio en una fecha, o null si no hay. */
     public Map<String, Object> vigente(long servicio, LocalDate fecha) {
-        return db.uno("""
-                SELECT id, valor, iva_porcentaje AS iva, impuesto_porcentaje AS impuesto, vigente_desde AS desde,
-                       vigente_hasta AS hasta
-                FROM tarifa_servicio
-                WHERE servicio_id = :s AND vigente_desde <= :f AND (vigente_hasta IS NULL OR vigente_hasta >= :f)
-                ORDER BY vigente_desde DESC LIMIT 1
-                """, Db.p("s", servicio, "f", fecha));
+        return repositorio.buscarTarifaServicio(Db.p("s", servicio, "f", fecha));
     }
 }

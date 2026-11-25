@@ -45,49 +45,23 @@ public class CitaService {
     static final Set<String> RESERVADAS = Set.of("pendiente", "programada", "confirmada");
     /** Margen mínimo entre citas del mismo veterinario (regla: 15 minutos antes y 15 después). */
     static final int MARGEN_MINUTOS = 15;
-    /** Estados que ocupan la agenda (bloquean el horario). */
-    static final String OCUPAN = "'pendiente', 'programada', 'confirmada', 'atendida'";
     /** Duración máxima de una cita en minutos. */
     private static final int MINUTOS_MAXIMOS = 240;
 
-    /** Consulta base de las citas para la agenda (calendario) del médico. */
-    private static final String EVENTO = """
-            SELECT c.id, c.estado, c.fecha_hora AS inicio, c.fecha_fin AS fin, c.motivo,
-                   CONCAT(md.nombres, ' ', md.apellidos) AS medico, m.nombre_mascota AS mascota,
-                   c.mascota_id AS mascotaId, c.cliente_id AS clienteId, c.medico_id AS medicoId,
-                   CONCAT(cl.nombres, ' ', cl.apellidos) AS propietario,
-                   cl.numero_documento AS documento, cl.telefono, r.especie, r.nombre AS raza, m.edad
-            FROM cita c
-            JOIN medico md ON md.id = c.medico_id
-            JOIN mascota m ON m.mascota_id = c.mascota_id
-            JOIN raza r ON r.raza_id = m.raza_id
-            JOIN cliente cl ON cl.cliente_id = c.cliente_id
-            """;
 
-    /** Acceso a datos. */
-    private final Db db;
+
+    /** Acceso a datos del módulo (SQL). */
+    private final CitaRepository repositorio;
 
     /**
-     * @param db acceso a datos.
+     * @param repositorio acceso a datos del módulo.
      */
-    public CitaService(Db db) {
-        this.db = db;
+    public CitaService(CitaRepository repositorio) {
+        this.repositorio = repositorio;
     }
 
     // ------------------------------------------------------------------ CRUD
 
-    /** Columnas de una cita con los nombres de cliente, mascota y veterinario para el DataTable. */
-    private static final String CITA_DETALLE = """
-            SELECT c.id, c.cliente_id AS clienteId, c.mascota_id AS mascotaId, c.medico_id AS medicoId,
-                   c.fecha_hora AS fechaHora, c.fecha_fin AS fechaFin, c.estado, c.motivo,
-                   CONCAT(cl.nombres, ' ', cl.apellidos) AS cliente, m.nombre_mascota AS mascota,
-                   CONCAT(md.nombres, ' ', md.apellidos) AS veterinario, h.id AS historiaId
-            FROM cita c
-            JOIN cliente cl ON cl.cliente_id = c.cliente_id
-            JOIN mascota m ON m.mascota_id = c.mascota_id
-            JOIN medico md ON md.id = c.medico_id
-            LEFT JOIN historia_medica h ON h.cita_id = c.id
-            """;
 
     /**
      * Lista las citas de la más reciente a la más antigua. El médico solo recibe las suyas.
@@ -114,12 +88,7 @@ public class CitaService {
         }
         SesionUsuario s = SesionActual.obtener();
         Long medico = s.es(Perfiles.VETERINARIO) ? SesionActual.medicoId() : null;
-        return db.lista(CITA_DETALLE + """
-                WHERE (:medico IS NULL OR c.medico_id = :medico)
-                  AND (:desde IS NULL OR c.fecha_hora >= :desde)
-                  AND (:hasta IS NULL OR c.fecha_hora < :hasta)
-                ORDER BY c.fecha_hora DESC, c.id DESC
-                """, Db.p("medico", medico, "desde", desde == null ? null : desde.atStartOfDay(),
+        return repositorio.listarCita(Db.p("medico", medico, "desde", desde == null ? null : desde.atStartOfDay(),
                 "hasta", hasta == null ? null : hasta.plusDays(1).atStartOfDay()));
     }
 
@@ -130,13 +99,10 @@ public class CitaService {
      * @return citas con nombres y la historia clínica asociada.
      */
     public List<Map<String, Object>> porMascota(int mascotaId) {
-        db.requerido("SELECT mascota_id FROM mascota WHERE mascota_id = :m", Db.p("m", mascotaId), "La mascota no existe.");
+        repositorio.obtenerMascota(Db.p("m", mascotaId), "La mascota no existe.");
         SesionUsuario s = SesionActual.obtener();
         Long medico = s.es(Perfiles.VETERINARIO) ? SesionActual.medicoId() : null;
-        return db.lista(CITA_DETALLE + """
-                WHERE c.mascota_id = :m AND (:medico IS NULL OR c.medico_id = :medico)
-                ORDER BY c.fecha_hora DESC
-                """, Db.p("m", mascotaId, "medico", medico));
+        return repositorio.listarCitaEnPorMascota(Db.p("m", mascotaId, "medico", medico));
     }
 
     /**
@@ -146,7 +112,7 @@ public class CitaService {
      * @return cita encontrada; 404 si no existe; 403 si es de otro médico.
      */
     public Map<String, Object> detalle(long id) {
-        Map<String, Object> cita = db.requerido(CITA_DETALLE + " WHERE c.id = :id", Db.p("id", id), "La cita no existe.");
+        Map<String, Object> cita = repositorio.obtenerCita(Db.p("id", id), "La cita no existe.");
         SesionUsuario s = SesionActual.obtener();
         if (s.es(Perfiles.VETERINARIO) && Validar.largo(cita, "medicoId") != SesionActual.medicoId()) {
             throw new ForbiddenException("Solo puedes consultar tus propias citas.");
@@ -173,8 +139,7 @@ public class CitaService {
         LocalDateTime fin = cambio == null || cambio.fin() == null
                 ? (LocalDateTime) actual.get("fecha_fin") : Validar.fechaHora(cambio.fin(), "fin");
         validarProgramacion(Validar.largo(actual, "medico_id"), Validar.largo(actual, "mascota_id"), inicio, fin, id);
-        db.ejecutar("UPDATE cita SET estado = 'pendiente', fecha_hora = :i, fecha_fin = :f, fecha_modificacion = :ahora WHERE id = :id",
-                Db.p("i", inicio, "f", fin, "ahora", Tiempo.ahora(), "id", id));
+        repositorio.actualizarCita(Db.p("i", inicio, "f", fin, "ahora", Tiempo.ahora(), "id", id));
         registrarRevision(id, actual, "pendiente", inicio, fin);
         return detalle(id);
     }
@@ -186,11 +151,7 @@ public class CitaService {
      * @return cita.
      */
     public Map<String, Object> consultar(long id) {
-        return db.requerido("""
-                SELECT id, cliente_id AS clienteId, mascota_id AS mascotaId, medico_id AS medicoId,
-                       fecha_hora AS fechaHora, fecha_fin AS fechaFin, estado, motivo
-                FROM cita WHERE id = :id
-                """, Db.p("id", id), "La cita no existe.");
+        return repositorio.obtenerCitaEnConsultar(Db.p("id", id), "La cita no existe.");
     }
 
     /**
@@ -207,11 +168,7 @@ public class CitaService {
             throw new BadRequestException("Una cita nueva solo puede quedar pendiente, programada o confirmada.");
         }
         validarProgramacion(datos.medico, datos.mascota, datos.inicio, datos.fin, null);
-        long id = db.insertar("""
-                INSERT INTO cita (cliente_id, mascota_id, medico_id, fecha_hora, fecha_fin, estado, motivo,
-                                  usuario_creacion, fecha_creacion)
-                VALUES (:cliente, :mascota, :medico, :inicio, :fin, :estado, :motivo, :usuario, :ahora)
-                """, Db.p("cliente", datos.cliente, "mascota", datos.mascota, "medico", datos.medico,
+        long id = repositorio.insertarCita(Db.p("cliente", datos.cliente, "mascota", datos.mascota, "medico", datos.medico,
                 "inicio", datos.inicio, "fin", datos.fin, "estado", datos.estado, "motivo", datos.motivo,
                 "usuario", SesionActual.usuarioId(), "ahora", Tiempo.ahora()));
         registrarRevision(id, null, datos.estado, datos.inicio, datos.fin);
@@ -251,11 +208,7 @@ public class CitaService {
             }
             validarProgramacion(datos.medico, datos.mascota, datos.inicio, datos.fin, id);
         }
-        db.ejecutar("""
-                UPDATE cita SET cliente_id = :cliente, mascota_id = :mascota, medico_id = :medico, fecha_hora = :inicio,
-                       fecha_fin = :fin, estado = :estado, motivo = :motivo, fecha_modificacion = :ahora
-                WHERE id = :id
-                """, Db.p("cliente", datos.cliente, "mascota", datos.mascota, "medico", datos.medico,
+        repositorio.actualizarCitaEnActualizar(Db.p("cliente", datos.cliente, "mascota", datos.mascota, "medico", datos.medico,
                 "inicio", datos.inicio, "fin", datos.fin, "estado", datos.estado, "motivo", datos.motivo,
                 "ahora", Tiempo.ahora(), "id", id));
         registrarRevision(id, actual, datos.estado, datos.inicio, datos.fin);
@@ -286,11 +239,7 @@ public class CitaService {
         if (filtroEstado != null && !ESTADOS.contains(filtroEstado)) {
             throw new BadRequestException("Estado de cita no válido.");
         }
-        return db.lista(EVENTO + """
-                WHERE c.medico_id = :medico AND c.fecha_hora >= :desde AND c.fecha_hora < :hasta
-                  AND (:estado IS NULL OR c.estado = :estado)
-                ORDER BY c.fecha_hora
-                """, Db.p("medico", medico, "desde", d.atStartOfDay(), "hasta", h.plusDays(1).atStartOfDay(),
+        return repositorio.listarCitaEnEventos(Db.p("medico", medico, "desde", d.atStartOfDay(), "hasta", h.plusDays(1).atStartOfDay(),
                 "estado", filtroEstado));
     }
 
@@ -305,8 +254,7 @@ public class CitaService {
      */
     public byte[] excel(long medico, String desde, String hasta, String estado) {
         List<Map<String, Object>> citas = eventos(medico, desde, hasta, estado);
-        Map<String, Object> m = db.uno("SELECT CONCAT(nombres, ' ', apellidos) AS nombre FROM medico WHERE id = :id",
-                Db.p("id", medico));
+        Map<String, Object> m = repositorio.buscarMedico(Db.p("id", medico));
         Map<String, String> filtros = new LinkedHashMap<>();
         filtros.put("Médico", Validar.cadena(m, "nombre"));
         filtros.put("Rango", desde + " a " + hasta);
@@ -335,8 +283,7 @@ public class CitaService {
      */
     public Map<String, Object> disponibilidad(long medico, String fechaTexto) {
         LocalDate fecha = Validar.fecha(fechaTexto, "fecha", true);
-        Map<String, Object> m = db.requerido("SELECT activo FROM medico WHERE id = :id", Db.p("id", medico),
-                "El médico no existe.");
+        Map<String, Object> m = repositorio.obtenerMedico(Db.p("id", medico), "El médico no existe.");
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("fecha", fecha);
         r.put("activo", Validar.bool(m, "activo"));
@@ -344,10 +291,7 @@ public class CitaService {
         if (Validar.bool(m, "activo")) {
             List<LocalDateTime[]> ocupados = new ArrayList<>();
             // Las citas ocupan su horario más el margen de 15 minutos antes y después; las ausencias, solo su rango.
-            for (Map<String, Object> o : db.lista("SELECT fecha_hora - INTERVAL 15 MINUTE AS i, fecha_fin + INTERVAL 15 MINUTE AS f FROM cita "
-                    + "WHERE medico_id = :m AND estado IN (" + OCUPAN + ") AND fecha_fin > :d AND fecha_hora < :h "
-                    + "UNION ALL SELECT inicio, fin FROM medico_ausencia WHERE medico_id = :m AND fin > :d AND inicio < :h",
-                    Db.p("m", medico, "d", fecha.atStartOfDay(), "h", fecha.plusDays(1).atStartOfDay()))) {
+            for (Map<String, Object> o : repositorio.listarCitaEnDisponibilidad(Db.p("m", medico, "d", fecha.atStartOfDay(), "h", fecha.plusDays(1).atStartOfDay()))) {
                 ocupados.add(new LocalDateTime[]{(LocalDateTime) o.get("i"), (LocalDateTime) o.get("f")});
             }
             LocalDateTime ahora = Tiempo.ahora();
@@ -395,18 +339,11 @@ public class CitaService {
      * @return configuración de agenda.
      */
     public Map<String, Object> configuracion(long medico) {
-        Map<String, Object> m = db.requerido("SELECT activo FROM medico WHERE id = :id", Db.p("id", medico),
-                "El médico no existe.");
+        Map<String, Object> m = repositorio.obtenerMedico(Db.p("id", medico), "El médico no existe.");
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("activo", Validar.bool(m, "activo"));
-        r.put("horarios", db.lista("""
-                SELECT dia_semana AS dia, hora_inicio AS inicio, hora_fin AS fin
-                FROM medico_horario WHERE medico_id = :m ORDER BY dia_semana, hora_inicio
-                """, Db.p("m", medico)));
-        r.put("ausencias", db.lista("""
-                SELECT id, inicio, fin, motivo FROM medico_ausencia
-                WHERE medico_id = :m AND fin >= :ahora ORDER BY inicio
-                """, Db.p("m", medico, "ahora", Tiempo.ahora())));
+        r.put("horarios", repositorio.listarMedicoHorario(Db.p("m", medico)));
+        r.put("ausencias", repositorio.listarMedicoAusencia(Db.p("m", medico, "ahora", Tiempo.ahora())));
         return r;
     }
 
@@ -419,7 +356,7 @@ public class CitaService {
      */
     @Transactional
     public Map<String, Object> guardarHorarios(long medico, List<CitaApi.Franja> franjas) {
-        db.requerido("SELECT id FROM medico WHERE id = :id FOR UPDATE", Db.p("id", medico), "El médico no existe.");
+        repositorio.obtenerMedicoEnGuardarHorarios(Db.p("id", medico), "El médico no existe.");
         if (franjas == null) {
             throw new BadRequestException("Debes enviar las franjas del horario.");
         }
@@ -442,10 +379,9 @@ public class CitaService {
             porDia.add(new LocalTime[]{inicio, fin});
             dias.add(f.dia());
         }
-        db.ejecutar("DELETE FROM medico_horario WHERE medico_id = :m", Db.p("m", medico));
+        repositorio.eliminarMedicoHorario(Db.p("m", medico));
         for (int i = 0; i < porDia.size(); i++) {
-            db.insertar("INSERT INTO medico_horario (medico_id, dia_semana, hora_inicio, hora_fin) VALUES (:m, :d, :i, :f)",
-                    Db.p("m", medico, "d", dias.get(i), "i", porDia.get(i)[0], "f", porDia.get(i)[1]));
+            repositorio.insertarMedicoHorario(Db.p("m", medico, "d", dias.get(i), "i", porDia.get(i)[0], "f", porDia.get(i)[1]));
         }
         return configuracion(medico);
     }
@@ -459,7 +395,7 @@ public class CitaService {
      */
     @Transactional
     public Map<String, Object> registrarAusencia(long medico, CitaApi.AusenciaRq a) {
-        db.requerido("SELECT id FROM medico WHERE id = :id FOR UPDATE", Db.p("id", medico), "El médico no existe.");
+        repositorio.obtenerMedicoEnRegistrarAusencia(Db.p("id", medico), "El médico no existe.");
         if (a == null) {
             throw new BadRequestException("Los datos de la ausencia son obligatorios.");
         }
@@ -472,21 +408,15 @@ public class CitaService {
         if (fin.isBefore(Tiempo.ahora())) {
             throw new BadRequestException("No se registran ausencias en el pasado.");
         }
-        long conflictos = db.contar("SELECT COUNT(*) FROM cita WHERE medico_id = :m "
-                + "AND estado IN ('pendiente', 'programada', 'confirmada') "
-                + "AND fecha_hora < :f AND fecha_fin > :i", Db.p("m", medico, "i", inicio, "f", fin));
+        long conflictos = repositorio.contarCita(Db.p("m", medico, "i", inicio, "f", fin));
         if (conflictos > 0) {
             throw new ConflictException("Hay " + conflictos + " cita(s) reservada(s) en ese periodo. "
                     + "Reprográmalas o cancélalas antes de registrar la ausencia.");
         }
-        if (db.existe("SELECT 1 FROM medico_ausencia WHERE medico_id = :m AND inicio < :f AND fin > :i",
-                Db.p("m", medico, "i", inicio, "f", fin))) {
+        if (repositorio.existeMedicoAusencia(Db.p("m", medico, "i", inicio, "f", fin))) {
             throw new ConflictException("Ya existe una ausencia registrada que se cruza con ese periodo.");
         }
-        db.insertar("""
-                INSERT INTO medico_ausencia (medico_id, inicio, fin, motivo, usuario_id, fecha_registro)
-                VALUES (:m, :i, :f, :motivo, :u, :ahora)
-                """, Db.p("m", medico, "i", inicio, "f", fin, "motivo", motivo, "u", SesionActual.usuarioId(),
+        repositorio.insertarMedicoAusencia(Db.p("m", medico, "i", inicio, "f", fin, "motivo", motivo, "u", SesionActual.usuarioId(),
                 "ahora", Tiempo.ahora()));
         return configuracion(medico);
     }
@@ -501,14 +431,12 @@ public class CitaService {
      */
     @Transactional
     public Map<String, Object> eliminarAusencia(long medico, long ausencia) {
-        Map<String, Object> a = db.requerido("""
-                SELECT fin FROM medico_ausencia WHERE id = :id AND medico_id = :m FOR UPDATE
-                """, Db.p("id", ausencia, "m", medico), "La ausencia no existe para este médico.");
+        Map<String, Object> a = repositorio.obtenerMedicoAusencia(Db.p("id", ausencia, "m", medico), "La ausencia no existe para este médico.");
         LocalDateTime fin = (LocalDateTime) a.get("fin");
         if (fin != null && !fin.isAfter(Tiempo.ahora())) {
             throw new ConflictException("La ausencia ya terminó; se conserva en el historial.");
         }
-        db.ejecutar("DELETE FROM medico_ausencia WHERE id = :id", Db.p("id", ausencia));
+        repositorio.eliminarMedicoAusencia(Db.p("id", ausencia));
         return configuracion(medico);
     }
 
@@ -523,10 +451,7 @@ public class CitaService {
     public List<Map<String, Object>> ausenciasEnRango(long medico, String desde, String hasta) {
         LocalDate d = Validar.fecha(desde, "desde", true);
         LocalDate h = Validar.fecha(hasta, "hasta", true);
-        return db.lista("""
-                SELECT id, inicio, fin, motivo FROM medico_ausencia
-                WHERE medico_id = :m AND inicio < :h AND fin > :d ORDER BY inicio
-                """, Db.p("m", medico, "d", d.atStartOfDay(), "h", h.plusDays(1).atStartOfDay()));
+        return repositorio.listarMedicoAusenciaEnAusenciasEnRango(Db.p("m", medico, "d", d.atStartOfDay(), "h", h.plusDays(1).atStartOfDay()));
     }
 
     /**
@@ -538,8 +463,8 @@ public class CitaService {
     @Transactional
     public void actividad(long medico, Boolean activo) {
         Validar.requerido(activo, "activo");
-        db.requerido("SELECT id FROM medico WHERE id = :id FOR UPDATE", Db.p("id", medico), "El médico no existe.");
-        db.ejecutar("UPDATE medico SET activo = :a WHERE id = :id", Db.p("a", activo, "id", medico));
+        repositorio.obtenerMedicoEnActividad(Db.p("id", medico), "El médico no existe.");
+        repositorio.actualizarMedico(Db.p("a", activo, "id", medico));
     }
 
     /**
@@ -577,10 +502,9 @@ public class CitaService {
             inicio = nuevoInicio;
             fin = nuevoFin;
         }
-        db.ejecutar("UPDATE cita SET estado = :e, fecha_hora = :i, fecha_fin = :f, fecha_modificacion = :ahora WHERE id = :id",
-                Db.p("e", estado, "i", inicio, "f", fin, "ahora", Tiempo.ahora(), "id", id));
+        repositorio.actualizarCitaEnCambiar(Db.p("e", estado, "i", inicio, "f", fin, "ahora", Tiempo.ahora(), "id", id));
         registrarRevision(id, actual, estado, inicio, fin);
-        return db.uno(EVENTO + " WHERE c.id = :id", Db.p("id", id));
+        return repositorio.buscarCita(Db.p("id", id));
     }
 
     /**
@@ -590,14 +514,9 @@ public class CitaService {
      * @return revisiones en orden cronológico.
      */
     public List<Map<String, Object>> historial(long id) {
-        Map<String, Object> cita = db.requerido("SELECT id, medico_id FROM cita WHERE id = :id", Db.p("id", id),
-                "La cita no existe.");
+        Map<String, Object> cita = repositorio.obtenerCitaEnHistorial(Db.p("id", id), "La cita no existe.");
         verificarAcceso(cita, SesionActual.obtener());
-        List<Map<String, Object>> filas = db.lista("""
-                SELECT id, usuario_id, fecha, estado_anterior, inicio_anterior, fin_anterior,
-                       estado_nuevo, inicio_nuevo, fin_nuevo
-                FROM cita_revision WHERE cita_id = :id ORDER BY fecha DESC, id DESC
-                """, Db.p("id", id));
+        List<Map<String, Object>> filas = repositorio.listarCitaRevision(Db.p("id", id));
         List<Map<String, Object>> resultado = new ArrayList<>();
         for (Map<String, Object> f : filas) {
             Map<String, Object> r = new LinkedHashMap<>();
@@ -631,17 +550,10 @@ public class CitaService {
      * @return página de citas y total.
      */
     public Map<String, Object> historialMascota(int mascota, Integer paginaRq) {
-        db.requerido("SELECT mascota_id FROM mascota WHERE mascota_id = :m", Db.p("m", mascota), "La mascota no existe.");
+        repositorio.obtenerMascota(Db.p("m", mascota), "La mascota no existe.");
         int pagina = Validar.pagina(paginaRq);
         int tamano = 10;
-        List<Map<String, Object>> citas = db.lista("""
-                SELECT c.id, c.fecha_hora AS inicio, c.fecha_fin AS fin, CONCAT(md.nombres, ' ', md.apellidos) AS medico,
-                       c.estado, a.id AS atencionId
-                FROM cita c JOIN medico md ON md.id = c.medico_id
-                LEFT JOIN atencion_medica a ON a.cita_id = c.id
-                WHERE c.mascota_id = :m
-                ORDER BY c.fecha_hora DESC LIMIT :limite OFFSET :desde
-                """, Db.p("m", mascota, "limite", tamano + 1, "desde", pagina * tamano));
+        List<Map<String, Object>> citas = repositorio.listarCitaEnHistorialMascota(Db.p("m", mascota, "limite", tamano + 1, "desde", pagina * tamano));
         boolean hayMas = citas.size() > tamano;
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("citas", hayMas ? citas.subList(0, tamano) : citas);
@@ -668,34 +580,27 @@ public class CitaService {
         if (inicio.isBefore(Tiempo.ahora())) {
             throw new BadRequestException("No se pueden programar citas en una fecha u hora pasada.");
         }
-        Map<String, Object> m = db.requerido("SELECT activo FROM medico WHERE id = :id FOR UPDATE",
-                Db.p("id", medico), "El médico no existe.");
+        Map<String, Object> m = repositorio.obtenerMedicoEnValidarProgramacion(Db.p("id", medico), "El médico no existe.");
         if (!Validar.bool(m, "activo")) {
             throw new ConflictException("No se pueden asignar citas a un médico inactivo.");
         }
-        db.requerido("SELECT mascota_id FROM mascota WHERE mascota_id = :id FOR UPDATE", Db.p("id", mascota),
-                "La mascota no existe.");
+        repositorio.obtenerMascotaEnValidarProgramacion(Db.p("id", mascota), "La mascota no existe.");
         boolean enHorario = franjas(medico, inicio.toLocalDate()).stream().anyMatch(f ->
                 !inicio.toLocalTime().isBefore(LocalTime.parse(Validar.cadena(f, "inicio")))
                         && !fin.toLocalTime().isAfter(LocalTime.parse(Validar.cadena(f, "fin"))));
         if (!enHorario) {
             throw new ConflictException("El horario solicitado está fuera de la disponibilidad del veterinario.");
         }
-        if (db.existe("SELECT 1 FROM medico_ausencia WHERE medico_id = :m AND inicio < :f AND fin > :i",
-                Db.p("m", medico, "i", inicio, "f", fin))) {
+        if (repositorio.existeMedicoAusencia(Db.p("m", medico, "i", inicio, "f", fin))) {
             throw new ConflictException("El veterinario tiene una ausencia registrada en ese horario.");
         }
         // Regla: el veterinario no puede tener otra cita a menos de 15 minutos antes o después.
-        if (db.existe("SELECT 1 FROM cita WHERE medico_id = :m AND estado IN (" + OCUPAN + ") "
-                + "AND fecha_hora < :f AND fecha_fin > :i AND (:excluir IS NULL OR id <> :excluir)",
-                Db.p("m", medico, "i", inicio.minusMinutes(MARGEN_MINUTOS), "f", fin.plusMinutes(MARGEN_MINUTOS),
+        if (repositorio.existeCita(Db.p("m", medico, "i", inicio.minusMinutes(MARGEN_MINUTOS), "f", fin.plusMinutes(MARGEN_MINUTOS),
                         "excluir", excluir))) {
             throw new ConflictException("El veterinario ya tiene una cita en ese horario o a menos de "
                     + MARGEN_MINUTOS + " minutos. Elige otra hora.");
         }
-        if (db.existe("SELECT 1 FROM cita WHERE mascota_id = :m AND estado IN (" + OCUPAN + ") "
-                + "AND fecha_hora < :f AND fecha_fin > :i AND (:excluir IS NULL OR id <> :excluir)",
-                Db.p("m", mascota, "i", inicio, "f", fin, "excluir", excluir))) {
+        if (repositorio.existeCitaEnValidarProgramacion(Db.p("m", mascota, "i", inicio, "f", fin, "excluir", excluir))) {
             throw new ConflictException("La mascota ya tiene otra cita en ese horario.");
         }
     }
@@ -777,7 +682,7 @@ public class CitaService {
      * @return fila de la cita.
      */
     private Map<String, Object> bloquear(long id) {
-        return db.requerido("SELECT * FROM cita WHERE id = :id FOR UPDATE", Db.p("id", id), "La cita no existe.");
+        return repositorio.obtenerCitaEnBloquear(Db.p("id", id), "La cita no existe.");
     }
 
     /**
@@ -788,10 +693,7 @@ public class CitaService {
      * @return franjas de atención.
      */
     private List<Map<String, Object>> franjas(long medico, LocalDate fecha) {
-        return db.lista("""
-                SELECT hora_inicio AS inicio, hora_fin AS fin FROM medico_horario
-                WHERE medico_id = :m AND dia_semana = :d ORDER BY hora_inicio
-                """, Db.p("m", medico, "d", fecha.getDayOfWeek().getValue()));
+        return repositorio.listarMedicoHorarioEnFranjas(Db.p("m", medico, "d", fecha.getDayOfWeek().getValue()));
     }
 
     /**
@@ -804,11 +706,7 @@ public class CitaService {
      * @param fin nuevo fin.
      */
     void registrarRevision(long cita, Map<String, Object> anterior, String estado, LocalDateTime inicio, LocalDateTime fin) {
-        db.insertar("""
-                INSERT INTO cita_revision (cita_id, usuario_id, fecha, estado_anterior, inicio_anterior, fin_anterior,
-                                           estado_nuevo, inicio_nuevo, fin_nuevo)
-                VALUES (:cita, :usuario, :ahora, :ea, :ia, :fa, :en, :in, :fn)
-                """, Db.p("cita", cita, "usuario", SesionActual.usuarioId(), "ahora", Tiempo.ahora(),
+        repositorio.insertarCitaRevision(Db.p("cita", cita, "usuario", SesionActual.usuarioId(), "ahora", Tiempo.ahora(),
                 "ea", anterior == null ? null : anterior.get("estado"),
                 "ia", anterior == null ? null : anterior.get("fecha_hora"),
                 "fa", anterior == null ? null : anterior.get("fecha_fin"),
@@ -843,20 +741,18 @@ public class CitaService {
         Validar.requerido(d.mascotaId(), "mascota");
         Validar.requerido(d.medicoId(), "médico");
         // Orden de validación: cliente, mascota, pertenencia y veterinario (mensajes claros para cada caso).
-        Map<String, Object> cliente = db.requerido("SELECT activo FROM cliente WHERE cliente_id = :c",
-                Db.p("c", d.clienteId()), "El cliente no existe.");
+        Map<String, Object> cliente = repositorio.obtenerCliente(Db.p("c", d.clienteId()), "El cliente no existe.");
         if (!Validar.bool(cliente, "activo")) {
             throw new BadRequestException("El propietario está archivado.");
         }
-        Map<String, Object> mascota = db.requerido("SELECT cliente_id, activo FROM mascota WHERE mascota_id = :m",
-                Db.p("m", d.mascotaId()), "La mascota no existe.");
+        Map<String, Object> mascota = repositorio.obtenerMascotaEnValidarDatos(Db.p("m", d.mascotaId()), "La mascota no existe.");
         if (Validar.largo(mascota, "cliente_id") != d.clienteId()) {
             throw new BadRequestException("La mascota seleccionada no pertenece al cliente indicado.");
         }
         if (!Validar.bool(mascota, "activo")) {
             throw new BadRequestException("La mascota está inactiva.");
         }
-        db.requerido("SELECT id FROM medico WHERE id = :m", Db.p("m", d.medicoId()), "El veterinario no existe.");
+        repositorio.obtenerMedicoEnValidarDatos(Db.p("m", d.medicoId()), "El veterinario no existe.");
         String estado = d.estado() == null || d.estado().isBlank() ? "pendiente" : d.estado().trim().toLowerCase();
         if (!ESTADOS.contains(estado)) {
             throw new BadRequestException("Estado de cita no válido.");

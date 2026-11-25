@@ -47,42 +47,21 @@ public class FacturacionService {
     /** Formato de moneda colombiana. */
     private static final NumberFormat COP = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-CO"));
 
-    /** Consulta de la atención que origina la factura. */
-    private static final String ORIGEN = """
-            SELECT a.id, a.cita_id AS cita, CONCAT(cl.nombres, ' ', cl.apellidos) AS propietario,
-                   (SELECT COUNT(*) FROM formula_clinica fc WHERE fc.atencion_id = a.id AND fc.estado = 'CONFIRMADA'
-                      AND fc.estado_despacho IN ('PENDIENTE_DESPACHO', 'EN_PREPARACION')) AS formulasSinDespachar,
-                   m.nombre_mascota AS mascota, CONCAT(md.nombres, ' ', md.apellidos) AS veterinario,
-                   e.nombre AS especialidad, a.fecha_finalizacion AS finalizada
-            FROM atencion_medica a
-            JOIN cita c ON c.id = a.cita_id
-            JOIN cliente cl ON cl.cliente_id = c.cliente_id
-            JOIN mascota m ON m.mascota_id = c.mascota_id
-            JOIN medico md ON md.id = a.medico_id
-            JOIN especializacion e ON e.id = a.especializacion_id
-            """;
 
-    /** Consulta base de facturas. */
-    private static final String FACTURA = """
-            SELECT f.id, f.numero, f.atencion_id AS atencion, f.cita_id AS cita, f.fecha_emision AS emitida,
-                   f.propietario, f.documento, f.mascota, f.veterinario, f.especialidad, f.subtotal, f.descuento,
-                   f.motivo_descuento AS motivoDescuento, f.iva, f.otros_impuestos, f.total, f.pagado,
-                   f.total - f.pagado AS saldo, f.estado, u.username AS responsable
-            FROM factura f JOIN usuario u ON u.id = f.usuario_id
-            """;
 
-    /** Acceso a datos. */
-    private final Db db;
 
     /** Log central de operaciones sensibles. */
     private final com.uniminuto.clinica.auditoria.AuditoriaService auditoria;
 
+    /** Acceso a datos del módulo (SQL). */
+    private final FacturacionRepository repositorio;
+
     /**
-     * @param db acceso a datos.
+     * @param repositorio acceso a datos del módulo.
      * @param auditoria log de operaciones sensibles.
      */
-    public FacturacionService(Db db, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
-        this.db = db;
+    public FacturacionService(FacturacionRepository repositorio, com.uniminuto.clinica.auditoria.AuditoriaService auditoria) {
+        this.repositorio = repositorio;
         this.auditoria = auditoria;
     }
 
@@ -93,11 +72,7 @@ public class FacturacionService {
      * @return atenciones finalizadas sin factura.
      */
     public List<Map<String, Object>> elegibles(Integer pagina) {
-        return db.lista(ORIGEN + """
-                WHERE a.fecha_finalizacion IS NOT NULL
-                  AND NOT EXISTS (SELECT 1 FROM factura f WHERE f.atencion_id = a.id AND f.estado <> 'ANULADA')
-                ORDER BY a.fecha_finalizacion DESC LIMIT :limite OFFSET :desde
-                """, Db.p("limite", TAMANO, "desde", Validar.pagina(pagina) * TAMANO));
+        return repositorio.listarFormulaClinica(Db.p("limite", TAMANO, "desde", Validar.pagina(pagina) * TAMANO));
     }
 
     /**
@@ -126,17 +101,16 @@ public class FacturacionService {
         if (rq == null || rq.clave() == null || rq.clave().isBlank() || rq.clave().length() > 64) {
             throw new BadRequestException("La solicitud de emisión no tiene una clave válida.");
         }
-        Map<String, Object> repetida = db.uno("SELECT id, atencion_id FROM factura WHERE clave = :c", Db.p("c", rq.clave()));
+        Map<String, Object> repetida = repositorio.buscarFactura(Db.p("c", rq.clave()));
         if (repetida != null) {
             if (Validar.largo(repetida, "atencion_id") != atencionId) {
                 throw new ConflictException("La clave de la solicitud ya fue usada en otra factura.");
             }
             return detalle(Validar.largo(repetida, "id"));
         }
-        db.requerido("SELECT id FROM atencion_medica WHERE id = :id FOR UPDATE", Db.p("id", atencionId),
-                "La atención no existe.");
+        repositorio.obtenerAtencionMedica(Db.p("id", atencionId), "La atención no existe.");
         Map<String, Object> origen = origen(atencionId);
-        if (db.existe("SELECT 1 FROM factura WHERE atencion_id = :a AND estado <> 'ANULADA'", Db.p("a", atencionId))) {
+        if (repositorio.existeFactura(Db.p("a", atencionId))) {
             throw new ConflictException("La atención ya tiene una factura vigente.");
         }
         long sinDespachar = formulasSinDespachar(atencionId);
@@ -152,35 +126,19 @@ public class FacturacionService {
         if (!huella(atencionId, r).equals(rq.previa())) {
             throw new ConflictException("Los conceptos o importes cambiaron desde la vista previa. Revisa nuevamente.");
         }
-        Map<String, Object> datos = db.uno("""
-                SELECT c.id AS cita, c.cliente_id, c.mascota_id, a.medico_id, a.especializacion_id,
-                       CONCAT(cl.tipo_documento, ' ', cl.numero_documento) AS documento
-                FROM atencion_medica a JOIN cita c ON c.id = a.cita_id JOIN cliente cl ON cl.cliente_id = c.cliente_id
-                WHERE a.id = :a
-                """, Db.p("a", atencionId));
+        Map<String, Object> datos = repositorio.buscarAtencionMedica(Db.p("a", atencionId));
         LocalDateTime ahora = Tiempo.ahora();
-        long id = db.insertar("""
-                INSERT INTO factura (clave, atencion_id, cita_id, cliente_id, mascota_id, medico_id, especializacion_id,
-                       propietario, documento, mascota, veterinario, especialidad, subtotal, descuento, motivo_descuento,
-                       iva, otros_impuestos, total, pagado, estado, usuario_id, fecha_emision)
-                VALUES (:clave, :a, :cita, :cliente, :mascota, :medico, :esp, :propietario, :documento, :nombreMascota,
-                       :veterinario, :especialidad, :subtotal, :descuento, :motivo, :iva, :otros, :total, 0,
-                       'PENDIENTE_PAGO', :u, :ahora)
-                """, Db.p("clave", rq.clave(), "a", atencionId, "cita", datos.get("cita"), "cliente", datos.get("cliente_id"),
+        long id = repositorio.insertarFactura(Db.p("clave", rq.clave(), "a", atencionId, "cita", datos.get("cita"), "cliente", datos.get("cliente_id"),
                 "mascota", datos.get("mascota_id"), "medico", datos.get("medico_id"), "esp", datos.get("especializacion_id"),
                 "propietario", origen.get("propietario"), "documento", datos.get("documento"),
                 "nombreMascota", origen.get("mascota"), "veterinario", origen.get("veterinario"),
                 "especialidad", origen.get("especialidad"), "subtotal", r.subtotal(), "descuento", r.descuento(),
                 "motivo", r.descuento().signum() > 0 ? rq.motivo().trim() : null, "iva", r.iva(), "otros", r.otros(),
                 "total", r.total(), "u", SesionActual.usuarioId(), "ahora", ahora));
-        db.ejecutar("UPDATE factura SET numero = :n WHERE id = :id", Db.p("n", String.format("FV-%06d", id), "id", id));
+        repositorio.actualizarFactura(Db.p("n", String.format("FV-%06d", id), "id", id));
         for (Liquidador.Linea l : r.lineas()) {
             Liquidador.Concepto c = l.concepto();
-            db.insertar("""
-                    INSERT INTO factura_linea (factura_id, servicio_id, tarifa_id, movimiento_id, concepto, cantidad,
-                           precio_unitario, subtotal, descuento, iva_porcentaje, iva, impuesto_porcentaje, otros_impuestos, total)
-                    VALUES (:f, :s, :t, :m, :concepto, :cantidad, :precio, :subtotal, :descuento, :ivap, :iva, :impp, :otros, :total)
-                    """, Db.p("f", id, "s", c.servicioId(), "t", c.tarifaId(), "m", c.movimientoId(), "concepto", c.nombre(),
+            repositorio.insertarFacturaLinea(Db.p("f", id, "s", c.servicioId(), "t", c.tarifaId(), "m", c.movimientoId(), "concepto", c.nombre(),
                     "cantidad", c.cantidad(), "precio", c.precio(), "subtotal", l.subtotal(), "descuento", l.descuento(),
                     "ivap", c.ivaPorcentaje(), "iva", l.iva(), "impp", c.impuestoPorcentaje(), "otros", l.otros(),
                     "total", l.total()));
@@ -212,14 +170,7 @@ public class FacturacionService {
         if (est != null && !Set.of("PENDIENTE_PAGO", "PAGO_PARCIAL", "PAGADA", "ANULADA").contains(est)) {
             throw new BadRequestException("Estado de factura no válido.");
         }
-        return db.lista(FACTURA + """
-                WHERE (:desde IS NULL OR f.fecha_emision >= :desde) AND (:hasta IS NULL OR f.fecha_emision < :hasta)
-                  AND (:propietario IS NULL OR f.propietario LIKE :propietario OR f.documento LIKE :propietario
-                       OR f.cliente_id = :clienteId)
-                  AND (:mascota IS NULL OR f.mascota LIKE :mascota OR f.mascota_id = :mascotaId)
-                  AND (:estado IS NULL OR f.estado = :estado)
-                ORDER BY f.fecha_emision DESC, f.id DESC LIMIT :limite OFFSET :pag
-                """, Db.p("desde", d == null ? null : d.atStartOfDay(), "hasta", h == null ? null : h.plusDays(1).atStartOfDay(),
+        return repositorio.listarFactura(Db.p("desde", d == null ? null : d.atStartOfDay(), "hasta", h == null ? null : h.plusDays(1).atStartOfDay(),
                 "propietario", like(propietario), "clienteId", numero(propietario), "mascota", like(mascota),
                 "mascotaId", numero(mascota), "estado", est, "limite", TAMANO, "pag", Validar.pagina(pagina) * TAMANO));
     }
@@ -229,23 +180,12 @@ public class FacturacionService {
      * @return factura con líneas, pagos e historial.
      */
     public Map<String, Object> detalle(long id) {
-        Map<String, Object> factura = db.requerido(FACTURA + " WHERE f.id = :id", Db.p("id", id), "La factura no existe.");
+        Map<String, Object> factura = repositorio.obtenerFactura(Db.p("id", id), "La factura no existe.");
         Map<String, Object> r = new LinkedHashMap<>();
         r.put("factura", factura);
-        r.put("lineas", db.lista("""
-                SELECT id, servicio_id, movimiento_id, concepto, cantidad, precio_unitario, subtotal, descuento,
-                       iva_porcentaje, iva, impuesto_porcentaje, otros_impuestos, total
-                FROM factura_linea WHERE factura_id = :f ORDER BY id
-                """, Db.p("f", id)));
-        r.put("pagos", db.lista("""
-                SELECT p.id, p.fecha, p.importe, p.metodo, p.referencia, u.username AS responsable, p.estado
-                FROM pago p JOIN usuario u ON u.id = p.usuario_id WHERE p.factura_id = :f ORDER BY p.fecha, p.id
-                """, Db.p("f", id)));
-        r.put("historial", db.lista("""
-                SELECT h.id, h.estado_anterior AS anterior, h.estado_nuevo AS nuevo, h.fecha, h.motivo, u.username AS responsable
-                FROM factura_estado_historial h JOIN usuario u ON u.id = h.usuario_id
-                WHERE h.factura_id = :f ORDER BY h.fecha, h.id
-                """, Db.p("f", id)));
+        r.put("lineas", repositorio.listarFacturaLinea(Db.p("f", id)));
+        r.put("pagos", repositorio.listarPago(Db.p("f", id)));
+        r.put("historial", repositorio.listarFacturaEstadoHistorial(Db.p("f", id)));
         return r;
     }
 
@@ -263,9 +203,8 @@ public class FacturacionService {
         if (rq == null || rq.clave() == null || rq.clave().isBlank() || rq.clave().length() > 64) {
             throw new BadRequestException("La solicitud de pago no tiene una clave válida.");
         }
-        Map<String, Object> f = db.requerido("SELECT * FROM factura WHERE id = :id FOR UPDATE", Db.p("id", id),
-                "La factura no existe.");
-        Map<String, Object> repetido = db.uno("SELECT factura_id FROM pago WHERE clave = :c", Db.p("c", rq.clave()));
+        Map<String, Object> f = repositorio.obtenerFacturaEnPagar(Db.p("id", id), "La factura no existe.");
+        Map<String, Object> repetido = repositorio.buscarPago(Db.p("c", rq.clave()));
         if (repetido != null) {
             if (Validar.largo(repetido, "factura_id") != id) {
                 throw new ConflictException("La clave del pago ya fue usada en otra factura.");
@@ -297,14 +236,11 @@ public class FacturacionService {
         if (!"EFECTIVO".equals(metodo) && referencia == null) {
             throw new BadRequestException("La referencia es obligatoria para pagos con " + metodo.toLowerCase() + ".");
         }
-        db.insertar("""
-                INSERT INTO pago (factura_id, clave, fecha, importe, metodo, referencia, usuario_id, estado)
-                VALUES (:f, :c, :ahora, :i, :m, :r, :u, 'REGISTRADO')
-                """, Db.p("f", id, "c", rq.clave(), "ahora", Tiempo.ahora(), "i", importe, "m", metodo, "r", referencia,
+        repositorio.insertarPago(Db.p("f", id, "c", rq.clave(), "ahora", Tiempo.ahora(), "i", importe, "m", metodo, "r", referencia,
                 "u", SesionActual.usuarioId()));
         BigDecimal pagado = Validar.decimal(f, "pagado").add(importe);
         String nuevo = pagado.compareTo(Validar.decimal(f, "total")) >= 0 ? "PAGADA" : "PAGO_PARCIAL";
-        db.ejecutar("UPDATE factura SET pagado = :p, estado = :e WHERE id = :id", Db.p("p", pagado, "e", nuevo, "id", id));
+        repositorio.actualizarFacturaEnPagar(Db.p("p", pagado, "e", nuevo, "id", id));
         if (!nuevo.equals(estado)) {
             historial(id, estado, nuevo, "Pago de " + importe.toPlainString() + " (" + metodo + ")");
         }
@@ -325,13 +261,12 @@ public class FacturacionService {
             throw new ForbiddenException("Tu perfil no tiene permiso para anular facturas.");
         }
         String motivo = Validar.texto(motivoRq, "motivo de anulación", 255);
-        Map<String, Object> f = db.requerido("SELECT estado FROM factura WHERE id = :id FOR UPDATE", Db.p("id", id),
-                "La factura no existe.");
+        Map<String, Object> f = repositorio.obtenerFacturaEnAnular(Db.p("id", id), "La factura no existe.");
         String estado = Validar.cadena(f, "estado");
         if ("ANULADA".equals(estado)) {
             throw new ConflictException("La factura ya está anulada.");
         }
-        db.ejecutar("UPDATE factura SET estado = 'ANULADA' WHERE id = :id", Db.p("id", id));
+        repositorio.actualizarFacturaEnAnular(Db.p("id", id));
         historial(id, estado, "ANULADA", motivo);
         auditoria.registrar("FACTURA_ANULADA", "factura", id, "Factura " + id + " anulada. Motivo: " + motivoRq);
         return detalle(id);
@@ -390,27 +325,12 @@ public class FacturacionService {
     /** Servicios de la atención y medicamentos dispensados (no revertidos ni facturados en otra factura vigente). */
     List<Liquidador.Concepto> conceptos(long atencionId) {
         List<Liquidador.Concepto> conceptos = new ArrayList<>();
-        for (Map<String, Object> s : db.lista("""
-                SELECT s.servicio_id, s.tarifa_id, sc.nombre, s.cantidad, s.valor_unitario, s.iva_porcentaje, s.impuesto_porcentaje
-                FROM atencion_servicio s JOIN servicio_clinico sc ON sc.id = s.servicio_id
-                WHERE s.atencion_id = :a ORDER BY s.id
-                """, Db.p("a", atencionId))) {
+        for (Map<String, Object> s : repositorio.listarAtencionServicio(Db.p("a", atencionId))) {
             conceptos.add(new Liquidador.Concepto(Validar.largo(s, "servicio_id"), Validar.largo(s, "tarifa_id"), null,
                     Validar.cadena(s, "nombre"), Validar.numero(s, "cantidad"), Validar.decimal(s, "valor_unitario"),
                     Validar.decimal(s, "iva_porcentaje"), Validar.decimal(s, "impuesto_porcentaje")));
         }
-        for (Map<String, Object> m : db.lista("""
-                SELECT dd.movimiento_id, md.nombre, l.numero, dd.cantidad, md.precio_venta, md.iva_porcentaje
-                FROM despacho_detalle dd
-                JOIN despacho d ON d.id = dd.despacho_id
-                JOIN formula_clinica f ON f.id = d.formula_id
-                JOIN medicamento md ON md.id = dd.medicamento_id
-                JOIN medicamento_lote l ON l.id = dd.lote_id
-                WHERE f.atencion_id = :a AND dd.movimiento_reversion_id IS NULL
-                  AND NOT EXISTS (SELECT 1 FROM factura_linea fl JOIN factura x ON x.id = fl.factura_id
-                                  WHERE fl.movimiento_id = dd.movimiento_id AND x.estado <> 'ANULADA')
-                ORDER BY dd.id
-                """, Db.p("a", atencionId))) {
+        for (Map<String, Object> m : repositorio.listarDespachoDetalle(Db.p("a", atencionId))) {
             conceptos.add(new Liquidador.Concepto(null, null, Validar.largo(m, "movimiento_id"),
                     m.get("nombre") + " (lote " + m.get("numero") + ")", Validar.numero(m, "cantidad"),
                     Validar.decimal(m, "precio_venta"), Validar.decimal(m, "iva_porcentaje"), BigDecimal.ZERO));
@@ -486,10 +406,7 @@ public class FacturacionService {
      * @return número de fórmulas sin despachar.
      */
     long formulasSinDespachar(long atencionId) {
-        return db.contar("""
-                SELECT COUNT(*) FROM formula_clinica WHERE atencion_id = :a AND estado = 'CONFIRMADA'
-                  AND estado_despacho IN ('PENDIENTE_DESPACHO', 'EN_PREPARACION')
-                """, Db.p("a", atencionId));
+        return repositorio.contarFormulaClinica(Db.p("a", atencionId));
     }
 
     /**
@@ -497,7 +414,7 @@ public class FacturacionService {
      * @return atención finalizada a facturar.
      */
     private Map<String, Object> origen(long atencionId) {
-        Map<String, Object> o = db.requerido(ORIGEN + " WHERE a.id = :id", Db.p("id", atencionId), "La atención no existe.");
+        Map<String, Object> o = repositorio.obtenerFormulaClinica(Db.p("id", atencionId), "La atención no existe.");
         if (o.get("finalizada") == null) {
             throw new ConflictException("Solo se facturan atenciones finalizadas.");
         }
@@ -536,10 +453,7 @@ public class FacturacionService {
      * @param motivo motivo.
      */
     private void historial(long factura, String anterior, String nuevo, String motivo) {
-        db.insertar("""
-                INSERT INTO factura_estado_historial (factura_id, estado_anterior, estado_nuevo, fecha, motivo, usuario_id)
-                VALUES (:f, :a, :n, :ahora, :m, :u)
-                """, Db.p("f", factura, "a", anterior, "n", nuevo, "ahora", Tiempo.ahora(), "m", motivo,
+        repositorio.insertarFacturaEstadoHistorial(Db.p("f", factura, "a", anterior, "n", nuevo, "ahora", Tiempo.ahora(), "m", motivo,
                 "u", SesionActual.usuarioId()));
     }
 
