@@ -138,7 +138,8 @@ public class AtencionService {
         Map<String, Object> cita = bloquearCita(citaId);
         verificarMedico(cita);
         String estado = Validar.cadena(cita, "estado");
-        if (!Set.of("pendiente", "confirmada", "atendida").contains(estado)) {
+        // Se atienden las citas reservadas (pendiente, programada o confirmada) y se puede reabrir una atendida.
+        if (!Set.of("pendiente", "programada", "confirmada", "atendida").contains(estado)) {
             throw new ConflictException("No se puede atender una cita " + estado + ".");
         }
         LocalDateTime inicio = (LocalDateTime) cita.get("fecha_hora");

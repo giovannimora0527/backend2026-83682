@@ -46,7 +46,7 @@ public class ReportesService {
     /** Reportes de inventario. */
     private static final Set<String> INVENTARIO = Set.of("EXISTENCIAS", "LOTES", "MOVIMIENTOS", "DISPENSACIONES");
     /** Estados de cita para filtrar. */
-    private static final Set<String> ESTADOS_CITA = Set.of("pendiente", "confirmada", "cancelada", "atendida", "finalizada");
+    private static final Set<String> ESTADOS_CITA = Set.of("pendiente", "programada", "confirmada", "cancelada", "atendida", "finalizada");
     /** Formato de moneda colombiana. */
     private static final NumberFormat COP = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("es-CO"));
 
@@ -529,7 +529,7 @@ public class ReportesService {
                 col("motivo", "Motivo", Formato.TEXTO));
         Map<String, Object> t = new LinkedHashMap<>();
         t.put("citas", filas.size());
-        for (String e : List.of("pendiente", "confirmada", "cancelada", "atendida", "finalizada")) {
+        for (String e : List.of("pendiente", "programada", "confirmada", "cancelada", "atendida", "finalizada")) {
             t.put("citas_" + e, filas.stream().filter(x -> e.equals(x.get("estado"))).count());
         }
         return new Reporte("Gestión médica de citas", c, filas, t, f.descripcion);
@@ -544,7 +544,7 @@ public class ReportesService {
         List<Map<String, Object>> filas = repositorio.listarCitaEnConsultas(f.params());
         List<Columna> c = List.of(col("veterinario", "Veterinario", Formato.TEXTO), col("especialidad", "Especialidad", Formato.TEXTO),
                 col("citas", "Citas", Formato.ENTERO), col("pendientes", "Pendientes", Formato.ENTERO),
-                col("confirmadas", "Confirmadas", Formato.ENTERO), col("canceladas", "Canceladas", Formato.ENTERO),
+                col("programadas", "Programadas", Formato.ENTERO), col("confirmadas", "Confirmadas", Formato.ENTERO), col("canceladas", "Canceladas", Formato.ENTERO),
                 col("atendidas", "Atendidas", Formato.ENTERO), col("consultas_realizadas", "Consultas realizadas", Formato.ENTERO),
                 col("mascotas_atendidas", "Mascotas atendidas", Formato.ENTERO));
         Map<String, Object> t = totales(filas, c, null);
@@ -584,7 +584,7 @@ public class ReportesService {
         f.estadoEn(ESTADOS_CITA);
         List<Map<String, Object>> filas = repositorio.listarCitaEnOperativas(f.params());
         List<Columna> c = List.of(col("fecha", "Fecha", Formato.FECHA), col("citas", "Citas", Formato.ENTERO),
-                col("pendientes", "Pendientes", Formato.ENTERO), col("confirmadas", "Confirmadas", Formato.ENTERO),
+                col("pendientes", "Pendientes", Formato.ENTERO), col("programadas", "Programadas", Formato.ENTERO), col("confirmadas", "Confirmadas", Formato.ENTERO),
                 col("canceladas", "Canceladas", Formato.ENTERO), col("atendidas", "Atendidas", Formato.ENTERO),
                 col("finalizadas", "Finalizadas", Formato.ENTERO), col("mascotas", "Mascotas", Formato.ENTERO),
                 col("veterinarios", "Veterinarios", Formato.ENTERO));

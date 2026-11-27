@@ -290,7 +290,8 @@ public class ReportesRepository {
     public List<Map<String, Object>> listarCitaEnConsultas(Map<String, ?> p) {
         return db.lista("""
                 SELECT CONCAT(md.nombres, ' ', md.apellidos) AS veterinario, e.nombre AS especialidad,
-                       COUNT(*) AS citas, SUM(c.estado = 'pendiente') AS pendientes, SUM(c.estado = 'confirmada') AS confirmadas,
+                       COUNT(*) AS citas, SUM(c.estado = 'pendiente') AS pendientes, SUM(c.estado = 'programada') AS programadas,
+                       SUM(c.estado = 'confirmada') AS confirmadas,
                        SUM(c.estado = 'cancelada') AS canceladas, SUM(c.estado IN ('atendida', 'finalizada')) AS atendidas,
                        COUNT(a.fecha_finalizacion) AS consultas_realizadas,
                        COUNT(DISTINCT IF(c.estado IN ('atendida', 'finalizada'), c.mascota_id, NULL)) AS mascotas_atendidas
@@ -348,7 +349,7 @@ public class ReportesRepository {
     public List<Map<String, Object>> listarCitaEnOperativas(Map<String, ?> p) {
         return db.lista("""
                 SELECT DATE(c.fecha_hora) AS fecha, COUNT(*) AS citas, SUM(c.estado = 'pendiente') AS pendientes,
-                       SUM(c.estado = 'confirmada') AS confirmadas, SUM(c.estado = 'cancelada') AS canceladas,
+                       SUM(c.estado = 'programada') AS programadas, SUM(c.estado = 'confirmada') AS confirmadas, SUM(c.estado = 'cancelada') AS canceladas,
                        SUM(c.estado = 'atendida') AS atendidas, SUM(c.estado = 'finalizada') AS finalizadas,
                        COUNT(DISTINCT c.mascota_id) AS mascotas, COUNT(DISTINCT c.medico_id) AS veterinarios
                 FROM cita c JOIN medico md ON md.id = c.medico_id
