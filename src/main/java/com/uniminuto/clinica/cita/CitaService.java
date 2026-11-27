@@ -294,18 +294,30 @@ public class CitaService {
             for (Map<String, Object> o : repositorio.listarCitaEnDisponibilidad(Db.p("m", medico, "d", fecha.atStartOfDay(), "h", fecha.plusDays(1).atStartOfDay()))) {
                 ocupados.add(new LocalDateTime[]{(LocalDateTime) o.get("i"), (LocalDateTime) o.get("f")});
             }
-            LocalDateTime ahora = Tiempo.ahora();
+            LocalDateTime ahora = proximoInicio(Tiempo.ahora());
             for (Map<String, Object> franja : franjas(medico, fecha)) {
                 LocalDateTime inicio = fecha.atTime(LocalTime.parse(Validar.cadena(franja, "inicio")));
                 LocalDateTime fin = fecha.atTime(LocalTime.parse(Validar.cadena(franja, "fin")));
                 if (inicio.isBefore(ahora)) {
-                    inicio = ahora.withSecond(0);
+                    inicio = ahora;
                 }
                 libres.addAll(restar(inicio, fin, ocupados));
             }
         }
         r.put("libres", libres.stream().map(i -> Map.of("inicio", i[0], "fin", i[1])).toList());
         return r;
+    }
+
+    /**
+     * Primer inicio que se puede ofrecer hoy: al menos 5 minutos después de ahora, redondeado al siguiente
+     * cuarto de hora (20:28 → 20:45). Así la hora sugerida sigue siendo futura cuando el usuario guarda la cita.
+     *
+     * @param ahora fecha y hora actual de Bogotá.
+     * @return inicio redondeado.
+     */
+    static LocalDateTime proximoInicio(LocalDateTime ahora) {
+        LocalDateTime base = ahora.plusMinutes(5).withSecond(0).withNano(0);
+        return base.plusMinutes((15 - base.getMinute() % 15) % 15);
     }
 
     /** Resta intervalos ocupados de un intervalo libre (algoritmo de barrido). */
