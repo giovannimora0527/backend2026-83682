@@ -1,5 +1,6 @@
 package com.uniminuto.clinica.clinica;
 
+import com.uniminuto.clinica.historia.FormulaIntegracionService;
 import com.uniminuto.clinica.comun.Db;
 import com.uniminuto.clinica.comun.PdfDocumento;
 import com.uniminuto.clinica.comun.Tiempo;
@@ -435,12 +436,16 @@ public class AtencionService {
             if (!"MEDICAMENTO".equals(m.get("tipo")) || !Validar.bool(m, "activo")) {
                 throw new BadRequestException(m.get("nombre") + " no es un medicamento activo formulable.");
             }
-            int cantidad = Validar.entero(l.cantidad(), "cantidad prescrita", 1);
+            String dosis = Validar.texto(l.dosis(), "dosis", 255);
+            String frecuencia = Validar.texto(l.frecuencia(), "frecuencia", 255);
+            String duracion = Validar.texto(l.duracion(), "duración", 255);
+            // Misma regla que Gestión de Fórmulas: dosis × tomas por día × días de tratamiento (lo enviado se ignora).
+            int cantidad = FormulaIntegracionService.calcularCantidad(dosis, frecuencia, duracion);
             if (cantidad > 1000) {
-                throw new BadRequestException("La cantidad prescrita no puede superar 1000 unidades.");
+                throw new BadRequestException("La cantidad calculada (" + cantidad + " unidades) supera el máximo de 1000. "
+                        + "Revisa la dosis, la frecuencia o la duración.");
             }
-            lineas.add(new Linea(l.medicamentoId(), Validar.texto(l.dosis(), "dosis", 255),
-                    Validar.texto(l.frecuencia(), "frecuencia", 255), Validar.texto(l.duracion(), "duración", 255),
+            lineas.add(new Linea(l.medicamentoId(), dosis, frecuencia, duracion,
                     cantidad, Validar.texto(l.via(), "vía de administración", 100),
                     Validar.opcional(l.indicaciones(), "indicaciones", 2000)));
         }
