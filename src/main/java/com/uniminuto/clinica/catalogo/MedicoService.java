@@ -81,7 +81,11 @@ public class MedicoService {
      */
     @Transactional
     public MedicoDto crear(MedicoApi.MedicoRq d) {
-        return consultar(repositorio.insertar(validar(d, null)));
+        long id = repositorio.insertar(validar(d, null));
+        // Todo médico nuevo queda agendable: horario base de 16 horas diarias (06:00-22:00, lunes a domingo),
+        // que luego se ajusta en Gestión de Citas → Agenda del médico.
+        repositorio.insertarHorarioBase(id);
+        return consultar(id);
     }
 
     /**

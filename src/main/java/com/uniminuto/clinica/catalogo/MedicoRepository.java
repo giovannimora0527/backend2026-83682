@@ -127,6 +127,26 @@ public class MedicoRepository {
                 """, Db.p("id", id, "ahora", ahora));
     }
 
+    /** Inicio del horario base de atención (16 horas diarias). */
+    static final String HORARIO_BASE_INICIO = "06:00:00";
+    /** Fin del horario base de atención. */
+    static final String HORARIO_BASE_FIN = "22:00:00";
+
+    /**
+     * Registra el horario base del médico: 06:00-22:00 de lunes (1) a domingo (7).
+     * Usada por {@link MedicoService} (crear).
+     *
+     * @param medico identificador del médico.
+     */
+    public void insertarHorarioBase(long medico) {
+        db.ejecutar("""
+                INSERT INTO medico_horario (medico_id, dia_semana, hora_inicio, hora_fin)
+                SELECT :m, d.dia, :inicio, :fin
+                FROM (SELECT 1 AS dia UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+                      UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7) d
+                """, Db.p("m", medico, "inicio", HORARIO_BASE_INICIO, "fin", HORARIO_BASE_FIN));
+    }
+
     /**
      * @param d datos validados.
      * @return id generado.
